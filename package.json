@@ -1,0 +1,29 @@
+{
+  "name": "nimiq-app-shell",
+  "version": "0.1.0",
+  "type": "module",
+  "description": "Framework-agnostic vanilla-TS shell for the Nimiq app fleet: dual-mode wallet (Nimiq Pay mini-app SDK or Hub), a profile widget (address + label + identicon + balance), and a zero-dependency i18n engine + flag-hex language switcher.",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "check": "bun tsc --noEmit",
+    "test": "bun test"
+  },
+  "dependencies": {
+    "@nimiq/hub-api": "^1.14.0",
+    "@nimiq/mini-app-sdk": "^0.1.0"
+  },
+  "peerDependencies": {
+    "@nimiq/iqons": "^1.6.0"
+  },
+  "peerDependenciesMeta": {
+    "@nimiq/iqons": {
+      "optional": true
+    }
+  },
+  "devDependencies": {
+    "@types/bun": "^1.2.0",
+    "typescript": "^5.7.0"
+  }
+}
