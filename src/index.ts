@@ -63,3 +63,8 @@ export {
   type LanguageSwitcherOptions,
   type LanguageSwitcherHandle,
 } from './ui/language-switcher';
+export {
+  mountBugReporter,
+  type BugReporterOptions,
+  type BugReporterHandle,
+} from './ui/bug-reporter';
