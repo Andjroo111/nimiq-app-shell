@@ -145,24 +145,56 @@ profile widget and switcher render in the active language.
 ## Vanilla UI
 
 ```ts
-import { mountProfileWidget, mountLanguageSwitcher } from 'nimiq-app-shell';
+import { mountLanguagePill, mountWalletPill } from 'nimiq-app-shell';
 
-mountLanguageSwitcher(document.querySelector('#lang')!, { i18n });
-
-mountProfileWidget(document.querySelector('#profile')!, {
-  wallet,
-  i18n,
-  getBalance: async (addr) => `${await myBalanceLookup(addr)} NIM`, // optional; shell does no chain reads
-});
+// The fleet-standard topbar chrome: a compact language pill + a wallet connect.
+mountLanguagePill(document.querySelector('#lang')!, { i18n });        // 11 featured langs
+mountWalletPill(document.querySelector('#wallet')!, { wallet, i18n }); // connect ↔ profile
 ```
 
-- **Profile widget** — identicon (via `@nimiq/iqons` if installed, else the
-  hexagon placeholder) + label + address + optional injected balance + copy /
-  disconnect buttons. Re-renders on account change and language change.
-- **Language switcher** — a row of flag-hexagon buttons, one per language, with the
-  Nimiq tooltip styling. Clicking one calls `i18n.setLanguage(id)`.
+- **`mountLanguagePill`** — the compact control: current flag + caret → a
+  scrollable white dropdown of the 11 `FEATURED_LANGUAGES`. **Theme-adaptive**
+  (`currentColor`), so it reads on a navy header or a light one.
+- **`mountWalletPill`** — hashmark-style **Connect wallet** pill that becomes a
+  compact identicon pill + profile dropdown (address / copy / disconnect) once
+  connected. Theme-adaptive.
+- **`mountLanguageSwitcher`** — the flag-hex **row** (one button per language), for
+  headers that prefer a row over the pill.
+- **`mountProfileWidget`** — identicon + label + address + optional balance + copy /
+  disconnect, for embedding a full profile.
+- **`buildFlagHex(code)`** — the underlying renderer: a flag clipped into the Nimiq
+  hexagon with a faint grey **flags-on-white** edge and per-flag fits (`FLAG_FIT`).
+  Flag artwork is **inlined** (data URIs) — no CDN, no asset files to vendor.
 
-Both inject their own `<style>` once and return a handle with `destroy()`.
+All inject their own `<style>` once and return a handle with `destroy()`.
+
+---
+
+## Use without a bundler (prebuilt ESM)
+
+Apps with **no build step** (raw `<script type="module">`, no bundler) can't
+import the TS source. For them the shell ships a **prebuilt, self-contained browser
+ESM** (`dist/app-shell.js`, all deps inlined) that jsDelivr serves straight from a
+git tag — no install, no bundler, no vendored assets:
+
+```html
+<div id="lang"></div>
+<div id="wallet"></div>
+<script type="module">
+  import {
+    createI18n, createWallet, mergeLocales, shellLocales,
+    mountLanguagePill, mountWalletPill,
+  } from 'https://cdn.jsdelivr.net/gh/Andjroo111/nimiq-app-shell@v0.2.1/dist/app-shell.js';
+
+  const i18n = createI18n({ locales: mergeLocales(shellLocales), fallback: 'en' });
+  const wallet = createWallet({ appName: 'My App' });
+  mountLanguagePill(document.getElementById('lang'), { i18n });
+  mountWalletPill(document.getElementById('wallet'), { wallet, i18n });
+</script>
+```
+
+Rebuild the bundle with `bun run build:dist` (it's committed so the CDN can serve
+it at the tagged ref). Bundled apps should keep importing the TS source instead.
 
 ---
 
