@@ -49,8 +49,14 @@ export {
   shellLocales,
   mergeLocales,
   SHELL_LANGUAGES,
+  FEATURED_LANGUAGES,
   type ShellLanguage,
 } from './locales';
+
+// ---- flags (the fleet-standard flag-hex: inlined artwork + per-flag fit) ----
+export { FLAG_SVG, flagDataUrl } from './flags/data';
+export { FLAG_FIT, type FlagFit } from './flags/fit';
+export { buildFlagHex, type FlagHexOptions } from './ui/flag-hex';
 
 // ---- vanilla UI ----
 export {
@@ -63,3 +69,13 @@ export {
   type LanguageSwitcherOptions,
   type LanguageSwitcherHandle,
 } from './ui/language-switcher';
+export {
+  mountLanguagePill,
+  type LanguagePillOptions,
+  type LanguagePillHandle,
+} from './ui/language-pill';
+export {
+  mountWalletPill,
+  type WalletPillOptions,
+  type WalletPillHandle,
+} from './ui/wallet-pill';
