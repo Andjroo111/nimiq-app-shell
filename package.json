@@ -8,7 +8,9 @@
   },
   "scripts": {
     "check": "bun tsc --noEmit",
-    "test": "bun test"
+    "test": "bun test",
+    "build:dist": "bun build src/index.ts --target browser --format esm --minify --outfile dist/app-shell.js",
+    "gen:flags": "node scripts/gen-flags.mjs"
   },
   "dependencies": {
     "@nimiq/hub-api": "^1.14.0",
