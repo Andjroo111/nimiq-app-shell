@@ -1,5 +1,8 @@
 # nimiq-app-shell
 
+<!-- nimiq-north-star -->
+> 🧭 **North Star** · Every Nimiq project aligns to one shared set of values and a single mission. See the canonical [Nimiq Values & North Star](https://github.com/Andjroo111/nimiq.life/blob/main/NORTH-STAR.md).
+
 Framework-agnostic vanilla-TS **shell** for the Nimiq app fleet. One small
 package that gives every chain app the same three things, with no framework
 lock-in (the chain apps are vanilla, not Vue):
