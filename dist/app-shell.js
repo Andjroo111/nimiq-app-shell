@@ -521,16 +521,16 @@ clique em qualquer lado para o trazer para a frente.`},n1={"popup-overlay":`От
   </g>
 </svg>`};function Y1(Q){let Z=k1[Q.toLowerCase()];return Z?"data:image/svg+xml,"+encodeURIComponent(Z):""}var V1={us:{aspect:1.3333333333333333},cn:{scale:1.2,dx:2.2,dy:2.8},kr:{scale:0.72}};var f1="M19.964 8.156 15.758.844A1.69 1.69 0 0014.299 0H5.887c-.6 0-1.156.32-1.456.844L.225 8.156c-.3.523-.3 1.165 0 1.688l4.206 7.312c.3.523.856.844 1.456.844h8.412c.6 0 1.156-.32 1.456-.844l4.206-7.312a1.69 1.69 0 00.003-1.688",_6=0;function F6(Q){let Z=Q?.aspect??1,X=Q?.scale??1,W=Q?.dx??0,K=Q?.dy??0,Y=1.08,G=Math.max(20,18*Z)*1.08*X,V=G/Z;return{x:10+W-G/2,y:9+K-V/2,w:G,h:V}}function h(Q,Z={}){let X=Z.size??24,W=Z.fit??V1[Q.toLowerCase()],{x:K,y:Y,w:G,h:V}=F6(W),F=Math.max(0.4,22/X),_=`nq-flag-${_6+=1}`,x=document.createElement("div");return x.innerHTML=`<svg class="nq-flag-hex" viewBox="0 0 20 18" width="${X}" height="${(X*0.9).toFixed(2)}" aria-hidden="true" style="display:block;overflow:visible"><defs><clipPath id="${_}"><path d="${f1}"/></clipPath></defs><image href="${Y1(Q)}" x="${K}" y="${Y}" width="${G}" height="${V}" preserveAspectRatio="xMidYMid slice" clip-path="url(#${_})"/><path d="${f1}" fill="none" stroke="rgba(31,35,72,0.4)" stroke-width="${F.toFixed(2)}" stroke-linejoin="round"/></svg>`,x.firstElementChild}var G1="data:image/svg+xml,"+encodeURIComponent('<svg width="64" height="64" viewBox="0 -4 64 64" xmlns="http://www.w3.org/2000/svg"><path opacity=".1" d="M62.3 25.4L49.2 2.6A5.3 5.3 0 0 0 44.6 0H18.4c-1.9 0-3.6 1-4.6 2.6L.7 25.4c-1 1.6-1 3.6 0 5.2l13.1 22.8c1 1.6 2.7 2.6 4.6 2.6h26.2c1.9 0 3.6-1 4.6-2.6l13-22.8c1-1.6 1-3.6.1-5.2z" fill="#1F2348"/></svg>');function $6(){if(typeof document>"u")return;if(document.getElementById("nimiq-shell-profile-style"))return;let Q=document.createElement("style");Q.id="nimiq-shell-profile-style",Q.textContent=`
 .nq-profile { display:flex; align-items:center; gap:12px; font-family:'Mulish',system-ui,sans-serif; }
-.nq-profile__icon { flex-shrink:0; border-radius:50%; overflow:hidden; background:#fff; }
+.nq-profile__icon { flex-shrink:0; border-radius:50%; overflow:hidden; background:var(--nq-profile-icon-bg, #fff); }
 .nq-profile__icon img { display:block; width:100%; height:100%; }
 .nq-profile__body { min-width:0; display:flex; flex-direction:column; gap:2px; }
-.nq-profile__label { font-weight:700; font-size:15px; color:#1f2348; line-height:1.2; }
-.nq-profile__addr { font-size:12px; color:#5f6370; font-family:ui-monospace,monospace; word-break:break-all; }
-.nq-profile__bal { font-size:13px; color:#1f2348; font-weight:600; }
+.nq-profile__label { font-weight:700; font-size:15px; color:var(--nq-profile-fg, #1f2348); line-height:1.2; }
+.nq-profile__addr { font-size:12px; color:var(--nq-profile-muted, #5f6370); font-family:ui-monospace,monospace; word-break:break-all; }
+.nq-profile__bal { font-size:13px; color:var(--nq-profile-fg, #1f2348); font-weight:600; }
 .nq-profile__actions { display:flex; gap:8px; margin-left:auto; flex-shrink:0; }
 .nq-profile__btn { font:inherit; font-size:13px; font-weight:600; padding:6px 12px; border-radius:500px;
-  border:1px solid #e5e7ef; background:#fff; color:#1f2348; cursor:pointer; }
-.nq-profile__btn:hover { background:#f4f5f9; }
+  border:1px solid var(--nq-profile-btn-border, #e5e7ef); background:var(--nq-profile-btn-bg, #fff); color:var(--nq-profile-fg, #1f2348); cursor:pointer; }
+.nq-profile__btn:hover { background:var(--nq-profile-btn-hover, #f4f5f9); }
 `,document.head.appendChild(Q)}async function j6(Q){if(!Q)return G1;try{let X=await import("@nimiq/iqons"),W=X.default??X;if(W&&typeof W.toDataUrl==="function")return await W.toDataUrl(Q)}catch{}return G1}function z1(Q,Z){let{wallet:X,i18n:W}=Z,K=Z.identiconSize??48,Y=Z.showDisconnect!==!1,G=Z.showCopy!==!1;if(Z.injectStyles!==!1)$6();let V=document.createElement("div");V.className="nq-profile",Q.appendChild(V);let F=0;async function _(){let $=++F,I=X.account;V.textContent="";let O=document.createElement("span");O.className="nq-profile__icon",O.style.width=`${K}px`,O.style.height=`${K}px`;let U=document.createElement("img");U.src=G1,U.alt="identicon",O.appendChild(U),V.appendChild(O);let P=document.createElement("div");P.className="nq-profile__body";let N=document.createElement("span");if(N.className="nq-profile__label",N.textContent=I?I.label||W.t("shell.account"):W.t("shell.notConnected"),P.appendChild(N),I){let C=document.createElement("span");if(C.className="nq-profile__addr",C.textContent=I.address,P.appendChild(C),Z.getBalance){let A=document.createElement("span");A.className="nq-profile__bal",A.textContent="…",P.appendChild(A),Promise.resolve(Z.getBalance(I.address)).then((l)=>{if($===F)A.textContent=l}).catch(()=>{if($===F)A.textContent=""})}}if(V.appendChild(P),I&&(G||Y)){let C=document.createElement("div");if(C.className="nq-profile__actions",G){let A=document.createElement("button");A.type="button",A.className="nq-profile__btn",A.textContent=W.t("shell.copyAddress"),A.addEventListener("click",async()=>{try{await navigator.clipboard?.writeText(I.address);let l=A.textContent;A.textContent=W.t("shell.copied"),setTimeout(()=>{A.textContent=l},1200)}catch{}}),C.appendChild(A)}if(Y){let A=document.createElement("button");A.type="button",A.className="nq-profile__btn",A.textContent=W.t("shell.disconnect"),A.addEventListener("click",()=>X.disconnect()),C.appendChild(A)}V.appendChild(C)}let E=await j6(I?.address??null);if($===F)U.src=E}_();let x=X.onAccountChange(()=>void _()),M=W.onChange(()=>void _());return{el:V,refresh(){_()},destroy(){x(),M(),V.remove()}}}var D1="nimiq-shell-lang-switcher-style";function P6(){if(typeof document>"u")return;if(document.getElementById(D1))return;let Q=document.createElement("style");Q.id=D1,Q.textContent=`
 .nq-langsw { list-style:none; margin:0; padding:0; display:flex; flex-wrap:wrap; justify-content:center; gap:calc(var(--nq-flag-w,40px)*0.3); }
 .nq-langsw li { display:block; }
@@ -582,19 +582,20 @@ clique em qualquer lado para o trazer para a frente.`},n1={"popup-overlay":`От
 .nq-connect:hover { border-color: color-mix(in srgb, currentColor 45%, transparent); background: color-mix(in srgb, currentColor 6%, transparent); transform:translateY(-1px); }
 .nq-connect:active { transform:translateY(0); }
 .nq-connect:disabled { opacity:.7; cursor:default; transform:none; }
-.nq-connect:focus-visible { outline:2px solid #0582ca; outline-offset:3px; }
+.nq-connect:focus-visible { outline:2px solid var(--nq-walletpill-accent, #0582ca); outline-offset:3px; }
 .nq-connect__icon { width:18px; height:18px; flex-shrink:0; opacity:.85; }
 .nq-wallet__btn { display:inline-flex; align-items:center; gap:8px; height:40px; padding:4px 12px 4px 5px;
   border:1px solid color-mix(in srgb, currentColor 22%, transparent); border-radius:999px;
   background:transparent; color:inherit; font:inherit; font-size:13px; font-weight:700; cursor:pointer;
   transition:border-color .15s var(--nimiq-ease, cubic-bezier(.25,0,0,1)), background-color .15s var(--nimiq-ease, cubic-bezier(.25,0,0,1)); }
 .nq-wallet__btn:hover { border-color: color-mix(in srgb, currentColor 40%, transparent); background: color-mix(in srgb, currentColor 6%, transparent); }
-.nq-wallet__btn:focus-visible { outline:2px solid #0582ca; outline-offset:3px; }
+.nq-wallet__btn:focus-visible { outline:2px solid var(--nq-walletpill-accent, #0582ca); outline-offset:3px; }
 .nq-wallet__icon { width:28px; height:28px; flex-shrink:0; border-radius:50%; background: color-mix(in srgb, currentColor 12%, transparent); }
 .nq-wallet__label { white-space:nowrap; font-family:ui-monospace,'Fira Mono',monospace; letter-spacing:.02em; }
 .nq-wallet__caret { width:10px; height:6px; flex-shrink:0; color:currentColor; opacity:.6; }
 .nq-wallet__menu { position:absolute; top:calc(100% + 10px); right:0; z-index:40; min-width:280px; max-width:92vw;
-  padding:16px; background:#fff; border-radius:12px; box-shadow:0 12px 36px rgba(13,11,36,.28); }
+  padding:16px; background:var(--nq-walletpill-menu-bg, #fff); border:var(--nq-walletpill-menu-border, none);
+  border-radius:12px; box-shadow:var(--nq-walletpill-menu-shadow, 0 12px 36px rgba(13,11,36,.28)); }
 @media (max-width:560px){
   .nq-wallet { position:static; }
   .nq-wallet__menu { left:clamp(16px,4vw,28px); right:clamp(16px,4vw,28px); min-width:0; max-width:none; }
