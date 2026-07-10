@@ -7,8 +7,11 @@
 //     copy + disconnect).
 //
 // Theme-adaptive: the pill uses currentColor so it reads on a navy or a light
-// header; the dropdown is always a white card (so the profile widget's dark text
-// is correct). Self-injects its styles. Promotes nimiq.life's mountWalletPill.
+// header; the dropdown defaults to a white card but every surface color is a CSS
+// var (--nq-walletpill-* here, --nq-profile-* in the hosted profile widget) with
+// the fleet-blue/white values as fallbacks, so an app can retint it to its own
+// palette (light or dark) without a fork. Self-injects its styles. Promotes
+// nimiq.life's mountWalletPill.
 
 import type { I18n } from '../i18n';
 import type { Wallet } from '../wallet';
@@ -41,19 +44,20 @@ function ensureStyles(): void {
 .nq-connect:hover { border-color: color-mix(in srgb, currentColor 45%, transparent); background: color-mix(in srgb, currentColor 6%, transparent); transform:translateY(-1px); }
 .nq-connect:active { transform:translateY(0); }
 .nq-connect:disabled { opacity:.7; cursor:default; transform:none; }
-.nq-connect:focus-visible { outline:2px solid #0582ca; outline-offset:3px; }
+.nq-connect:focus-visible { outline:2px solid var(--nq-walletpill-accent, #0582ca); outline-offset:3px; }
 .nq-connect__icon { width:18px; height:18px; flex-shrink:0; opacity:.85; }
 .nq-wallet__btn { display:inline-flex; align-items:center; gap:8px; height:40px; padding:4px 12px 4px 5px;
   border:1px solid color-mix(in srgb, currentColor 22%, transparent); border-radius:999px;
   background:transparent; color:inherit; font:inherit; font-size:13px; font-weight:700; cursor:pointer;
   transition:border-color .15s var(--nimiq-ease, cubic-bezier(.25,0,0,1)), background-color .15s var(--nimiq-ease, cubic-bezier(.25,0,0,1)); }
 .nq-wallet__btn:hover { border-color: color-mix(in srgb, currentColor 40%, transparent); background: color-mix(in srgb, currentColor 6%, transparent); }
-.nq-wallet__btn:focus-visible { outline:2px solid #0582ca; outline-offset:3px; }
+.nq-wallet__btn:focus-visible { outline:2px solid var(--nq-walletpill-accent, #0582ca); outline-offset:3px; }
 .nq-wallet__icon { width:28px; height:28px; flex-shrink:0; border-radius:50%; background: color-mix(in srgb, currentColor 12%, transparent); }
 .nq-wallet__label { white-space:nowrap; font-family:ui-monospace,'Fira Mono',monospace; letter-spacing:.02em; }
 .nq-wallet__caret { width:10px; height:6px; flex-shrink:0; color:currentColor; opacity:.6; }
 .nq-wallet__menu { position:absolute; top:calc(100% + 10px); right:0; z-index:40; min-width:280px; max-width:92vw;
-  padding:16px; background:#fff; border-radius:12px; box-shadow:0 12px 36px rgba(13,11,36,.28); }
+  padding:16px; background:var(--nq-walletpill-menu-bg, #fff); border:var(--nq-walletpill-menu-border, none);
+  border-radius:12px; box-shadow:var(--nq-walletpill-menu-shadow, 0 12px 36px rgba(13,11,36,.28)); }
 @media (max-width:560px){
   .nq-wallet { position:static; }
   .nq-wallet__menu { left:clamp(16px,4vw,28px); right:clamp(16px,4vw,28px); min-width:0; max-width:none; }
