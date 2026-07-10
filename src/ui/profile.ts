@@ -33,6 +33,10 @@ export interface ProfileWidgetOptions {
   showCopy?: boolean;
   /** Identicon pixel size. Default 48. */
   identiconSize?: number;
+  /** Optional identicon renderer. When provided it is used instead of the built-in
+   *  @nimiq/iqons resolve + hexagon placeholder — so a no-bundler / CDN-loaded app
+   *  can inject its own (already vendored) identicon. Returns a self-sized element. */
+  identicon?: (address: string, sizePx: number) => HTMLElement;
   /** Inject the widget's <style> once. Default true. */
   injectStyles?: boolean;
 }
@@ -46,23 +50,36 @@ export interface ProfileWidgetHandle {
 
 const STYLE_ID = 'nimiq-shell-profile-style';
 
+/** Compact a friendly Nimiq address to a single clean line (full value stays on the
+ *  Copy button + the title attr). Groups: "NQ07 0000 68AR … 6RH9". */
+function shortenAddress(addr: string): string {
+  const a = (addr ?? '').trim();
+  const parts = a.split(/\s+/);
+  if (parts.length >= 5) return `${parts.slice(0, 3).join(' ')} … ${parts.slice(-1)}`;
+  if (a.length > 16) return `${a.slice(0, 8)}…${a.slice(-5)}`;
+  return a;
+}
+
 function ensureStyles(): void {
   if (typeof document === 'undefined') return;
   if (document.getElementById(STYLE_ID)) return;
   const style = document.createElement('style');
   style.id = STYLE_ID;
   style.textContent = `
-.nq-profile { display:flex; align-items:center; gap:12px; font-family:'Mulish',system-ui,sans-serif; }
-.nq-profile__icon { flex-shrink:0; border-radius:50%; overflow:hidden; background:#fff; }
+.nq-profile { display:flex; align-items:center; flex-wrap:wrap; gap:12px; font-family:'Mulish',system-ui,sans-serif; }
+.nq-profile__icon { flex-shrink:0; border-radius:50%; overflow:hidden; background:var(--nq-profile-icon-bg, #fff); }
 .nq-profile__icon img { display:block; width:100%; height:100%; }
-.nq-profile__body { min-width:0; display:flex; flex-direction:column; gap:2px; }
-.nq-profile__label { font-weight:700; font-size:15px; color:#1f2348; line-height:1.2; }
-.nq-profile__addr { font-size:12px; color:#5f6370; font-family:ui-monospace,monospace; word-break:break-all; }
-.nq-profile__bal { font-size:13px; color:#1f2348; font-weight:600; }
-.nq-profile__actions { display:flex; gap:8px; margin-left:auto; flex-shrink:0; }
+.nq-profile__body { flex:1 1 auto; min-width:0; display:flex; flex-direction:column; gap:2px; }
+.nq-profile__label { font-weight:700; font-size:15px; color:var(--nq-profile-fg, #1f2348); line-height:1.2; }
+.nq-profile__addr { font-size:12px; color:var(--nq-profile-muted, #5f6370); font-family:ui-monospace,monospace; overflow-wrap:anywhere; }
+.nq-profile__bal { font-size:13px; color:var(--nq-profile-fg, #1f2348); font-weight:600; }
+/* Actions drop to their own full-width row so the address keeps the identity row to
+   itself (in a ~280px dropdown, inline Copy + Disconnect otherwise crush it to a
+   one-char-per-line column). */
+.nq-profile__actions { display:flex; gap:8px; flex-basis:100%; margin-top:2px; justify-content:flex-end; }
 .nq-profile__btn { font:inherit; font-size:13px; font-weight:600; padding:6px 12px; border-radius:500px;
-  border:1px solid #e5e7ef; background:#fff; color:#1f2348; cursor:pointer; }
-.nq-profile__btn:hover { background:#f4f5f9; }
+  border:1px solid var(--nq-profile-btn-border, #e5e7ef); background:var(--nq-profile-btn-bg, #fff); color:var(--nq-profile-fg, #1f2348); cursor:pointer; }
+.nq-profile__btn:hover { background:var(--nq-profile-btn-hover, #f4f5f9); }
 `;
   document.head.appendChild(style);
 }
@@ -115,10 +132,17 @@ export function mountProfileWidget(
     icon.className = 'nq-profile__icon';
     icon.style.width = `${size}px`;
     icon.style.height = `${size}px`;
-    const img = document.createElement('img');
-    img.src = PLACEHOLDER_SVG;
-    img.alt = 'identicon';
-    icon.appendChild(img);
+    // A caller-supplied identicon (self-sized) wins; else the built-in img that
+    // resolves @nimiq/iqons async over the hexagon placeholder.
+    let img: HTMLImageElement | null = null;
+    if (account && options.identicon) {
+      icon.appendChild(options.identicon(account.address, size));
+    } else {
+      img = document.createElement('img');
+      img.src = PLACEHOLDER_SVG;
+      img.alt = 'identicon';
+      icon.appendChild(img);
+    }
     root.appendChild(icon);
 
     const body = document.createElement('div');
@@ -133,7 +157,8 @@ export function mountProfileWidget(
     if (account) {
       const addr = document.createElement('span');
       addr.className = 'nq-profile__addr';
-      addr.textContent = account.address;
+      addr.textContent = shortenAddress(account.address);
+      addr.title = account.address;
       body.appendChild(addr);
 
       if (options.getBalance) {
@@ -185,9 +210,12 @@ export function mountProfileWidget(
       root.appendChild(actions);
     }
 
-    // Swap in the real identicon once resolved (placeholder shows meanwhile).
-    const url = await identiconUrl(account?.address ?? null);
-    if (token === renderToken) img.src = url;
+    // Swap in the resolved iqons identicon over the placeholder — only for the
+    // built-in path (a caller-supplied identicon renders itself).
+    if (img) {
+      const url = await identiconUrl(account?.address ?? null);
+      if (token === renderToken) img.src = url;
+    }
   }
 
   void render();
