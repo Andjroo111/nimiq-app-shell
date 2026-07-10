@@ -4,8 +4,12 @@
 // full flag ROW (mountLanguageSwitcher) for headers that want a compact control.
 //
 // Theme-adaptive: the trigger uses currentColor, so it reads on a navy header
-// (white text) or a light one (dark text); the dropdown is always a white card.
-// Flags use the shared buildFlagHex (inlined artwork + flags-on-white grey edge).
+// (white text) or a light one (dark text). The dropdown defaults to a white card
+// with the fleet blue accent, but every surface color is a CSS custom property with
+// that default as its fallback (--nq-langpill-menu-bg / -menu-fg / -menu-hover /
+// -menu-border / -menu-shadow / -accent), so a host with its own palette or a dark
+// mode can retheme the dropdown without forking the component. Apps that set nothing
+// render exactly as before. Flags use the shared buildFlagHex.
 
 import type { I18n } from '../i18n';
 import { FEATURED_LANGUAGES, type ShellLanguage } from '../locales';
@@ -40,19 +44,20 @@ function ensureStyles(): void {
   background:transparent; color:inherit; cursor:pointer; font:inherit;
   transition:border-color .15s var(--nimiq-ease, cubic-bezier(.25,0,0,1)), background-color .15s var(--nimiq-ease, cubic-bezier(.25,0,0,1)); }
 .nq-langpill__btn:hover { border-color: color-mix(in srgb, currentColor 40%, transparent); background: color-mix(in srgb, currentColor 6%, transparent); }
-.nq-langpill__btn:focus-visible { outline:2px solid #0582ca; outline-offset:3px; }
+.nq-langpill__btn:focus-visible { outline:2px solid var(--nq-langpill-accent, #0582ca); outline-offset:3px; }
 .nq-langpill__caret { width:10px; height:6px; color:currentColor; opacity:.6; }
 .nq-langpill__menu { position:absolute; top:calc(100% + 10px); right:0; z-index:40; width:224px;
   max-height:min(64vh,392px); overflow-y:auto; overscroll-behavior:contain; scrollbar-width:thin;
-  margin:0; padding:6px; list-style:none; background:#fff; border-radius:10px;
-  box-shadow:0 12px 36px rgba(13,11,36,.28); }
+  margin:0; padding:6px; list-style:none; background:var(--nq-langpill-menu-bg, #fff); border-radius:10px;
+  border:var(--nq-langpill-menu-border, none);
+  box-shadow:var(--nq-langpill-menu-shadow, 0 12px 36px rgba(13,11,36,.28)); }
 .nq-langpill__menu li { display:block; }
 .nq-langpill__option { display:flex; align-items:center; gap:10px; width:100%; padding:8px 10px;
   border:none; border-radius:7px; background:none; font:inherit; font-size:14px; font-weight:600;
-  color:#1f2348; text-align:left; cursor:pointer;
+  color:var(--nq-langpill-menu-fg, #1f2348); text-align:left; cursor:pointer;
   transition:background-color .12s var(--nimiq-ease, cubic-bezier(.25,0,0,1)); }
-.nq-langpill__option:hover { background:rgba(31,35,72,.06); }
-.nq-langpill__option.is-active { color:#0582ca; }
+.nq-langpill__option:hover { background:var(--nq-langpill-menu-hover, rgba(31,35,72,.06)); }
+.nq-langpill__option.is-active { color:var(--nq-langpill-accent, #0582ca); }
 .nq-langpill__name { white-space:nowrap; }
 @media (max-width:560px){
   .nq-langpill { position:static; }
