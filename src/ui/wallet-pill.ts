@@ -106,12 +106,16 @@ export function mountWalletPill(
   let profileHandle: ProfileWidgetHandle | null = null;
   let menuOpen = false;
 
+  // Tears down the previous connected render's profile widget + document listeners
+  // before every re-render. It must NOT touch `menuOpen`: that flag is the desired
+  // NEXT state, owned by whoever called render() (the toggle click, closeMenu, or an
+  // account change). Resetting it here made the toggle open-then-immediately-close, so
+  // the dropdown could never open.
   function teardownConnected(): void {
     profileHandle?.destroy();
     profileHandle = null;
     document.removeEventListener('click', onDocClick, true);
     document.removeEventListener('keydown', onKeydown);
-    menuOpen = false;
   }
   function onDocClick(e: MouseEvent): void {
     if (!root.contains(e.target as Node)) closeMenu();
