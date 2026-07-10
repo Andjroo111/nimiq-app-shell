@@ -520,14 +520,17 @@ clique em qualquer lado para o trazer para a frente.`},n1={"popup-overlay":`От
     <path fill="#ff0" d="m661 527.5-124-92.6-123.3 93.5 45.9-152-123.2-93.8 152.4-1.3L536 129.8 584.3 281l152.4.2-122.5 94.7z"/>
   </g>
 </svg>`};function Y1(Q){let Z=k1[Q.toLowerCase()];return Z?"data:image/svg+xml,"+encodeURIComponent(Z):""}var V1={us:{aspect:1.3333333333333333},cn:{scale:1.2,dx:2.2,dy:2.8},kr:{scale:0.72}};var f1="M19.964 8.156 15.758.844A1.69 1.69 0 0014.299 0H5.887c-.6 0-1.156.32-1.456.844L.225 8.156c-.3.523-.3 1.165 0 1.688l4.206 7.312c.3.523.856.844 1.456.844h8.412c.6 0 1.156-.32 1.456-.844l4.206-7.312a1.69 1.69 0 00.003-1.688",_6=0;function F6(Q){let Z=Q?.aspect??1,X=Q?.scale??1,W=Q?.dx??0,K=Q?.dy??0,Y=1.08,G=Math.max(20,18*Z)*1.08*X,V=G/Z;return{x:10+W-G/2,y:9+K-V/2,w:G,h:V}}function h(Q,Z={}){let X=Z.size??24,W=Z.fit??V1[Q.toLowerCase()],{x:K,y:Y,w:G,h:V}=F6(W),F=Math.max(0.4,22/X),_=`nq-flag-${_6+=1}`,x=document.createElement("div");return x.innerHTML=`<svg class="nq-flag-hex" viewBox="0 0 20 18" width="${X}" height="${(X*0.9).toFixed(2)}" aria-hidden="true" style="display:block;overflow:visible"><defs><clipPath id="${_}"><path d="${f1}"/></clipPath></defs><image href="${Y1(Q)}" x="${K}" y="${Y}" width="${G}" height="${V}" preserveAspectRatio="xMidYMid slice" clip-path="url(#${_})"/><path d="${f1}" fill="none" stroke="rgba(31,35,72,0.4)" stroke-width="${F.toFixed(2)}" stroke-linejoin="round"/></svg>`,x.firstElementChild}var G1="data:image/svg+xml,"+encodeURIComponent('<svg width="64" height="64" viewBox="0 -4 64 64" xmlns="http://www.w3.org/2000/svg"><path opacity=".1" d="M62.3 25.4L49.2 2.6A5.3 5.3 0 0 0 44.6 0H18.4c-1.9 0-3.6 1-4.6 2.6L.7 25.4c-1 1.6-1 3.6 0 5.2l13.1 22.8c1 1.6 2.7 2.6 4.6 2.6h26.2c1.9 0 3.6-1 4.6-2.6l13-22.8c1-1.6 1-3.6.1-5.2z" fill="#1F2348"/></svg>');function $6(){if(typeof document>"u")return;if(document.getElementById("nimiq-shell-profile-style"))return;let Q=document.createElement("style");Q.id="nimiq-shell-profile-style",Q.textContent=`
-.nq-profile { display:flex; align-items:center; gap:12px; font-family:'Mulish',system-ui,sans-serif; }
+.nq-profile { display:flex; align-items:center; flex-wrap:wrap; gap:12px; font-family:'Mulish',system-ui,sans-serif; }
 .nq-profile__icon { flex-shrink:0; border-radius:50%; overflow:hidden; background:var(--nq-profile-icon-bg, #fff); }
 .nq-profile__icon img { display:block; width:100%; height:100%; }
-.nq-profile__body { min-width:0; display:flex; flex-direction:column; gap:2px; }
+.nq-profile__body { flex:1 1 auto; min-width:0; display:flex; flex-direction:column; gap:2px; }
 .nq-profile__label { font-weight:700; font-size:15px; color:var(--nq-profile-fg, #1f2348); line-height:1.2; }
-.nq-profile__addr { font-size:12px; color:var(--nq-profile-muted, #5f6370); font-family:ui-monospace,monospace; word-break:break-all; }
+.nq-profile__addr { font-size:12px; color:var(--nq-profile-muted, #5f6370); font-family:ui-monospace,monospace; overflow-wrap:anywhere; }
 .nq-profile__bal { font-size:13px; color:var(--nq-profile-fg, #1f2348); font-weight:600; }
-.nq-profile__actions { display:flex; gap:8px; margin-left:auto; flex-shrink:0; }
+/* Actions drop to their own full-width row so the address keeps the identity row to
+   itself (in a ~280px dropdown, inline Copy + Disconnect otherwise crush it to a
+   one-char-per-line column). */
+.nq-profile__actions { display:flex; gap:8px; flex-basis:100%; margin-top:2px; justify-content:flex-end; }
 .nq-profile__btn { font:inherit; font-size:13px; font-weight:600; padding:6px 12px; border-radius:500px;
   border:1px solid var(--nq-profile-btn-border, #e5e7ef); background:var(--nq-profile-btn-bg, #fff); color:var(--nq-profile-fg, #1f2348); cursor:pointer; }
 .nq-profile__btn:hover { background:var(--nq-profile-btn-hover, #f4f5f9); }
