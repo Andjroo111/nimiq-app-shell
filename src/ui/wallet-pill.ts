@@ -20,6 +20,10 @@ import { mountProfileWidget, type ProfileWidgetHandle } from './profile';
 export interface WalletPillOptions {
   wallet: Wallet;
   i18n: I18n;
+  /** Optional identicon renderer, used for the connected pill's avatar + the dropdown
+   *  (forwarded to the profile widget). Lets a no-bundler / CDN-loaded app inject its
+   *  own vendored identicon instead of the hexagon placeholder. Self-sized element. */
+  identicon?: (address: string, sizePx: number) => HTMLElement;
   /** Inject the component's <style> once. Default true. */
   injectStyles?: boolean;
 }
@@ -52,7 +56,8 @@ function ensureStyles(): void {
   transition:border-color .15s var(--nimiq-ease, cubic-bezier(.25,0,0,1)), background-color .15s var(--nimiq-ease, cubic-bezier(.25,0,0,1)); }
 .nq-wallet__btn:hover { border-color: color-mix(in srgb, currentColor 40%, transparent); background: color-mix(in srgb, currentColor 6%, transparent); }
 .nq-wallet__btn:focus-visible { outline:2px solid var(--nq-walletpill-accent, #0582ca); outline-offset:3px; }
-.nq-wallet__icon { width:28px; height:28px; flex-shrink:0; border-radius:50%; background: color-mix(in srgb, currentColor 12%, transparent); }
+.nq-wallet__icon { width:28px; height:28px; flex-shrink:0; border-radius:50%; overflow:hidden; display:inline-flex; background: color-mix(in srgb, currentColor 12%, transparent); }
+.nq-wallet__icon img, .nq-wallet__icon > * { width:100%; height:100%; display:block; }
 .nq-wallet__label { white-space:nowrap; font-family:ui-monospace,'Fira Mono',monospace; letter-spacing:.02em; }
 .nq-wallet__caret { width:10px; height:6px; flex-shrink:0; color:currentColor; opacity:.6; }
 .nq-wallet__menu { position:absolute; top:calc(100% + 10px); right:0; z-index:40; min-width:280px; max-width:92vw;
@@ -155,10 +160,16 @@ export function mountWalletPill(
     btn.setAttribute('aria-haspopup', 'dialog');
     btn.setAttribute('aria-expanded', String(menuOpen));
 
-    const icon = document.createElement('img');
+    const icon = document.createElement('span');
     icon.className = 'nq-wallet__icon';
-    icon.src = PLACEHOLDER_SVG;
-    icon.alt = '';
+    if (options.identicon) {
+      icon.appendChild(options.identicon(account.address, 28));
+    } else {
+      const img = document.createElement('img');
+      img.src = PLACEHOLDER_SVG;
+      img.alt = '';
+      icon.appendChild(img);
+    }
     btn.appendChild(icon);
 
     const label = document.createElement('span');
@@ -181,6 +192,7 @@ export function mountWalletPill(
         wallet,
         i18n,
         identiconSize: 40,
+        identicon: options.identicon,
         showCopy: true,
         showDisconnect: true,
       });
