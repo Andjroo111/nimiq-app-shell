@@ -5,9 +5,11 @@
 //
 //   1. Dual-mode wallet  — createWallet() auto-detects Nimiq Pay (mini-app SDK)
 //      vs standalone web (Hub), behind one unified API.
-//   2. i18n engine       — createI18n() with ?lang= / nimiqPay.language /
+//   2. nim-format        — fmtNim()/fmtFiat()/parseNim(): the fleet-canonical
+//      luna/NIM formatter (registry amount-component semantics).
+//   3. i18n engine       — createI18n() with ?lang= / nimiqPay.language /
 //      localStorage / navigator resolution, runtime switch, no reload.
-//   3. Vanilla UI        — mountProfileWidget(), mountLanguageSwitcher().
+//   4. Vanilla UI        — mountProfileWidget(), mountLanguageSwitcher().
 //
 // Chain READS (balance, settlement) are intentionally NOT here — that's
 // nimiq-settlement. Cashlinks are NOT here either — apps mint them via
@@ -33,6 +35,18 @@ export {
   type MiniAppProvider,
   type HubClient,
 } from './wallet';
+
+// ---- nim-format ----
+export {
+  LUNA_PER_NIM,
+  NIM_DECIMALS,
+  fmtNim,
+  fmtFiat,
+  lunaToNim,
+  nimToLuna,
+  parseNim,
+  type FmtNimOptions,
+} from './format/nim';
 
 // ---- i18n ----
 export {

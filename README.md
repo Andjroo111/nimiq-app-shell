@@ -4,15 +4,18 @@
 > 🧭 **North Star** · Every Nimiq project aligns to one shared set of values and a single mission. See the canonical [Nimiq Values & North Star](https://github.com/Andjroo111/nimiq.life/blob/main/NORTH-STAR.md).
 
 Framework-agnostic vanilla-TS **shell** for the Nimiq app fleet. One small
-package that gives every chain app the same three things, with no framework
+package that gives every chain app the same four things, with no framework
 lock-in (the chain apps are vanilla, not Vue):
 
 1. **Dual-mode wallet** — one unified API that auto-detects whether it's running
    inside **Nimiq Pay** (the official mini-app SDK) or as a **standalone web app**
    (the Nimiq **Hub**), and routes every call to the right backend.
-2. **i18n engine** — a zero-dependency translator with `?lang=` / Nimiq-Pay /
+2. **nim-format** — `fmtNim` / `fmtFiat` / `lunaToNim` / `nimToLuna` / `parseNim`:
+   the fleet-canonical luna/NIM formatter (registry `amount` component semantics,
+   U+202F grouping, no float loss).
+3. **i18n engine** — a zero-dependency translator with `?lang=` / Nimiq-Pay /
    `localStorage` / browser language resolution, runtime switching, and no reload.
-3. **Vanilla UI** — a profile widget (identicon + label + address + balance) and a
+4. **Vanilla UI** — a profile widget (identicon + label + address + balance) and a
    flag-hex language switcher, both mountable into any container.
 
 It is built for **Bun** and for **no-bundler vanilla PWAs**. It does **no chain
@@ -96,6 +99,38 @@ options (used by the tests).
 The mini-app SDK returns the serialized transaction (not a hash), so in miniapp
 mode `txHash` carries that serialized form and `serializedTx` is set too — callers
 always get a non-empty handle.
+
+---
+
+## NIM formatting (`nim-format`)
+
+The fleet-canonical luna/NIM formatter — the single most re-implemented snippet
+in the fleet, now implemented once. String-based digit math (no float loss,
+bigint-safe) following the `nq` registry `amount` component's semantics exactly:
+half-up rounding, trailing-zero trim padded to `minDecimals`, and integer digit
+grouping with U+202F (narrow no-break space) only above 4 integer digits.
+
+```ts
+import { fmtNim, fmtFiat, lunaToNim, nimToLuna, parseNim } from 'nimiq-app-shell';
+
+fmtNim(1234567890);                    // '12 345.6789'  (U+202F separators)
+fmtNim(500000);                        // '5.00'          (minDecimals 2 default)
+fmtNim(123500, { maxDecimals: 2 });    // '1.24'          (half-up)
+fmtNim(500000, { signed: true });      // '+5.00'         (tx-feed style)
+fmtNim(1234567890, { grouping: false }) // '12345.6789'
+
+fmtFiat(12.5, 'USD', 'en-US');         // '$12.50' (narrow symbol, Intl decimals)
+
+lunaToNim(100000);                     // 1
+nimToLuna(12.5);                       // 1250000
+parseNim('12 345.6789');               // 1234567890 (validates; throws on junk,
+                                       //  >5 decimals, unsafe range)
+```
+
+**Vendored bundle:** apps on the scaffold's `build:shell` pattern (esbuild →
+`public/vendor/app-shell.js`) get all of this in the same single file:
+`import { fmtNim } from './vendor/app-shell.js'`. There is no separate
+standalone build — the module rides the shell bundle.
 
 ---
 
