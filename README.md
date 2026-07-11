@@ -71,6 +71,12 @@ const { txHash } = await wallet.signAndSend({
   // data: 'thanks!',         // optional UTF-8 or Uint8Array — apps encode cashlinks here
 });
 
+// Prove wallet ownership by signing a challenge (Sign-in-with-Nimiq). Requires
+// a connected account. The returned proof is the exact shape a Nimiq signed-
+// message verifier (e.g. @nimiq-captcha/core) consumes — hand it straight in.
+const proof = await wallet.signMessage(serverChallengeString);
+// → { address, message, publicKeyHex, signatureHex }
+
 wallet.disconnect();
 ```
 
@@ -95,6 +101,13 @@ options (used by the tests).
 | `signAndSend({…, data})` | `sendBasicTransactionWithData` (data hex-encoded) | `signTransaction` (basic transfer, `extraData` bytes) |
 | `signAndSend({…})` | `sendBasicTransaction` | `signTransaction` |
 | result | `{ txHash: serializedTx, serializedTx }` | `{ txHash: hash, serializedTx }` |
+| `signMessage(message)` | `provider.sign(message)` (hex pubkey/sig) | `hub.signMessage({signer, message})` (bytes → hex) |
+| result | `{ address, message, publicKeyHex, signatureHex }` | `{ address, message, publicKeyHex, signatureHex }` |
+
+`signMessage` returns a normalised wallet-proof both backends agree on. The Hub
+path is interop-verified against `@nimiq-captcha/core`'s signed-message verifier
+(the Nimiq `"\x16Nimiq Signed Message:\n"` prefix convention); pass the
+verifier's canonical challenge string **unmodified**.
 
 The mini-app SDK returns the serialized transaction (not a hash), so in miniapp
 mode `txHash` carries that serialized form and `serializedTx` is set too — callers

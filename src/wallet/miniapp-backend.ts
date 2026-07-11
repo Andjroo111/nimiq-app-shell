@@ -9,7 +9,7 @@
 //       : Promise<string | ErrorResponse>
 // The send methods return the SERIALIZED transaction (hex), not a hash.
 
-import type { Account, SendArgs, SendResult } from './types';
+import type { Account, SendArgs, SendResult, SignMessageResult } from './types';
 import { type WalletBackend, dataToHex } from './backend';
 
 /** The slice of the SDK provider this backend depends on. window.nimiq from
@@ -29,6 +29,11 @@ export interface MiniAppProvider {
     fee?: number;
     validityStartHeight?: number;
   }): Promise<string | { error: { type: string; message: string } }>;
+  sign(
+    message: string | { message: string; isHex?: boolean },
+  ): Promise<
+    { publicKey: string; signature: string } | { error: { type: string; message: string } }
+  >;
   connect?(): Promise<void>;
 }
 
@@ -142,6 +147,26 @@ export class MiniAppBackend implements WalletBackend {
    *  confirms and broadcasts) — pay and signAndSend are the same thing here. */
   pay(args: SendArgs): Promise<SendResult> {
     return this.signAndSend(args);
+  }
+
+  async signMessage(message: string): Promise<SignMessageResult> {
+    const provider = await this.resolveProvider();
+    // The mini-app SignatureResult carries no address, so we return the
+    // connected account — require a prior connect().
+    if (!this.current) {
+      throw new Error('Nimiq Pay: connect a wallet before signing');
+    }
+    // The SDK already returns publicKey/signature as hex strings — pass them
+    // straight through. NOTE: whether Nimiq Pay applies the same Nimiq
+    // signed-message prefix Hub/Keyguard does is not provable from the SDK
+    // types; the Hub path is the interop-verified one (see PR notes).
+    const result = unwrap(await provider.sign(message));
+    return {
+      address: this.current.address,
+      message,
+      publicKeyHex: result.publicKey,
+      signatureHex: result.signature,
+    };
   }
 
   disconnect(): void {

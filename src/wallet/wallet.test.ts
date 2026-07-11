@@ -13,6 +13,7 @@ function fakeMiniAppProvider(
     listAccounts: async () => ['NQ07 0000 0000 0000 0000 0000 0000 0000 0000'],
     sendBasicTransaction: async () => 'serialized-basic',
     sendBasicTransactionWithData: async () => 'serialized-with-data',
+    sign: async () => ({ publicKey: 'ab'.repeat(32), signature: 'cd'.repeat(64) }),
     ...overrides,
   };
 }
@@ -25,6 +26,11 @@ function fakeHubClient(overrides: Partial<HubClient> = {}): HubClient {
     }),
     signTransaction: async () => ({ serializedTx: 'hub-serialized', hash: 'hub-hash' }),
     checkout: async () => ({ serializedTx: 'hub-checkout-serialized', hash: 'hub-checkout-hash' }),
+    signMessage: async () => ({
+      signer: 'NQ11 1111 1111 1111 1111 1111 1111 1111 1111',
+      signerPublicKey: new Uint8Array(32).fill(0xab),
+      signature: new Uint8Array(64).fill(0xcd),
+    }),
     ...overrides,
   };
 }
@@ -161,6 +167,44 @@ describe('miniapp wallet', () => {
     expect(seen).toEqual(['NQ07 0000 0000 0000 0000 0000 0000 0000 0000', null]);
     expect(w.account).toBeNull();
   });
+
+  test('signMessage passes hex publicKey/signature through with the connected address', async () => {
+    let captured: unknown = null;
+    const provider = fakeMiniAppProvider({
+      sign: async (m) => {
+        captured = m;
+        return { publicKey: 'ab'.repeat(32), signature: 'cd'.repeat(64) };
+      },
+    });
+    setWindow({ nimiqPay: {}, nimiq: provider });
+    const w = createWallet({}, { miniApp: { provider } });
+    await w.connect();
+    const proof = await w.signMessage('demo:sign-in:nonce123:1700000000000');
+    expect(captured).toBe('demo:sign-in:nonce123:1700000000000');
+    expect(proof).toEqual({
+      address: 'NQ07 0000 0000 0000 0000 0000 0000 0000 0000',
+      message: 'demo:sign-in:nonce123:1700000000000',
+      publicKeyHex: 'ab'.repeat(32),
+      signatureHex: 'cd'.repeat(64),
+    });
+  });
+
+  test('signMessage before connect throws', async () => {
+    const provider = fakeMiniAppProvider();
+    setWindow({ nimiqPay: {}, nimiq: provider });
+    const w = createWallet({}, { miniApp: { provider } });
+    await expect(w.signMessage('m')).rejects.toThrow(/connect/i);
+  });
+
+  test('signMessage surfaces a provider ErrorResponse', async () => {
+    const provider = fakeMiniAppProvider({
+      sign: async () => ({ error: { type: 'denied', message: 'user rejected' } }),
+    });
+    setWindow({ nimiqPay: {}, nimiq: provider });
+    const w = createWallet({}, { miniApp: { provider } });
+    await w.connect();
+    await expect(w.signMessage('m')).rejects.toThrow(/user rejected/);
+  });
 });
 
 // ---- hub backend routing ---------------------------------------------------
@@ -228,5 +272,39 @@ describe('hub wallet', () => {
     await expect(w.signAndSend({ recipient: 'NQ99', valueLuna: 1 })).rejects.toThrow(
       /connect/i,
     );
+  });
+
+  test('signMessage normalises Uint8Array pubkey/sig to hex with the connected address', async () => {
+    let captured: any = null;
+    const client = fakeHubClient({
+      signMessage: async (req) => {
+        captured = req;
+        return {
+          signer: 'NQ11 1111 1111 1111 1111 1111 1111 1111 1111',
+          signerPublicKey: new Uint8Array([0x01, 0x02, 0xff]),
+          signature: new Uint8Array([0xde, 0xad, 0xbe, 0xef]),
+        };
+      },
+    });
+    setWindow({});
+    const w = createWallet({ appName: 'Demo' }, { hub: { client, isMobile: false } });
+    await w.connect();
+    const proof = await w.signMessage('Demo:sign-in:nonceX:1700000000000');
+    // Signs the STRING message unmodified, as the connected signer.
+    expect(captured.appName).toBe('Demo');
+    expect(captured.signer).toBe('NQ11 1111 1111 1111 1111 1111 1111 1111 1111');
+    expect(captured.message).toBe('Demo:sign-in:nonceX:1700000000000');
+    expect(proof).toEqual({
+      address: 'NQ11 1111 1111 1111 1111 1111 1111 1111 1111',
+      message: 'Demo:sign-in:nonceX:1700000000000',
+      publicKeyHex: '0102ff',
+      signatureHex: 'deadbeef',
+    });
+  });
+
+  test('signMessage before connect throws', async () => {
+    setWindow({});
+    const w = createWallet({}, { hub: { client: fakeHubClient(), isMobile: false } });
+    await expect(w.signMessage('m')).rejects.toThrow(/connect/i);
   });
 });

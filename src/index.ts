@@ -29,6 +29,7 @@ export {
   type CreateWalletAdvanced,
   type SendArgs,
   type SendResult,
+  type SignMessageResult,
   type Wallet,
   type WalletMode,
   type WalletBackend,
