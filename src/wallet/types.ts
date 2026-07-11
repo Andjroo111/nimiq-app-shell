@@ -48,6 +48,22 @@ export interface SendResult {
   serializedTx?: string;
 }
 
+/** Result of signMessage — a wallet-ownership proof, normalised across both
+ *  backends to hex strings. The shape matches the `{ address, message,
+ *  publicKeyHex, signatureHex }` proof that Nimiq signed-message verifiers
+ *  (e.g. @nimiq-captcha/core's verifySignedMessage) consume, so a consumer can
+ *  hand `wallet.signMessage` straight into a Sign-in-with-Nimiq flow. */
+export interface SignMessageResult {
+  /** The connected account that produced the signature. */
+  address: string;
+  /** The exact message string that was signed, echoed back. */
+  message: string;
+  /** Signer Ed25519 public key, hex (32 bytes → 64 hex chars). */
+  publicKeyHex: string;
+  /** Ed25519 signature over the Nimiq-prefixed message hash, hex (64 bytes). */
+  signatureHex: string;
+}
+
 /** Listener invoked whenever the connected account changes (or clears). */
 export type AccountChangeListener = (account: Account | null) => void;
 
@@ -69,6 +85,11 @@ export interface Wallet {
    *  should call; signAndSend is the low-level building block for app-specific
    *  flows that broadcast on their own. */
   pay(args: SendArgs): Promise<SendResult>;
+  /** Sign a UTF-8 message to prove control of the connected wallet
+   *  (Sign-in-with-Nimiq / wallet-proof). Requires a connected account; throws
+   *  otherwise. The wallet applies the Nimiq signed-message prefix, so pass the
+   *  verifier's canonical message string unmodified. */
+  signMessage(message: string): Promise<SignMessageResult>;
   /** Subscribe to account changes. Returns an unsubscribe function. */
   onAccountChange(cb: AccountChangeListener): () => void;
   /** Forget the connected account (local only — does not revoke the wallet). */

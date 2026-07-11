@@ -10,8 +10,8 @@
 // Hub auto-detect only recognises *.nimiq.com hosts; on any other origin it
 // falls back to a dead localhost endpoint. So we pin hub.nimiq.com explicitly.
 
-import type { Account, SendArgs, SendResult } from './types';
-import { type WalletBackend, dataToBytes } from './backend';
+import type { Account, SendArgs, SendResult, SignMessageResult } from './types';
+import { type WalletBackend, dataToBytes, bytesToHex } from './backend';
 
 const DEFAULT_HUB_ENDPOINT = 'https://hub.nimiq.com';
 
@@ -48,6 +48,10 @@ export interface HubClient {
     },
     behavior?: unknown,
   ): Promise<{ serializedTx: string; hash: string }>;
+  signMessage(
+    req: { appName: string; signer?: string; message: string | Uint8Array },
+    behavior?: unknown,
+  ): Promise<{ signer: string; signerPublicKey: Uint8Array; signature: Uint8Array }>;
   on?(...args: unknown[]): void;
   checkRedirectResponse?(): Promise<void>;
 }
@@ -164,6 +168,27 @@ export class HubBackend implements WalletBackend {
       extraData: dataToBytes(args.data),
     });
     return { txHash: result.hash, serializedTx: result.serializedTx };
+  }
+
+  async signMessage(message: string): Promise<SignMessageResult> {
+    const client = await this.resolveClient();
+    if (!this.current) {
+      throw new Error('Hub: connect a wallet before signing');
+    }
+    // Hub/Keyguard applies the Nimiq signed-message prefix to the STRING
+    // message before hashing+signing, and returns the pubkey/signature as raw
+    // bytes — hex-encode them into the proof shape a verifier deserialises.
+    const result = await client.signMessage({
+      appName: this.appName,
+      signer: this.current.address,
+      message,
+    });
+    return {
+      address: this.current.address,
+      message,
+      publicKeyHex: bytesToHex(result.signerPublicKey),
+      signatureHex: bytesToHex(result.signature),
+    };
   }
 
   disconnect(): void {
