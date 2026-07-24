@@ -37,6 +37,27 @@ export interface CreateWalletAdvanced {
   hub?: Omit<HubBackendOptions, 'appName' | 'hubEndpoint'>;
 }
 
+// Hub-mode session memory: the connected address + label (public data, never
+// keys) so a reload doesn't force a reconnect popup.
+const PERSIST_KEY = 'nq-shell:hub-account';
+function readPersisted(): Account | null {
+  try {
+    const raw = localStorage.getItem(PERSIST_KEY);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw) as { address?: unknown; label?: unknown };
+    if (typeof parsed.address !== 'string' || !parsed.address) return null;
+    return { address: parsed.address, label: typeof parsed.label === 'string' ? parsed.label : '' };
+  } catch {
+    return null;
+  }
+}
+function writePersisted(account: Account | null): void {
+  try {
+    if (account) localStorage.setItem(PERSIST_KEY, JSON.stringify({ address: account.address, label: account.label }));
+    else localStorage.removeItem(PERSIST_KEY);
+  } catch { /* storage unavailable */ }
+}
+
 export function createWallet(
   opts: CreateWalletOptions = {},
   advanced: CreateWalletAdvanced = {},
@@ -53,11 +74,13 @@ export function createWallet(
           ...advanced.hub,
         });
 
+  const persist = mode === 'hub' && opts.persist !== false;
   const listeners = new Set<AccountChangeListener>();
-  let account: Account | null = null;
+  let account: Account | null = persist ? readPersisted() : null;
 
   backend.setAccountChange((next) => {
     account = next;
+    if (persist) writePersisted(next);
     for (const cb of listeners) cb(next);
   });
 
@@ -73,7 +96,10 @@ export function createWallet(
       const result = await backend.connect();
       // Backends fire setAccountChange themselves; keep the getter in sync for
       // the desktop path where connect resolves the account directly.
-      if (result) account = result;
+      if (result) {
+        account = result;
+        if (persist) writePersisted(result);
+      }
       return result;
     },
     signAndSend(args: SendArgs): Promise<SendResult> {
@@ -86,6 +112,7 @@ export function createWallet(
     disconnect(): void {
       backend.disconnect();
       account = null;
+      if (persist) writePersisted(null);
     },
   };
 
