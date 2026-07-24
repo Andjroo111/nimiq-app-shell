@@ -21,4 +21,10 @@ export default {
   'shell.tapToCopy': 'Adresse antippen zum Kopieren',
   'shell.createCashlink': 'Cashlink erstellen',
   'shell.newToNimiq': 'Neu bei Nimiq? Wallet erstellen',
+  'shell.recipient': 'Empfänger',
+  'shell.available': 'Verfügbar',
+  'shell.sending': 'Wird gesendet',
+  'shell.sent': 'Gesendet',
+  'shell.sendFailed': 'Etwas ist schiefgelaufen',
+  'shell.amount': 'Betrag',
 } as const;

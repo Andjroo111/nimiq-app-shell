@@ -10,6 +10,9 @@ export interface WalletBackend {
   connect(): Promise<Account | null>;
   /** Sign + broadcast a basic transaction on the active backend. */
   signAndSend(args: SendArgs): Promise<SendResult>;
+  /** The wallet-UI payment flow (broadcast guaranteed): Hub checkout popup /
+   *  the mini-app host's native send. */
+  pay(args: SendArgs): Promise<SendResult>;
   /** Register the callback createWallet uses to keep its `account` in sync and
    *  fan out to onAccountChange subscribers. */
   setAccountChange(cb: (account: Account | null) => void): void;

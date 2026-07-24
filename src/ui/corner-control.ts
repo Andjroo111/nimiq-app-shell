@@ -26,7 +26,7 @@ import type { I18n } from '../i18n';
 import type { Wallet } from '../wallet';
 import { SHELL_LANGUAGES, type ShellLanguage } from '../locales';
 import { buildFlagHex } from './flag-hex';
-import { fmtNim, fmtFiat, lunaToNim } from '../format/nim';
+import { fmtNim, fmtFiat, lunaToNim, nimToLuna } from '../format/nim';
 
 export interface CornerControlOptions {
   wallet: Wallet;
@@ -223,6 +223,40 @@ button.nq-cc-name:focus-visible { outline:2px solid var(--nq-cc-accent, #0582ca)
 .nq-cc-view-receive { display:none; }
 .nq-cc.nq-cc-show-receive .nq-cc-view-main { display:none; }
 .nq-cc.nq-cc-show-receive .nq-cc-view-receive { display:block; }
+
+/* send view: the mini-wallet send — recipient + amount here, the user's own
+   wallet only appears for the approval (Hub checkout / Nimiq Pay confirm) */
+.nq-cc-view-send { display:none; }
+.nq-cc.nq-cc-show-send .nq-cc-view-main { display:none; }
+.nq-cc.nq-cc-show-send .nq-cc-view-send { display:block; }
+.nq-cc-send-body { display:flex; flex-direction:column; gap:8px; padding:10px 8px 8px; }
+.nq-cc-field-label { font-size:12px; font-weight:600; color:var(--nq-cc-menu-muted, rgba(31,35,72,.5)); }
+/* inputs: inset box-shadow border, never border (rule 1) */
+.nq-cc-input { width:100%; border:none; border-radius:8px; padding:9px 10px; font-family:inherit;
+  font-size:14px; font-weight:600; color:#1f2348; background:#fff;
+  box-shadow:inset 0 0 0 2px rgba(31,35,72,.12); }
+.nq-cc-input:focus { outline:none; box-shadow:inset 0 0 0 2px #0582ca; }
+.nq-cc-input::placeholder { color:rgba(31,35,72,.3); font-weight:600; }
+.nq-cc-input-addr { font-family:'Fira Mono',ui-monospace,monospace; font-size:12px;
+  letter-spacing:.02em; text-transform:uppercase; }
+.nq-cc-amount-row { position:relative; }
+.nq-cc-amount-row .nq-cc-input { padding-right:44px; }
+.nq-cc-amount-suffix { position:absolute; right:11px; top:50%; transform:translateY(-50%);
+  font-size:13px; font-weight:700; color:rgba(31,35,72,.45); pointer-events:none; }
+.nq-cc-send-hint { font-size:12px; font-weight:600; color:var(--nq-cc-menu-muted, rgba(31,35,72,.5)); }
+.nq-cc-send-hint:empty { display:none; }
+.nq-cc-send-confirm { width:100%; height:36px; border:none; border-radius:500px; margin-top:2px;
+  font-family:inherit; font-size:14px; font-weight:700; color:#fff; cursor:pointer;
+  background-color:#0582ca; background-image:radial-gradient(100% 100% at 100% 100%, #265dd7, #0582ca); }
+.nq-cc-send-confirm:hover:not(:disabled) { background-image:radial-gradient(100% 100% at 100% 100%, #1f4fbc, #0473b3); }
+.nq-cc-send-confirm:focus-visible { outline:2px solid var(--nq-cc-accent, #0582ca); outline-offset:3px; }
+.nq-cc-send-confirm:disabled { opacity:.4; cursor:default; }
+.nq-cc-send-error { font-size:12px; font-weight:600; color:#d94432; text-align:center; }
+.nq-cc-send-error:empty { display:none; }
+.nq-cc-send-done { display:none; flex-direction:column; align-items:center; gap:6px;
+  padding:16px 0 10px; color:#13b59d; font-size:14px; font-weight:700; }
+.nq-cc-view-send.nq-cc-sent .nq-cc-send-body { display:none; }
+.nq-cc-view-send.nq-cc-sent .nq-cc-send-done { display:flex; }
 .nq-cc-back { display:flex; align-items:center; gap:6px; width:100%; padding:7px 10px; border:none;
   border-radius:6px; background:none; font-family:inherit; font-size:15px;
   color:var(--nq-cc-menu-muted, rgba(31,35,72,.6)); text-align:left; cursor:pointer;
@@ -468,8 +502,9 @@ export function mountCornerControl(
   const menu = el('div', 'nq-cc-menu', root);
   menu.hidden = true;
 
-  // receive view (behind Receive)
+  // receive + send views (each behind its action button, like the wallet)
   const viewReceive = el('div', 'nq-cc-view-receive', menu);
+  const viewSend = el('div', 'nq-cc-view-send', menu);
   const viewMain = el('div', 'nq-cc-view-main', menu);
 
   // translatable text registry: node -> i18n key
@@ -548,9 +583,11 @@ export function mountCornerControl(
     });
   }
 
-  // action bar (wallet MobileActionBar order: Receive LEFT, Send RIGHT, scan)
-  const anyAction = showReceive || options.send || options.scan;
-  if (anyAction) {
+  // action bar (wallet MobileActionBar order: Receive LEFT, Send RIGHT, scan).
+  // Send is ALWAYS there: the built-in send view makes the menu a real mini
+  // wallet (recipient + amount here, the wallet only for the approval); an
+  // options.send override redirects it to an app-specific flow instead.
+  {
     const actions = el('div', 'nq-cc-actions', walletSection);
     if (showReceive) {
       const btn = el('button', 'nq-cc-receive', actions);
@@ -560,15 +597,22 @@ export function mountCornerControl(
       tNode(span, 'shell.receive');
       btn.addEventListener('click', () => openReceive());
     }
-    if (options.send) {
+    {
       const btn = el('button', 'nq-cc-send', actions);
       btn.type = 'button';
       btn.insertAdjacentHTML('beforeend', ARROW.replace('%CLS%', 'nq-cc-arrow-up'));
       const span = el('span', undefined, btn);
       tNode(span, 'shell.send');
-      // action rows CLOSE the menu — the handoff (view change, wallet popup)
-      // happens underneath it, and an open menu on top reads as a dead button
-      btn.addEventListener('click', () => { setOpen(false); options.send!(); });
+      btn.addEventListener('click', () => {
+        if (options.send) {
+          // app override CLOSES the menu — its handoff happens underneath,
+          // and an open menu on top reads as a dead button
+          setOpen(false);
+          options.send();
+        } else {
+          openSend();
+        }
+      });
     }
     if (options.scan) {
       const btn = el('button', 'nq-cc-scan', actions);
@@ -754,6 +798,110 @@ export function mountCornerControl(
   });
   addressBtn.addEventListener('blur', () => copyWrap.classList.remove('nq-cc-copied-hold'));
 
+  // ---- send view content ----------------------------------------------------
+  const sendBackBtn = el('button', 'nq-cc-back', viewSend);
+  sendBackBtn.type = 'button';
+  sendBackBtn.appendChild(document.createTextNode('‹ '));
+  const sendBackLabel = el('span', 'nq-cc-strong', sendBackBtn);
+  tNode(sendBackLabel, 'shell.send');
+  sendBackBtn.addEventListener('click', () => closeSend());
+  el('div', 'nq-cc-divider', viewSend);
+  const sendBody = el('div', 'nq-cc-send-body', viewSend);
+  const recipientLabel = el('label', 'nq-cc-field-label', sendBody);
+  tNode(recipientLabel, 'shell.recipient');
+  const recipientInput = el('input', 'nq-cc-input nq-cc-input-addr', sendBody);
+  recipientInput.placeholder = 'NQ00 0000 0000 0000 0000 0000 0000 0000 0000';
+  recipientInput.autocomplete = 'off';
+  recipientInput.spellcheck = false;
+  const amountLabel = el('label', 'nq-cc-field-label', sendBody);
+  tNode(amountLabel, 'shell.amount');
+  const amountRow = el('div', 'nq-cc-amount-row', sendBody);
+  const amountInput = el('input', 'nq-cc-input', amountRow);
+  amountInput.placeholder = '0';
+  amountInput.inputMode = 'decimal';
+  amountInput.autocomplete = 'off';
+  const amountSuffix = el('span', 'nq-cc-amount-suffix', amountRow);
+  amountSuffix.textContent = 'NIM';
+  const availableHint = el('p', 'nq-cc-send-hint', sendBody);
+  const sendError = el('p', 'nq-cc-send-error', sendBody);
+  const sendConfirm = el('button', 'nq-cc-send-confirm', sendBody);
+  sendConfirm.type = 'button';
+  tNode(sendConfirm, 'shell.send');
+  const sendDone = el('div', 'nq-cc-send-done', viewSend);
+  sendDone.insertAdjacentHTML(
+    'beforeend',
+    '<svg width="36" height="36" viewBox="0 0 24 24" fill="none" aria-hidden="true">' +
+      '<circle cx="12" cy="12" r="10" stroke="currentColor" stroke-width="2"/>' +
+      '<path d="M7.5 12.5l3 3 6-6.5" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" fill="none"/></svg>',
+  );
+  const sendDoneLabel = el('span', undefined, sendDone);
+  tNode(sendDoneLabel, 'shell.sent');
+
+  // 36 chars in Nimiq's base32 alphabet (no I, O, W, Z), NQ + check + 8 blocks
+  const NIM_ADDRESS_RE = /^NQ\d{2}[0-9A-HJ-NP-VXY]{32}$/;
+  const compactRecipient = (): string => recipientInput.value.toUpperCase().replace(/[\s-]+/g, '');
+  const amountNim = (): number => {
+    const n = Number(amountInput.value.replace(',', '.'));
+    return Number.isFinite(n) ? n : 0;
+  };
+  function validateSend(): void {
+    const okAddress = NIM_ADDRESS_RE.test(compactRecipient());
+    const nim = amountNim();
+    const okAmount = nim > 0 && (balanceLuna === null || nim <= lunaToNim(balanceLuna));
+    sendConfirm.disabled = !(okAddress && okAmount);
+  }
+  recipientInput.addEventListener('input', validateSend);
+  amountInput.addEventListener('input', validateSend);
+
+  function openSend(): void {
+    if (!wallet.account) return;
+    sendError.textContent = '';
+    viewSend.classList.remove('nq-cc-sent');
+    availableHint.textContent =
+      balanceLuna !== null ? `${i18n.t('shell.available')}: ${fmtNim(balanceLuna)} NIM` : '';
+    validateSend();
+    root.classList.add('nq-cc-show-send');
+    recipientInput.focus();
+  }
+  function closeSend(): void {
+    root.classList.remove('nq-cc-show-send');
+  }
+
+  sendConfirm.addEventListener('click', async () => {
+    const compact = compactRecipient();
+    const spaced = compact.replace(/(.{4})(?=.)/g, '$1 ');
+    sendConfirm.disabled = true;
+    sendError.textContent = '';
+    sendConfirm.textContent = i18n.t('shell.sending');
+    try {
+      const result = await wallet.pay({
+        recipient: spaced,
+        valueLuna: nimToLuna(amountNim()),
+      });
+      if (result) {
+        viewSend.classList.add('nq-cc-sent');
+        recipientInput.value = '';
+        amountInput.value = '';
+        balanceFetchedAt = 0; // the balance just changed — refetch on next look
+        window.setTimeout(() => {
+          closeSend();
+          void refreshBalance(true);
+        }, 1800);
+      } else {
+        // mobile redirect flow: the page is navigating to the wallet
+        closeSend();
+      }
+    } catch (err) {
+      // a user closing the wallet dialog is a normal outcome, not an error
+      if (!/cancel|denied|rejected|closed|dismiss/i.test(String(err))) {
+        sendError.textContent = i18n.t('shell.sendFailed');
+      }
+    } finally {
+      sendConfirm.textContent = i18n.t('shell.send');
+      validateSend();
+    }
+  });
+
   let qrFor = '';
   function openReceive(): void {
     const account = wallet.account;
@@ -847,6 +995,7 @@ export function mountCornerControl(
       void refreshBalance();
     } else {
       root.classList.remove('nq-cc-show-receive');
+      root.classList.remove('nq-cc-show-send');
       document.removeEventListener('click', onDocClick, true);
       document.removeEventListener('keydown', onKeydown);
     }

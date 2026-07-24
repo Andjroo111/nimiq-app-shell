@@ -36,6 +36,18 @@ export interface HubClient {
     },
     behavior?: unknown,
   ): Promise<{ serializedTx: string; hash: string }>;
+  checkout(
+    req: {
+      appName: string;
+      sender?: string;
+      forceSender?: boolean;
+      recipient: string;
+      value: number;
+      fee?: number;
+      extraData?: Uint8Array;
+    },
+    behavior?: unknown,
+  ): Promise<{ serializedTx: string; hash: string }>;
   on?(...args: unknown[]): void;
   checkRedirectResponse?(): Promise<void>;
 }
@@ -128,6 +140,28 @@ export class HubBackend implements WalletBackend {
       flags: 0, // TransactionFlag.None
       extraData: dataToBytes(args.data),
       validityStartHeight: height,
+    });
+    return { txHash: result.hash, serializedTx: result.serializedTx };
+  }
+
+  /** The full wallet-UI payment flow: the Hub CHECKOUT popup signs AND
+   *  broadcasts (its transmission step calls the network itself — verified in
+   *  hub src CheckoutTransmission.vue), so callers need no chain access. The
+   *  connected account is pinned as the forced sender. Mobile uses the Hub's
+   *  redirect flow: this resolves with the result on the return trip. */
+  async pay(args: SendArgs): Promise<SendResult> {
+    const client = await this.resolveClient();
+    if (!this.current) {
+      throw new Error('Hub: connect a wallet before paying');
+    }
+    const result = await client.checkout({
+      appName: this.appName,
+      sender: this.current.address,
+      forceSender: true,
+      recipient: args.recipient,
+      value: args.valueLuna,
+      fee: args.feeLuna ?? 0,
+      extraData: dataToBytes(args.data),
     });
     return { txHash: result.hash, serializedTx: result.serializedTx };
   }
