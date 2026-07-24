@@ -93,3 +93,8 @@ export {
   type WalletPillOptions,
   type WalletPillHandle,
 } from './ui/wallet-pill';
+export {
+  mountCornerControl,
+  type CornerControlOptions,
+  type CornerControlHandle,
+} from './ui/corner-control';
