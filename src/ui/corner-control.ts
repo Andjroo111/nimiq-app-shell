@@ -128,7 +128,8 @@ function ensureStyles(): void {
   transition:border-color .15s var(--nimiq-ease, cubic-bezier(.25,0,0,1)), background-color .15s var(--nimiq-ease, cubic-bezier(.25,0,0,1)); }
 .nq-cc-face:hover { border-color: color-mix(in srgb, currentColor 45%, transparent); background: color-mix(in srgb, currentColor 6%, transparent); }
 .nq-cc-face:focus-visible { outline:2px solid var(--nq-cc-accent, #0582ca); outline-offset:3px; }
-.nq-cc[data-connected] .nq-cc-face { padding:4px 12px 4px 5px; font-size:13px; }
+/* 8px left: the identicon needs air off the pill edge (Andjroo, phone review) */
+.nq-cc[data-connected] .nq-cc-face { padding:4px 12px 4px 8px; font-size:13px; }
 .nq-cc-face-icon { width:28px; height:28px; flex:none; border-radius:50%; overflow:hidden; display:inline-flex; }
 .nq-cc-face-icon > * { width:100%; height:100%; display:block; }
 .nq-cc-face-label { white-space:nowrap; }
