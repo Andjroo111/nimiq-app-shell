@@ -565,14 +565,16 @@ export function mountCornerControl(
       btn.insertAdjacentHTML('beforeend', ARROW.replace('%CLS%', 'nq-cc-arrow-up'));
       const span = el('span', undefined, btn);
       tNode(span, 'shell.send');
-      btn.addEventListener('click', () => options.send!());
+      // action rows CLOSE the menu — the handoff (view change, wallet popup)
+      // happens underneath it, and an open menu on top reads as a dead button
+      btn.addEventListener('click', () => { setOpen(false); options.send!(); });
     }
     if (options.scan) {
       const btn = el('button', 'nq-cc-scan', actions);
       btn.type = 'button';
       btn.setAttribute('aria-label', 'Scan QR code');
       btn.insertAdjacentHTML('beforeend', SCAN_QR);
-      btn.addEventListener('click', () => options.scan!());
+      btn.addEventListener('click', () => { setOpen(false); options.scan!(); });
     }
   }
   el('div', 'nq-cc-divider nq-cc-when-connected nq-cc-when-hub', viewMain);
@@ -585,7 +587,7 @@ export function mountCornerControl(
     slot.innerHTML = CASHLINK_ICON;
     const label = el('span', 'nq-cc-strong', row);
     tNode(label, 'shell.createCashlink');
-    row.addEventListener('click', () => options.createCashlink!());
+    row.addEventListener('click', () => { setOpen(false); options.createCashlink!(); });
     el('div', 'nq-cc-divider nq-cc-when-connected nq-cc-when-hub', viewMain);
   }
 
@@ -698,6 +700,7 @@ export function mountCornerControl(
     const label = el('span', 'nq-cc-strong', row);
     tNode(label, 'shell.openInPay');
     row.addEventListener('click', () => {
+      setOpen(false);
       const target = options.openInPay!;
       window.location.href = typeof target === 'function' ? target() : target;
     });
