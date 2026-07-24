@@ -21,4 +21,10 @@ export default {
   'shell.tapToCopy': 'Toque no endereço para copiar',
   'shell.createCashlink': 'Criar um Cashlink',
   'shell.newToNimiq': 'Novo na Nimiq? Crie uma carteira',
+  'shell.recipient': 'Destinatário',
+  'shell.available': 'Disponível',
+  'shell.sending': 'Enviando',
+  'shell.sent': 'Enviado',
+  'shell.sendFailed': 'Algo deu errado',
+  'shell.amount': 'Valor',
 } as const;

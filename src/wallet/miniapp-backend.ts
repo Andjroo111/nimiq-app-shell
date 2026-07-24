@@ -138,6 +138,12 @@ export class MiniAppBackend implements WalletBackend {
     return { txHash: serialized, serializedTx: serialized };
   }
 
+  /** Inside Nimiq Pay the native send IS the full wallet flow (the host
+   *  confirms and broadcasts) — pay and signAndSend are the same thing here. */
+  pay(args: SendArgs): Promise<SendResult> {
+    return this.signAndSend(args);
+  }
+
   disconnect(): void {
     this.current = null;
     this.onChange?.(null);

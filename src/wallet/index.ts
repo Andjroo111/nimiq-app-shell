@@ -105,6 +105,9 @@ export function createWallet(
     signAndSend(args: SendArgs): Promise<SendResult> {
       return backend.signAndSend(args);
     },
+    pay(args: SendArgs): Promise<SendResult> {
+      return backend.pay(args);
+    },
     onAccountChange(cb: AccountChangeListener): () => void {
       listeners.add(cb);
       return () => listeners.delete(cb);
