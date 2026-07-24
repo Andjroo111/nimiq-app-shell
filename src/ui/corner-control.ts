@@ -49,7 +49,10 @@ export interface CornerControlOptions {
   /** Wire the signed-out "New to Nimiq? Create a wallet" line (HubApi.onboard).
    *  Hidden when absent. */
   onboard?: () => void;
-  /** Wire tap-name-to-rename. Without it the name is plain text (see header note). */
+  /** Tap-name-to-rename is BUILT IN: the new label persists locally per address
+   *  (localStorage) and shows on the face + menu. This hook is an optional
+   *  EXTRA — called with the committed label for hosts that can sync it further
+   *  (see header note on why Hub rename can't be the default). */
   onRename?: (label: string) => void | Promise<void>;
   /** Balance source in luna. Without it the balance stack is hidden. */
   getBalanceLuna?: (address: string) => Promise<number>;
@@ -81,6 +84,14 @@ export interface CornerControlHandle {
 
 const STYLE_ID = 'nimiq-shell-corner-control-style';
 const FIAT_STORE_KEY = 'nq-shell:fiat';
+const LABEL_STORE_PREFIX = 'nq-shell:label:';
+
+function storedLabel(address: string): string | null {
+  try { return localStorage.getItem(LABEL_STORE_PREFIX + address.replace(/\s+/g, '')); } catch { return null; }
+}
+function setStoredLabel(address: string, label: string): void {
+  try { localStorage.setItem(LABEL_STORE_PREFIX + address.replace(/\s+/g, ''), label); } catch { /* ignore */ }
+}
 
 /** Native-language display names (the locked spec shows native names in the
  *  picker; SHELL_LANGUAGES carries English names for other components). */
@@ -133,7 +144,11 @@ function ensureStyles(): void {
 .nq-cc[data-mode="miniapp"] .nq-cc-face-flag { display:inline-flex; }
 
 /* menu */
-.nq-cc-menu { position:absolute; top:calc(100% + 8px); right:0; z-index:60; width:272px; padding:6px;
+/* stays a compact card hanging off the corner on EVERY viewport (Andjroo,
+   mobile review 7/23: full-width phone sheet rejected — "it should just come
+   out of the corner"); max-width only guards sub-300px screens */
+.nq-cc-menu { position:absolute; top:calc(100% + 8px); right:0; z-index:60; width:272px;
+  max-width:calc(100vw - 24px); padding:6px;
   background:var(--nq-cc-menu-bg, #fff); border:var(--nq-cc-menu-border, none); border-radius:10px;
   box-shadow:var(--nq-cc-menu-shadow, 0 4px 28px rgba(0,0,0,.16));
   color:var(--nq-cc-menu-fg, #1f2348); text-align:left; }
@@ -314,10 +329,6 @@ button.nq-cc-name:focus-visible { outline:2px solid var(--nq-cc-accent, #0582ca)
 .nq-cc[data-mode="miniapp"]:not([data-testnet]) .nq-cc-footer,
 .nq-cc[data-mode="miniapp"]:not([data-testnet]) .nq-cc-footer-divider { display:none; }
 
-@media (max-width:560px){
-  .nq-cc { position:static; }
-  .nq-cc-menu { left:clamp(16px,4vw,28px); right:clamp(16px,4vw,28px); width:auto; }
-}
 `;
   document.head.appendChild(style);
 }
@@ -365,6 +376,8 @@ function goldHex(): string {
 }
 
 function shortLabel(account: { label?: string; address: string }, fallback: string): string {
+  const local = account.address ? storedLabel(account.address) : null;
+  if (local) return local;
   if (account.label) return account.label;
   const addr = account.address?.trim() ?? '';
   if (!addr) return fallback;
@@ -498,15 +511,10 @@ export function mountCornerControl(
   const walletSection = el('div', 'nq-cc-section nq-cc-wallet nq-cc-when-connected nq-cc-when-hub', viewMain);
   const accountRow = el('div', 'nq-cc-account', walletSection);
   const identiconSlot = el('span', 'nq-cc-identicon', accountRow);
-  let nameEl: HTMLElement;
-  if (options.onRename) {
-    const btn = el('button', 'nq-cc-name', accountRow);
-    btn.type = 'button';
-    btn.addEventListener('click', () => startRename(btn));
-    nameEl = btn;
-  } else {
-    nameEl = el('span', 'nq-cc-name', accountRow);
-  }
+  // the name IS the rename affordance (tap to edit) — always on, local-first
+  const nameEl = el('button', 'nq-cc-name', accountRow);
+  nameEl.type = 'button';
+  nameEl.addEventListener('click', () => startRename(nameEl));
   const balanceStack = el('div', 'nq-cc-balance', accountRow);
   balanceStack.hidden = true;
   const balanceNim = el('span', 'nq-cc-balance-nim', balanceStack);
@@ -526,7 +534,11 @@ export function mountCornerControl(
     const commit = (): void => {
       const value = inp.value.trim() || current;
       btn.textContent = value;
-      if (value !== current) void options.onRename!(value);
+      if (value !== current) {
+        if (wallet.account) setStoredLabel(wallet.account.address, value);
+        renderFace();
+        if (options.onRename) void options.onRename(value);
+      }
     };
     inp.addEventListener('blur', commit);
     inp.addEventListener('keydown', (e) => {
