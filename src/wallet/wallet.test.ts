@@ -24,6 +24,7 @@ function fakeHubClient(overrides: Partial<HubClient> = {}): HubClient {
       label: 'My Wallet',
     }),
     signTransaction: async () => ({ serializedTx: 'hub-serialized', hash: 'hub-hash' }),
+    checkout: async () => ({ serializedTx: 'hub-checkout-serialized', hash: 'hub-checkout-hash' }),
     ...overrides,
   };
 }
@@ -194,6 +195,31 @@ describe('hub wallet', () => {
     expect(captured.fee).toBe(1);
     expect(res.txHash).toBe('hub-hash');
     expect(res.serializedTx).toBe('hub-serialized');
+  });
+
+  test('pay routes through checkout with the connected account pinned as sender', async () => {
+    let captured: any = null;
+    const client = fakeHubClient({
+      checkout: async (req) => {
+        captured = req;
+        return { serializedTx: 'hub-checkout-serialized', hash: 'hub-checkout-hash' };
+      },
+    });
+    setWindow({});
+    const w = createWallet({ appName: 'Demo' }, { hub: { client, isMobile: false } });
+    await w.connect();
+    const res = await w.pay({ recipient: 'NQ99', valueLuna: 12345 });
+    expect(captured.sender).toBe('NQ11 1111 1111 1111 1111 1111 1111 1111 1111');
+    expect(captured.forceSender).toBe(true);
+    expect(captured.recipient).toBe('NQ99');
+    expect(captured.value).toBe(12345);
+    expect(res.txHash).toBe('hub-checkout-hash');
+  });
+
+  test('pay before connect throws', async () => {
+    setWindow({});
+    const w = createWallet({ appName: 'Demo' }, { hub: { client: fakeHubClient(), isMobile: false } });
+    await expect(w.pay({ recipient: 'NQ99', valueLuna: 1 })).rejects.toThrow(/connect/);
   });
 
   test('signAndSend before connect throws', async () => {
