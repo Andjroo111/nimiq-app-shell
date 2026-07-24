@@ -14,4 +14,11 @@ export default {
   'shell.send': 'Enviar',
   'shell.cancel': 'Cancelar',
   'shell.retry': 'Tentar novamente',
+  'shell.receive': 'Receber',
+  'shell.amountsIn': 'Mostrar valores em',
+  'shell.openInPay': 'Abrir no Nimiq Pay',
+  'shell.network': 'Rede',
+  'shell.tapToCopy': 'Toque no endereço para copiar',
+  'shell.createCashlink': 'Criar um Cashlink',
+  'shell.newToNimiq': 'Novo na Nimiq? Crie uma carteira',
 } as const;
