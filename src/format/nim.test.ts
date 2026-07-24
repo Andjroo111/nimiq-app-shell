@@ -86,6 +86,21 @@ describe('fmtFiat', () => {
     expect(() => fmtFiat(Number.NaN, 'USD')).toThrow();
     expect(() => fmtFiat(Number.POSITIVE_INFINITY, 'EUR')).toThrow();
   });
+
+  // FiatAmount's maxRelativeDeviation rule: extra decimals until the shown
+  // number is within 10% of the true value — sub-cent NIM balances must never
+  // floor to "$0.00" (the wallet shows "$0.0015" for 3 NIM at $0.0005).
+  test('small values grow decimals until within 10% of the truth', () => {
+    expect(fmtFiat(0.0015, 'USD', 'en-US')).toBe('$0.0015');
+    expect(fmtFiat(0.014, 'USD', 'en-US')).toBe('$0.014');
+    expect(fmtFiat(0.5, 'JPY', 'en-US')).toBe('¥0.5');
+  });
+
+  test('zero and ordinary values keep the currency default decimals', () => {
+    expect(fmtFiat(0, 'USD', 'en-US')).toBe('$0.00');
+    expect(fmtFiat(0.32, 'USD', 'en-US')).toBe('$0.32');
+    expect(fmtFiat(103.4, 'USD', 'en-US')).toBe('$103.40');
+  });
 });
 
 // ---- conversions ---------------------------------------------------------------
