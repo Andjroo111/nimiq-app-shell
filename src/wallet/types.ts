@@ -62,6 +62,13 @@ export interface Wallet {
   connect(): Promise<Account | null>;
   /** Sign and broadcast a basic transaction. Routes to the active backend. */
   signAndSend(args: SendArgs): Promise<SendResult>;
+  /** The full wallet-UI payment flow — the user approves in their wallet and
+   *  the transaction is BROADCAST before this resolves. Hub mode: the CHECKOUT
+   *  popup (the Hub transmits itself; no chain access needed here). Mini-app
+   *  mode: the host wallet's native send. This is what a generic "Send" button
+   *  should call; signAndSend is the low-level building block for app-specific
+   *  flows that broadcast on their own. */
+  pay(args: SendArgs): Promise<SendResult>;
   /** Subscribe to account changes. Returns an unsubscribe function. */
   onAccountChange(cb: AccountChangeListener): () => void;
   /** Forget the connected account (local only — does not revoke the wallet). */
