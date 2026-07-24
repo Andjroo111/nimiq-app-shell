@@ -64,8 +64,10 @@ export interface CornerControlOptions {
   };
   /** 'test' renders the network row (mainnet says nothing). Default 'main'. */
   network?: 'main' | 'test';
-  /** "Open in Nimiq Pay" deeplink URL (standalone web only). Hidden when absent. */
-  openInPay?: string;
+  /** "Open in Nimiq Pay" deeplink URL (standalone web only). Hidden when
+   *  absent. Pass a function for URLs that depend on late state (e.g. an auth
+   *  token that must ride along) — it is called at click time. */
+  openInPay?: string | (() => string);
   /** Inject the component's <style> once. Default true. */
   injectStyles?: boolean;
 }
@@ -683,7 +685,10 @@ export function mountCornerControl(
     row.insertAdjacentHTML('beforeend', goldHex());
     const label = el('span', 'nq-cc-strong', row);
     tNode(label, 'shell.openInPay');
-    row.addEventListener('click', () => { window.location.href = options.openInPay!; });
+    row.addEventListener('click', () => {
+      const target = options.openInPay!;
+      window.location.href = typeof target === 'function' ? target() : target;
+    });
   }
 
   // ---- footer ---------------------------------------------------------------
