@@ -139,16 +139,33 @@ export function fmtNim(luna: number | bigint, options: FmtNimOptions = {}): stri
  * Format a fiat value (whole currency units, e.g. 12.5 for $12.50) with the
  * platform's Intl rules: correct symbol, the currency's own decimal count
  * (USD 2, JPY 0, ...), narrow symbol where available ('$', not 'US$').
+ *
+ * Small values get EXTRA decimals until the shown number is within 10% of the
+ * true value — the wallet FiatAmount's maxRelativeDeviation rule. With NIM at
+ * sub-cent prices a small balance would otherwise floor to "$0.00", which
+ * reads as a wrong price, not a rounding (Andjroo's phone review, round 4).
  */
 export function fmtFiat(value: number, currency: string, locale?: string): string {
   if (!Number.isFinite(value)) throw new Error(`fmtFiat: ${value} is not a finite number`);
   const base: Intl.NumberFormatOptions = { style: 'currency', currency };
-  try {
-    return new Intl.NumberFormat(locale, { ...base, currencyDisplay: 'narrowSymbol' }).format(value);
-  } catch {
-    // older engines without narrowSymbol support
-    return new Intl.NumberFormat(locale, base).format(value);
-  }
+  const fmt = (options: Intl.NumberFormatOptions): string => {
+    try {
+      return new Intl.NumberFormat(locale, { ...options, currencyDisplay: 'narrowSymbol' }).format(value);
+    } catch {
+      // older engines without narrowSymbol support
+      return new Intl.NumberFormat(locale, options).format(value);
+    }
+  };
+  if (value === 0) return fmt(base);
+  // Add fraction digits until the rounded value deviates <10% from the true
+  // value (FiatAmount semantics; 20 is Intl's maximumFractionDigits ceiling).
+  // The check is arithmetic (value.toFixed), never parsed back from the
+  // formatted string — locale decimal separators would corrupt a parse.
+  const defaultDigits = new Intl.NumberFormat(locale, base).resolvedOptions().maximumFractionDigits ?? 2;
+  let digits = defaultDigits;
+  while (Math.abs((value - Number(value.toFixed(digits))) / value) > 0.1 && digits < 20) digits += 1;
+  if (digits === defaultDigits) return fmt(base);
+  return fmt({ ...base, minimumFractionDigits: digits, maximumFractionDigits: digits });
 }
 
 /** Luna → whole NIM as a number. Display/math convenience; fine for any real
