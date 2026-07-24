@@ -86,4 +86,10 @@ export interface CreateWalletOptions {
    * Only used when window.nimiqPay is absent but we still probe.
    */
   miniAppInitTimeout?: number;
+  /**
+   * Hub mode: remember the connected account (address + label — public data,
+   * no keys) in localStorage so a reload doesn't force a reconnect. Default
+   * true. Mini-app mode ignores this (the host wallet is the session).
+   */
+  persist?: boolean;
 }
