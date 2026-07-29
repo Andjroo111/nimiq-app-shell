@@ -29,7 +29,11 @@ import { buildFlagHex } from './flag-hex';
 import { fmtNim, fmtFiat, lunaToNim, nimToLuna } from '../format/nim';
 
 export interface CornerControlOptions {
-  wallet: Wallet;
+  /** The app's wallet. OMIT IT on pages that have no wallet concept at all
+   *  (a kid app on device pairing, a portal chooser): the corner then renders
+   *  language-only — the same flag face and single-section menu it shows inside
+   *  Nimiq Pay — instead of offering a Connect button the page can't honour. */
+  wallet?: Wallet;
   i18n: I18n;
   /** Languages to offer. Default: the 5 the shell ships strings for. */
   languages?: ShellLanguage[];
@@ -452,7 +456,10 @@ export function mountCornerControl(
   }
 
   const root = el('div', 'nq-cc');
-  root.dataset.mode = wallet.mode === 'miniapp' ? 'miniapp' : 'hub';
+  // No wallet → the wallet is not merely ambient (mini-app) but absent, and the
+  // menu's own when-hub / when-connected gates already collapse it to the
+  // language section alone. Reuse that state rather than inventing a third mode.
+  root.dataset.mode = !wallet || wallet.mode === 'miniapp' ? 'miniapp' : 'hub';
   if (options.network === 'test') root.dataset.testnet = '';
   container.appendChild(root);
 
@@ -473,7 +480,7 @@ export function mountCornerControl(
 
   function renderFace(): void {
     face.textContent = '';
-    const account = wallet.account;
+    const account = wallet?.account ?? null;
     if (account) {
       root.dataset.connected = '';
       const icon = el('span', 'nq-cc-face-icon', face);
@@ -523,6 +530,7 @@ export function mountCornerControl(
   connectBtn.type = 'button';
   tNode(connectBtn, 'shell.connectWallet');
   connectBtn.addEventListener('click', async () => {
+    if (!wallet) return; // language-only: this button is never rendered
     connectBtn.disabled = true;
     connectBtn.textContent = i18n.t('shell.connecting');
     try {
@@ -571,7 +579,7 @@ export function mountCornerControl(
       const value = inp.value.trim() || current;
       btn.textContent = value;
       if (value !== current) {
-        if (wallet.account) setStoredLabel(wallet.account.address, value);
+        if (wallet?.account) setStoredLabel(wallet.account.address, value);
         renderFace();
         if (options.onRename) void options.onRename(value);
       }
@@ -758,7 +766,7 @@ export function mountCornerControl(
   disconnectBtn.type = 'button';
   tNode(disconnectBtn, 'shell.disconnect');
   disconnectBtn.addEventListener('click', () => {
-    wallet.disconnect();
+    wallet?.disconnect();
     setOpen(false);
   });
   const netGroup = el('span', 'nq-cc-net-group', footer);
@@ -789,7 +797,7 @@ export function mountCornerControl(
 
   let copyTimer: ReturnType<typeof setTimeout> | undefined;
   addressBtn.addEventListener('click', () => {
-    const addr = wallet.account?.address;
+    const addr = wallet?.account?.address;
     if (!addr) return;
     try { void navigator.clipboard.writeText(addr); } catch { /* clipboard unavailable */ }
     copyWrap.classList.add('nq-cc-copied', 'nq-cc-copied-hold');
@@ -854,7 +862,7 @@ export function mountCornerControl(
   amountInput.addEventListener('input', validateSend);
 
   function openSend(): void {
-    if (!wallet.account) return;
+    if (!wallet?.account) return;
     sendError.textContent = '';
     viewSend.classList.remove('nq-cc-sent');
     availableHint.textContent =
@@ -868,6 +876,7 @@ export function mountCornerControl(
   }
 
   sendConfirm.addEventListener('click', async () => {
+    if (!wallet) return; // language-only: the send view is never reachable
     const compact = compactRecipient();
     const spaced = compact.replace(/(.{4})(?=.)/g, '$1 ');
     sendConfirm.disabled = true;
@@ -904,7 +913,7 @@ export function mountCornerControl(
 
   let qrFor = '';
   function openReceive(): void {
-    const account = wallet.account;
+    const account = wallet?.account ?? null;
     if (!account) return;
     root.classList.add('nq-cc-show-receive');
     const compact = account.address.replace(/\s+/g, '');
@@ -939,7 +948,7 @@ export function mountCornerControl(
   let balanceFetchedAt = 0;
   let balanceLuna: number | null = null;
   async function refreshBalance(force = false): Promise<void> {
-    const account = wallet.account;
+    const account = wallet?.account ?? null;
     if (!hasBalance || !account) return;
     const now = Date.now();
     if (!force && now - balanceFetchedAt < 30_000 && balanceLuna !== null) {
@@ -954,7 +963,7 @@ export function mountCornerControl(
     if (hasFiat && balanceLuna !== null) {
       try {
         const rate = await options.fiat!.rate(fiatTicker);
-        if (rate !== null && wallet.account) {
+        if (rate !== null && wallet?.account) {
           balanceFiat.textContent = fmtFiat(lunaToNim(balanceLuna) * rate, fiatTicker);
           balanceFiat.hidden = false;
         } else {
@@ -974,7 +983,7 @@ export function mountCornerControl(
 
   // ---- wallet block render --------------------------------------------------
   function renderWalletBlock(): void {
-    const account = wallet.account;
+    const account = wallet?.account ?? null;
     if (!account) return;
     identiconSlot.textContent = '';
     if (options.identicon) identiconSlot.appendChild(options.identicon(account.address, 40));
@@ -1015,13 +1024,15 @@ export function mountCornerControl(
   renderFaceFlag();
   renderLangValue();
   renderFiatValue();
-  if (wallet.account) renderWalletBlock();
+  if (wallet?.account) renderWalletBlock();
 
-  const unsubWallet = wallet.onAccountChange(() => {
-    renderFace();
-    if (wallet.account) renderWalletBlock();
-    else { balanceLuna = null; balanceStack.hidden = true; }
-  });
+  const unsubWallet = wallet
+    ? wallet.onAccountChange(() => {
+      renderFace();
+      if (wallet.account) renderWalletBlock();
+      else { balanceLuna = null; balanceStack.hidden = true; }
+    })
+    : () => { /* language-only: no wallet to subscribe to */ };
   const unsubLang = i18n.onChange(() => {
     applyLang();
     renderLangValue();
