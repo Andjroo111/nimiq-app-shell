@@ -61,13 +61,23 @@ export interface CornerControlOptions {
   /** Balance source in luna. Without it the balance stack is hidden. */
   getBalanceLuna?: (address: string) => Promise<number>;
   /** Reference-currency support: offered tickers + a 1-NIM price feed. Enables
-   *  the "Show amounts in" grid (only meaningful with getBalanceLuna). */
+   *  the "Show amounts in" grid.
+   *
+   *  This does NOT require a wallet or getBalanceLuna. Which currency a person
+   *  reads amounts in is a display preference, not a property of being signed
+   *  in — and an app can price its own screens off it with no wallet in sight
+   *  (nimiq.kids authenticates by device pairing and still shows NIM values).
+   *  With a balance the menu's own balance line follows it too. */
   fiat?: {
     currencies: string[];
     /** Default ticker. Default 'USD'. */
     default?: string;
-    /** Price of 1 NIM in `ticker`, or null when unknown. */
+    /** Price of 1 NIM in `ticker`, or null when unknown. Only called when a
+     *  balance is being rendered; a fiat-only host may return null. */
     rate: (ticker: string) => Promise<number | null>;
+    /** Called whenever the visitor picks a different ticker, and once at mount
+     *  with the restored/default one, so a host can price its own UI. */
+    onChange?: (ticker: string) => void;
   };
   /** 'test' renders the network row (mainnet says nothing). Default 'main'. */
   network?: 'main' | 'test';
@@ -84,6 +94,9 @@ export interface CornerControlHandle {
   open(): void;
   close(): void;
   destroy(): void;
+  /** The ticker amounts are currently shown in, or null when no fiat feed was
+   *  passed. Lets a host read the restored choice without waiting for onChange. */
+  readonly fiatTicker: string | null;
 }
 
 const STYLE_ID = 'nimiq-shell-corner-control-style';
@@ -443,7 +456,11 @@ export function mountCornerControl(
   const languages = options.languages ?? SHELL_LANGUAGES;
   const showReceive = options.receive !== false;
   const hasBalance = typeof options.getBalanceLuna === 'function';
-  const hasFiat = hasBalance && !!options.fiat && options.fiat.currencies.length > 0;
+  // Currency choice stands on its own: a wallet-less page (the language-only
+  // corner from v0.5.0) still wants to offer it, so this is gated on the fiat
+  // feed alone. It used to require hasBalance, which made the picker
+  // unreachable on exactly those pages.
+  const hasFiat = !!options.fiat && options.fiat.currencies.length > 0;
   if (options.injectStyles !== false) ensureStyles();
 
   let fiatTicker = options.fiat?.default ?? 'USD';
@@ -694,8 +711,11 @@ export function mountCornerControl(
   let fiatValue: HTMLElement | null = null;
   const fiatCards = new Map<string, HTMLButtonElement>();
   if (hasFiat) {
-    el('div', 'nq-cc-divider nq-cc-when-connected', viewMain);
-    const section = el('div', 'nq-cc-section nq-cc-when-connected', viewMain);
+    // With a balance the row belongs to the signed-in block and follows it.
+    // Without one there is nothing to be signed in TO, so it is always visible.
+    const gate = hasBalance ? ' nq-cc-when-connected' : '';
+    el('div', `nq-cc-divider${gate}`, viewMain);
+    const section = el('div', `nq-cc-section${gate}`, viewMain);
     const acc = el('button', 'nq-cc-acc', section);
     acc.type = 'button';
     acc.setAttribute('aria-expanded', 'false');
@@ -720,10 +740,12 @@ export function mountCornerControl(
       const tick = el('span', 'nq-cc-card-ticker', card);
       tick.textContent = ticker;
       card.addEventListener('click', () => {
+        if (ticker === fiatTicker) { window.setTimeout(() => collapse(acc, body), 260); return; }
         fiatTicker = ticker;
         try { localStorage.setItem(FIAT_STORE_KEY, ticker); } catch { /* ignore */ }
         renderFiatValue();
-        void refreshBalance(true);
+        if (hasBalance) void refreshBalance(true);
+        options.fiat!.onChange?.(ticker);
         window.setTimeout(() => collapse(acc, body), 260);
       });
       fiatCards.set(ticker, card);
@@ -1024,6 +1046,9 @@ export function mountCornerControl(
   renderFaceFlag();
   renderLangValue();
   renderFiatValue();
+  // Announce the restored/default ticker so a host renders in the right currency
+  // on first paint, rather than flashing USD until the visitor touches the menu.
+  if (hasFiat) options.fiat!.onChange?.(fiatTicker);
   if (wallet?.account) renderWalletBlock();
 
   const unsubWallet = wallet
@@ -1042,6 +1067,7 @@ export function mountCornerControl(
 
   return {
     el: root,
+    get fiatTicker() { return hasFiat ? fiatTicker : null; },
     open: () => setOpen(true),
     close: () => setOpen(false),
     destroy() {
