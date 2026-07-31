@@ -38,4 +38,38 @@ describe('corner-control data', () => {
     const langOnly: CornerControlOptions = { i18n: {} as never };
     expect(langOnly.wallet).toBeUndefined();
   });
+
+  // The currency grid used to be gated on getBalanceLuna, which made it
+  // unreachable on exactly the wallet-less pages above — a display preference
+  // hidden behind being signed in. These pin the decoupled contract: `fiat`
+  // stands alone, and `onChange` is how a fiat-only host prices its own screens.
+  test('fiat needs no wallet and no balance source', () => {
+    const fiatOnly: CornerControlOptions = {
+      i18n: {} as never,
+      fiat: { currencies: ['USD', 'EUR'], rate: async () => null },
+    };
+    expect(fiatOnly.wallet).toBeUndefined();
+    expect(fiatOnly.getBalanceLuna).toBeUndefined();
+    expect(fiatOnly.fiat!.currencies).toHaveLength(2);
+  });
+
+  test('fiat.onChange is part of the contract', () => {
+    const seen: string[] = [];
+    const withHook: CornerControlOptions = {
+      i18n: {} as never,
+      fiat: {
+        currencies: ['USD'], rate: async () => null,
+        onChange: (ticker) => seen.push(ticker),
+      },
+    };
+    withHook.fiat!.onChange!('EUR');
+    expect(seen).toEqual(['EUR']);
+  });
+
+  test('every ticker a host may offer has flag artwork', () => {
+    // nimiq.kids offers all 14 its rate feed returns; each needs a hexagon.
+    const offered = ['USD', 'EUR', 'GBP', 'MXN', 'BRL', 'CNY', 'INR',
+      'JPY', 'CHF', 'CAD', 'AUD', 'KRW', 'TRY', 'VND'];
+    for (const ticker of offered) expect(FIAT_FLAGS[ticker], ticker).toBeDefined();
+  });
 });
