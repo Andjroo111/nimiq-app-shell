@@ -39,6 +39,17 @@ describe('corner-control data', () => {
     expect(langOnly.wallet).toBeUndefined();
   });
 
+  // v0.5.0 gave those pages the mini-app FACE too — chrome-less flag, no pill —
+  // so the nimiq.kids portal header lost the control outline every wallet page
+  // still wore (Andrew, 7/31). The menu gating is legitimately shared; the face
+  // is not. No DOM in this suite, so pin both halves at the source: the mount
+  // stamps data-face, and data-face carries the pill.
+  test('a wallet-less corner wears the outline pill, not the mini-app flag', async () => {
+    const src = await Bun.file(new URL('./corner-control.ts', import.meta.url)).text();
+    expect(src).toContain("if (!wallet) root.dataset.face = 'lang';");
+    expect(src).toMatch(/\.nq-cc\[data-face="lang"\] \.nq-cc-face-flag \{[^}]*border-radius:999px/);
+  });
+
   // The currency grid used to be gated on getBalanceLuna, which made it
   // unreachable on exactly the wallet-less pages above — a display preference
   // hidden behind being signed in. These pin the decoupled contract: `fiat`

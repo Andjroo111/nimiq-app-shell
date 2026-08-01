@@ -31,8 +31,9 @@ import { fmtNim, fmtFiat, lunaToNim, nimToLuna } from '../format/nim';
 export interface CornerControlOptions {
   /** The app's wallet. OMIT IT on pages that have no wallet concept at all
    *  (a kid app on device pairing, a portal chooser): the corner then renders
-   *  language-only — the same flag face and single-section menu it shows inside
-   *  Nimiq Pay — instead of offering a Connect button the page can't honour. */
+   *  language-only — the flag inside the same outline pill the wallet pages
+   *  wear, over the single-section menu it shows inside Nimiq Pay — instead of
+   *  offering a Connect button the page can't honour. */
   wallet?: Wallet;
   i18n: I18n;
   /** Languages to offer. Default: the 5 the shell ships strings for. */
@@ -160,6 +161,20 @@ function ensureStyles(): void {
 .nq-cc-face-flag:focus-visible { outline:2px solid var(--nq-cc-accent, #0582ca); outline-offset:2px; }
 .nq-cc[data-mode="miniapp"] .nq-cc-face { display:none; }
 .nq-cc[data-mode="miniapp"] .nq-cc-face-flag { display:inline-flex; }
+
+/* face (language-only): the SAME outline pill as hub mode, holding the flag.
+   Chrome-less is a mini-app statement — inside Nimiq Pay the host wallet is the
+   context, so the control recedes. A wallet-less page (the kid app, the portal
+   chooser) is not that: the language control is the header's only affordance and
+   has to read as a control, exactly like the langpill it replaced and like the
+   pill sitting on every wallet page. Both share data-mode="miniapp" for the
+   MENU gating; only the face differs, so it keys off data-face. */
+.nq-cc[data-face="lang"] .nq-cc-face-flag { height:40px; padding:0 12px;
+  border:1px solid color-mix(in srgb, currentColor 22%, transparent); border-radius:999px;
+  transition:border-color .15s var(--nimiq-ease, cubic-bezier(.25,0,0,1)), background-color .15s var(--nimiq-ease, cubic-bezier(.25,0,0,1)); }
+.nq-cc[data-face="lang"] .nq-cc-face-flag:hover { border-color: color-mix(in srgb, currentColor 45%, transparent);
+  background: color-mix(in srgb, currentColor 6%, transparent); }
+.nq-cc[data-face="lang"] .nq-cc-face-flag:focus-visible { outline-offset:3px; }
 
 /* menu */
 /* stays a compact card hanging off the corner on EVERY viewport (Andrew,
@@ -477,6 +492,9 @@ export function mountCornerControl(
   // menu's own when-hub / when-connected gates already collapse it to the
   // language section alone. Reuse that state rather than inventing a third mode.
   root.dataset.mode = !wallet || wallet.mode === 'miniapp' ? 'miniapp' : 'hub';
+  // ...but the FACE is not shared: mini-app recedes into the host wallet's
+  // chrome, a wallet-less page keeps the outline pill (see the data-face rules).
+  if (!wallet) root.dataset.face = 'lang';
   if (options.network === 'test') root.dataset.testnet = '';
   container.appendChild(root);
 
