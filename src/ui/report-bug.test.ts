@@ -6,6 +6,7 @@ import { afterEach, describe, expect, test } from 'bun:test';
 import {
   validateFeedbackInput,
   submitFeedback,
+  submitToBot,
   type FeedbackInput,
 } from './report-bug';
 import { shellLocales } from '../locales';
@@ -137,5 +138,103 @@ describe('submitFeedback', () => {
     globalThis.fetch = (async () => { throw new Error('Failed to fetch'); }) as unknown as typeof fetch;
     const result = await submitFeedback('/api/feedback', valid);
     expect(result).toMatchObject({ ok: false, status: 0, error: 'Failed to fetch' });
+  });
+});
+
+describe('submitToBot (the nimiq.bot transport)', () => {
+  const calls: Array<{ url: string; body: Record<string, unknown> }> = [];
+  function stubBot(draftRes: Record<string, unknown>, fileRes: Record<string, unknown>, okDraft = true, okFile = true): void {
+    calls.length = 0;
+    globalThis.fetch = (async (url: string, init?: RequestInit) => {
+      const body = JSON.parse(String(init?.body ?? '{}'));
+      calls.push({ url: String(url), body });
+      const isDraft = String(url).endsWith('/api/draft');
+      return {
+        ok: isDraft ? okDraft : okFile,
+        status: (isDraft ? okDraft : okFile) ? 200 : 500,
+        json: async () => (isDraft ? draftRes : fileRes),
+      } as Response;
+    }) as unknown as typeof fetch;
+  }
+  const draftOk = {
+    reportId: 'r1',
+    draft: { title: 'Timer freezes at 30 seconds', body: 'The egg timer sticks.', labels: ['bug', 'user-report'] },
+  };
+  const filedOk = { url: 'https://github.test/i/12', number: 12 };
+
+  test('drafts then files, against the repo it was given', async () => {
+    stubBot(draftOk, filedOk);
+    const result = await submitToBot({ repo: 'nimiq.kids' }, valid);
+    expect(result).toMatchObject({ ok: true, issueNumber: 12, issueUrl: 'https://github.test/i/12' });
+    expect(calls.map((c) => c.url)).toEqual([
+      'https://bot.nimiq.tech/api/draft',
+      'https://bot.nimiq.tech/api/file',
+    ]);
+    expect(calls[0]!.body.repo).toBe('nimiq.kids');
+    expect(calls[1]!.body.reportId).toBe('r1');
+  });
+
+  test('host labels ride along with the drafted ones, deduped', async () => {
+    stubBot(draftOk, filedOk);
+    await submitToBot({ repo: 'nimiq.kids', labels: ['surface:kid', 'bug'] }, valid);
+    expect(calls[1]!.body.labels).toEqual(['bug', 'user-report', 'surface:kid']);
+  });
+
+  // In bot mode the browser talks to the service directly, so there is no server
+  // of ours left to scrub on the way out. If this regresses, kid account ids go
+  // into public GitHub issues.
+  test('addresses are redacted from the text AND from captured context', async () => {
+    stubBot(draftOk, filedOk);
+    await submitToBot({ repo: 'nimiq.kids' }, {
+      ...valid,
+      description: 'it paid NQ07 0000 0000 0000 0000 0000 0000 0000 0000 twice',
+      pageContext: {
+        consoleErrors: ['balance failed for NQ070000000000000000000000000000000000'],
+        url: 'https://nimiq.kids/kid/',
+      },
+    });
+    const sent = JSON.stringify(calls[0]!.body);
+    expect(sent).not.toContain('NQ07 0000');
+    expect(sent).not.toContain('NQ0700000000');
+    expect(sent).toContain('[address redacted]');
+  });
+
+  test('the draft title is scrubbed too, since the service echoes our text back', async () => {
+    stubBot({ reportId: 'r1', draft: { title: 'Sent to NQ07 0000 0000 0000 0000 0000 0000 0000 0000', body: 'b' } }, filedOk);
+    await submitToBot({ repo: 'nimiq.kids' }, valid);
+    expect(String(calls[1]!.body.title)).toContain('[address redacted]');
+  });
+
+  test('a service error code becomes a sentence, not a code', async () => {
+    stubBot({ error: 'rate_limited' }, {}, false);
+    const result = await submitToBot({ repo: 'nimiq.kids' }, valid);
+    expect(result.ok).toBe(false);
+    expect(result.error).toBe('Too many reports just now. Give it a minute.');
+  });
+
+  // The widget treats this as success and so must we: the issue exists, and
+  // telling someone it failed gets the same bug filed twice.
+  test('a non-2xx file response that still carries a url counts as filed', async () => {
+    stubBot(draftOk, { url: 'https://github.test/i/13', number: 13 }, true, false);
+    const result = await submitToBot({ repo: 'nimiq.kids' }, valid);
+    expect(result).toMatchObject({ ok: true, issueNumber: 13 });
+  });
+
+  test('a draft with nothing to file does not blindly POST /api/file', async () => {
+    stubBot({ reportId: 'r1' }, filedOk);
+    const result = await submitToBot({ repo: 'nimiq.kids' }, valid);
+    expect(result.ok).toBe(false);
+    expect(calls).toHaveLength(1);
+  });
+
+  test('a custom service origin is honoured, trailing slash and all', async () => {
+    stubBot(draftOk, filedOk);
+    await submitToBot({ repo: 'nimiq.kids', service: 'https://bot.test/' }, valid);
+    expect(calls[0]!.url).toBe('https://bot.test/api/draft');
+  });
+
+  test('offline comes back as a result, never a throw', async () => {
+    globalThis.fetch = (async () => { throw new Error('Failed to fetch'); }) as unknown as typeof fetch;
+    expect(await submitToBot({ repo: 'nimiq.kids' }, valid)).toMatchObject({ ok: false, status: 0 });
   });
 });
