@@ -191,34 +191,21 @@ export async function submitToBot(
   }
 }
 
-/** The half of the context that has to travel IN THE TEXT.
+/** The part of the host's context that nimiq.bot does not render.
  *
- *  nimiq.bot renders an Environment block from `context` (URL, page, viewport,
- *  browser, referrer) and drops everything else — verified against a real filed
- *  issue: the console errors, the failed requests and the host's own fields were
- *  accepted and then not shown. Those are the parts a maintainer actually needs,
- *  and the reported text IS rendered, so they ride there instead. Send `context`
- *  as well: the service's own block is better than re-typing it here, and if it
- *  learns to render the rest this becomes belt and braces rather than a lie. */
+ *  It builds an Environment block from `context` and DOES render `consoleErrors`
+ *  and `networkFailures` from it (src/issue.ts) — an earlier version of this
+ *  function repeated both into the text, on the strength of one filed issue that
+ *  showed neither. That issue simply had no errors to show. What the service
+ *  genuinely drops is everything it does not have a field for, which is the
+ *  host's own: surface, app version, whatever else an app passes.
+ *
+ *  So only those travel here. The captured errors keep going as structured
+ *  context, where they get proper fenced sections rather than a second copy. */
 function diagnosticLines(input: FeedbackInput): string[] {
-  const ctx = input.pageContext as
-    | { consoleErrors?: string[]; networkFailures?: string[] }
-    | undefined;
   const host = input.context ?? {};
-  const errors = ctx?.consoleErrors ?? [];
-  const failures = ctx?.networkFailures ?? [];
   const hostLine = Object.entries(host).map(([k, v]) => `${k}: ${v}`).join(' · ');
-  if (!hostLine && !errors.length && !failures.length) return [];
-
-  const out = ['', '---'];
-  if (hostLine) out.push(hostLine);
-  if (errors.length) {
-    out.push('', `Console (last ${Math.min(errors.length, 5)}):`, '```', ...errors.slice(-5), '```');
-  }
-  if (failures.length) {
-    out.push('', 'Failed requests:', '```', ...failures.slice(-5), '```');
-  }
-  return out;
+  return hostLine ? ['', '---', hostLine] : [];
 }
 
 /** nimiq.bot answers with machine codes; these are the human versions, matching

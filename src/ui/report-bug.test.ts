@@ -300,10 +300,11 @@ describe('submitToBot: a missing label must not swallow the report', () => {
   });
 });
 
-describe('submitToBot: what the service drops has to ride in the text', () => {
-  // Verified against a real filed issue: nimiq.bot renders URL/viewport/browser
-  // from `context` and shows nothing else, so console errors, failed requests
-  // and the host's own fields were arriving and then vanishing.
+describe('submitToBot: the host fields the service has no place for', () => {
+  // nimiq.bot renders an Environment block plus fenced Console errors / Failed
+  // requests sections from `context` (its src/issue.ts). What it has no field
+  // for is the host's own: surface, app version. Those go in the text; the
+  // captured errors must NOT, or every report carries them twice.
   const calls: Array<Record<string, unknown>> = [];
   function stub(): void {
     calls.length = 0;
@@ -315,47 +316,47 @@ describe('submitToBot: what the service drops has to ride in the text', () => {
     }) as unknown as typeof fetch;
   }
 
-  test('surface, version, console errors and failed requests reach the text', async () => {
+  test('surface and version reach the text, which the service renders verbatim', async () => {
     stub();
     await submitToBot({ repo: 'nimiq.kids' }, {
       ...valid,
       context: { surface: 'kid', version: '0.99.0' },
+    });
+    const text = String(calls[0]!.text);
+    expect(text).toContain('surface: kid');
+    expect(text).toContain('version: 0.99.0');
+  });
+
+  test('captured errors travel ONCE, as structured context', async () => {
+    stub();
+    await submitToBot({ repo: 'nimiq.kids' }, {
+      ...valid,
+      context: { surface: 'kid' },
       pageContext: {
         consoleErrors: ['TypeError: x is not a function'],
         networkFailures: ['GET /api/rates -> 502'],
       },
     });
-    const text = String(calls[0]!.text);
-    expect(text).toContain('surface: kid');
-    expect(text).toContain('version: 0.99.0');
-    expect(text).toContain('TypeError: x is not a function');
-    expect(text).toContain('GET /api/rates -> 502');
-    expect((calls[0]!.context as Record<string, unknown>).surface).toBe('kid');
+    const ctx = calls[0]!.context as Record<string, unknown>;
+    expect(ctx.consoleErrors).toEqual(['TypeError: x is not a function']);
+    // ...and NOT a second time in the prose, which is what the service prints.
+    expect(String(calls[0]!.text)).not.toContain('TypeError');
+    expect(String(calls[0]!.text)).not.toContain('/api/rates');
   });
 
-  test('nothing to report adds no trailing rule', async () => {
+  test('no host context adds no trailing rule', async () => {
     stub();
     await submitToBot({ repo: 'nimiq.kids' }, valid);
     expect(String(calls[0]!.text).trim().endsWith('---')).toBe(false);
-    expect(String(calls[0]!.text)).not.toContain('Console');
   });
 
   test('the appended block is scrubbed like everything else', async () => {
     stub();
     await submitToBot({ repo: 'nimiq.kids' }, {
       ...valid,
-      pageContext: { consoleErrors: ['send failed to NQ07 0000 0000 0000 0000 0000 0000 0000 0000'] },
+      context: { lastAddress: 'NQ07 0000 0000 0000 0000 0000 0000 0000 0000' },
     });
     expect(String(calls[0]!.text)).toContain('[address redacted]');
     expect(String(calls[0]!.text)).not.toContain('NQ07 0000');
-  });
-
-  test('only the last few lines travel, so a noisy page cannot flood the issue', async () => {
-    stub();
-    const many = Array.from({ length: 20 }, (_, i) => `error ${i}`);
-    await submitToBot({ repo: 'nimiq.kids' }, { ...valid, pageContext: { consoleErrors: many } });
-    const text = String(calls[0]!.text);
-    expect(text).toContain('error 19');
-    expect(text).not.toContain('error 14');
   });
 });
