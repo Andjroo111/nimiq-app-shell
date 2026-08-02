@@ -267,6 +267,13 @@ export function openReportBugSheet(doc: Document, i18n: I18n, options: ReportBug
   doc.addEventListener('keydown', onKey);
   summaryEl.focus();
 
+  // Editing anything clears the complaint. Leaving "give it a summary of at
+  // least 5 characters" under a summary that now has forty of them reads as the
+  // form still refusing, and people re-read the message instead of pressing Send.
+  for (const field of [typeEl, summaryEl, detailsEl]) {
+    field.addEventListener('input', () => { errEl.style.display = 'none'; });
+  }
+
   sendBtn.addEventListener('click', async () => {
     const input: FeedbackInput = {
       type: (typeEl.value as ReportBugType | '') || '',
