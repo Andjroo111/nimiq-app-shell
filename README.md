@@ -206,6 +206,42 @@ mountWalletPill(document.querySelector('#wallet')!, { wallet, i18n }); // connec
 
 All inject their own `<style>` once and return a handle with `destroy()`.
 
+### Report a bug (v0.7.0)
+
+The corner control can carry the fleet's bug reporter. Pass `reportBug` and a
+**Report a bug** row appears in the menu, above the footer; leave it off and there
+is no row, like every other seam here.
+
+```ts
+mountCornerControl(document.querySelector('#wallet-slot')!, {
+  wallet, i18n,
+  reportBug: {
+    endpoint: '/api/feedback',                       // your server, your channel
+    context: { surface: 'parent', version: '1.4.0' } // static fields, sent verbatim
+  },
+});
+```
+
+The shell renders the sheet (type / summary / details + an opt-in diagnostics
+box) and POSTs JSON to `endpoint`. Turning that into a GitHub issue, an email or
+a ticket is the **host server's** job: no token ever reaches the browser. A
+non-2xx keeps the sheet open with the text intact, and a `fallbackMailto` in the
+error body becomes an "email instead" link, so a server that isn't wired up yet
+still doesn't lose a report.
+
+Deliberate choices worth knowing:
+
+- **No floating button.** The corner is the fleet's one header control; a
+  reporter doesn't get to add a second permanent affordance to every page.
+- **Ungated by wallet state** — it shows connected or not, hub or mini-app,
+  because a bug on a wallet-less page is still a bug.
+- **Diagnostics are opt-in and thin**: path + hash (no query string), UA,
+  language, viewport. Put nothing personal in `context`.
+
+Pass a function instead of the object (`reportBug: () => openMyOwnForm()`) to
+keep the row but render your own UI. `openReportBugSheet`, `submitFeedback` and
+`validateFeedbackInput` are exported for hosts with another entry point.
+
 ---
 
 ## Use without a bundler (prebuilt ESM)
