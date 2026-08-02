@@ -8,6 +8,7 @@ import type {
   CreateWalletOptions,
   SendArgs,
   SendResult,
+  SignMessageResult,
   Wallet,
   WalletMode,
 } from './types';
@@ -22,6 +23,7 @@ export type {
   CreateWalletOptions,
   SendArgs,
   SendResult,
+  SignMessageResult,
   Wallet,
   WalletMode,
 };
@@ -107,6 +109,9 @@ export function createWallet(
     },
     pay(args: SendArgs): Promise<SendResult> {
       return backend.pay(args);
+    },
+    signMessage(message: string): Promise<SignMessageResult> {
+      return backend.signMessage(message);
     },
     onAccountChange(cb: AccountChangeListener): () => void {
       listeners.add(cb);

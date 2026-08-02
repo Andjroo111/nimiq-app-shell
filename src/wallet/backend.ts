@@ -1,7 +1,7 @@
 // The backend seam: both the mini-app and Hub implementations satisfy this,
 // and createWallet routes the unified API to whichever one the runtime selected.
 
-import type { Account, SendArgs, SendResult } from './types';
+import type { Account, SendArgs, SendResult, SignMessageResult } from './types';
 
 export interface WalletBackend {
   readonly mode: 'miniapp' | 'hub';
@@ -13,6 +13,9 @@ export interface WalletBackend {
   /** The wallet-UI payment flow (broadcast guaranteed): Hub checkout popup /
    *  the mini-app host's native send. */
   pay(args: SendArgs): Promise<SendResult>;
+  /** Sign a UTF-8 message on the active backend — a wallet-ownership proof.
+   *  Throws when no wallet is connected. */
+  signMessage(message: string): Promise<SignMessageResult>;
   /** Register the callback createWallet uses to keep its `account` in sync and
    *  fan out to onAccountChange subscribers. */
   setAccountChange(cb: (account: Account | null) => void): void;
@@ -36,4 +39,14 @@ export function dataToBytes(data: string | Uint8Array | undefined): Uint8Array |
   if (data == null) return undefined;
   const bytes = typeof data === 'string' ? new TextEncoder().encode(data) : data;
   return bytes.length === 0 ? undefined : bytes;
+}
+
+/** Hex-encode raw bytes (the signature/public-key Uint8Arrays the Hub returns),
+ *  so both backends emit the same hex-string shape a signed-message verifier
+ *  deserialises. Unlike dataToHex this never returns undefined — a signature or
+ *  public key is always non-empty. */
+export function bytesToHex(bytes: Uint8Array): string {
+  let hex = '';
+  for (const b of bytes) hex += b.toString(16).padStart(2, '0');
+  return hex;
 }
