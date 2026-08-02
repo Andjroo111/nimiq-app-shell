@@ -153,13 +153,22 @@ export async function submitToBot(
     }
 
     const labels = [...new Set([...(draft.labels ?? []), ...(bot.labels ?? [])])];
-    const filed = await post('/api/file', {
+    const issue = {
       reportId,
       repo: bot.repo,
       title: scrubAddresses(draft.title),
       body: scrubAddresses(draft.body),
-      labels,
-    });
+    };
+    let filed = await post('/api/file', { ...issue, labels });
+
+    // A label the repo does not have takes the WHOLE issue down with it (GitHub
+    // 422s the create, the service reports github_failed, and the person is told
+    // to try again — which fails identically, forever). Verified against a live
+    // repo: `user-report` was missing and every report died on it. A report is
+    // worth more than its labels, so drop them and file it anyway.
+    if (!filed.res.ok && labels.length && String(filed.json.error ?? '') === 'github_failed') {
+      filed = await post('/api/file', { ...issue, labels: [] });
+    }
     // The service can answer non-2xx and STILL have filed the issue (it returns
     // the url when that happens), which the widget also treats as success.
     const url = filed.json.url as string | undefined;
