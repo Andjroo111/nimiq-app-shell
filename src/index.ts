@@ -98,3 +98,15 @@ export {
   type CornerControlOptions,
   type CornerControlHandle,
 } from './ui/corner-control';
+// The corner's Report a bug row wires itself from `reportBug`; these are for
+// hosts that want the sheet from their own entry point, or the validator alone.
+export {
+  openReportBugSheet,
+  validateFeedbackInput,
+  submitFeedback,
+  collectDiagnostics,
+  type ReportBugOptions,
+  type ReportBugType,
+  type FeedbackInput,
+  type SubmitFeedbackResult,
+} from './ui/report-bug';
