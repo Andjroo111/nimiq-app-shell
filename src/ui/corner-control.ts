@@ -28,6 +28,7 @@ import { SHELL_LANGUAGES, type ShellLanguage } from '../locales';
 import { buildFlagHex } from './flag-hex';
 import { fmtNim, fmtFiat, lunaToNim, nimToLuna } from '../format/nim';
 import { BUG_ICON, openReportBugSheet, type ReportBugOptions } from './report-bug';
+import { installReportCapture } from './report-capture';
 
 export interface CornerControlOptions {
   /** The app's wallet. OMIT IT on pages that have no wallet concept at all
@@ -816,6 +817,12 @@ export function mountCornerControl(
   // No nq-cc-when-* gate: unlike the wallet rows above, this one is about the
   // PAGE, not the account, so it shows connected or not, hub or mini-app.
   if (options.reportBug) {
+    // Hooks go in at MOUNT, not when the sheet opens: by the time someone taps
+    // "Report a bug" the error they are reporting has already happened, and the
+    // console error that explains it is the one nobody can retype.
+    if (typeof options.reportBug === 'object' && options.reportBug.bot) {
+      installReportCapture(options.reportBug.bot.service ?? 'https://bot.nimiq.tech');
+    }
     el('div', 'nq-cc-divider', viewMain);
     const row = el('button', 'nq-cc-row nq-cc-report', viewMain);
     row.type = 'button';
