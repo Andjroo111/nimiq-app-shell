@@ -206,9 +206,9 @@ mountWalletPill(document.querySelector('#wallet')!, { wallet, i18n }); // connec
 
 All inject their own `<style>` once and return a handle with `destroy()`.
 
-### Report a bug (v0.7.0)
+### Report a bug (v0.8.0)
 
-The corner control can carry the fleet's bug reporter. Pass `reportBug` and a
+The corner control carries the fleet's bug reporter. Pass `reportBug` and a
 **Report a bug** row appears in the menu, above the footer; leave it off and there
 is no row, like every other seam here.
 
@@ -216,30 +216,42 @@ is no row, like every other seam here.
 mountCornerControl(document.querySelector('#wallet-slot')!, {
   wallet, i18n,
   reportBug: {
-    endpoint: '/api/feedback',                       // your server, your channel
-    context: { surface: 'parent', version: '1.4.0' } // static fields, sent verbatim
+    bot: { repo: 'nimiq.kids', labels: ['surface:parent'] },  // files via bot.nimiq.tech
+    context: { surface: 'parent', version: '1.4.0' },         // static fields, sent verbatim
   },
 });
 ```
 
-The shell renders the sheet (type / summary / details + an opt-in diagnostics
-box) and POSTs JSON to `endpoint`. Turning that into a GitHub issue, an email or
-a ticket is the **host server's** job: no token ever reaches the browser. A
-non-2xx keeps the sheet open with the text intact, and a `fallbackMailto` in the
-error body becomes an "email instead" link, so a server that isn't wired up yet
-still doesn't lose a report.
+That is the whole integration. **No endpoint of your own and no GitHub token
+anywhere**: [nimiq.bot](https://bot.nimiq.tech) drafts the issue with an LLM and
+files it into `repo`, exactly as its floating widget does, so a report from the
+corner and a report from the widget read the same in your issue tracker.
+
+Apps that must keep reports on their own origin can pass `endpoint: '/api/feedback'`
+instead and file them themselves; the payload is flat JSON and a non-2xx with a
+`fallbackMailto` in the body becomes an "email instead" link.
+
+**Page context comes for free.** `installReportCapture()` runs at mount and rings
+the last 20 console errors, unhandled rejections and failed requests, which ship
+with the report. At mount, not at open: by the time someone taps the row, the
+error they are reporting happened minutes ago and nobody can retype a stack.
 
 Deliberate choices worth knowing:
 
 - **No floating button.** The corner is the fleet's one header control; a
-  reporter doesn't get to add a second permanent affordance to every page.
+  reporter doesn't get to add a second permanent affordance to every page. (The
+  nimiq.bot widget does mount one — this is the same service without it.)
 - **Ungated by wallet state** — it shows connected or not, hub or mini-app,
   because a bug on a wallet-less page is still a bug.
-- **Diagnostics are opt-in and thin**: path + hash (no query string), UA,
-  language, viewport. Put nothing personal in `context`.
+- **Addresses are redacted client-side**, from the text, the captured context and
+  the title the service returns. In bot mode nothing of yours sits between the
+  browser and the issue, so this cannot be a server's job.
+- **No draft to approve.** The service can hand back an editable issue draft; the
+  sheet files straight through. Asking a parent to proofread a GitHub issue is
+  not a review step, it is an obstacle.
 
-Pass a function instead of the object (`reportBug: () => openMyOwnForm()`) to
-keep the row but render your own UI. `openReportBugSheet`, `submitFeedback` and
+Pass a function instead (`reportBug: () => openMyOwnForm()`) to keep the row and
+render your own UI. `openReportBugSheet`, `submitToBot`, `submitFeedback` and
 `validateFeedbackInput` are exported for hosts with another entry point.
 
 ---
