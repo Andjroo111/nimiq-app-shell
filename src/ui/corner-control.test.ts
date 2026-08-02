@@ -77,6 +77,48 @@ describe('corner-control data', () => {
     expect(seen).toEqual(['EUR']);
   });
 
+  // The bug row is a seam like every other one here: absent option, no row. It
+  // takes either an options object (the shell owns the sheet) or a plain
+  // callback (the host renders its own).
+  test('reportBug is optional, and accepts either form', () => {
+    const none: CornerControlOptions = { i18n: {} as never };
+    expect(none.reportBug).toBeUndefined();
+
+    const shellOwned: CornerControlOptions = {
+      i18n: {} as never,
+      reportBug: { endpoint: '/api/feedback', context: { surface: 'kid' } },
+    };
+    expect(typeof shellOwned.reportBug).toBe('object');
+
+    let opened = 0;
+    const hostOwned: CornerControlOptions = { i18n: {} as never, reportBug: () => { opened += 1; } };
+    (hostOwned.reportBug as () => void)();
+    expect(opened).toBe(1);
+  });
+
+  // A bug on a wallet-less page is still a bug. The row must NOT carry the
+  // nq-cc-when-hub / nq-cc-when-connected gates the wallet rows use, or the kid
+  // app and every mini-app surface would render the menu without it.
+  test('the bug row is ungated by wallet state', async () => {
+    const src = await Bun.file(new URL('./corner-control.ts', import.meta.url)).text();
+    const row = src.match(/const row = el\('button', 'nq-cc-row nq-cc-report'[^;]*;/);
+    expect(row).not.toBeNull();
+    expect(row![0]).not.toContain('nq-cc-when-');
+  });
+
+  test('the bug row strings exist in every shipped locale', () => {
+    const keys = [
+      'shell.reportBug', 'shell.fbType', 'shell.fbBug', 'shell.fbIdea', 'shell.fbQuestion',
+      'shell.fbSummary', 'shell.fbDetails', 'shell.fbIncludeDiag', 'shell.fbSend',
+      'shell.fbSending', 'shell.fbThanks', 'shell.fbFailed', 'shell.fbFailEmail',
+    ];
+    for (const [locale, messages] of Object.entries(shellLocales)) {
+      for (const key of keys) {
+        expect((messages as Record<string, string>)[key], `${locale}:${key}`).toBeDefined();
+      }
+    }
+  });
+
   test('every ticker a host may offer has flag artwork', () => {
     // nimiq.kids offers all 14 its rate feed returns; each needs a hexagon.
     const offered = ['USD', 'EUR', 'GBP', 'MXN', 'BRL', 'CNY', 'INR',

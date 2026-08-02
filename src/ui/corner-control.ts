@@ -27,6 +27,7 @@ import type { Wallet } from '../wallet';
 import { SHELL_LANGUAGES, type ShellLanguage } from '../locales';
 import { buildFlagHex } from './flag-hex';
 import { fmtNim, fmtFiat, lunaToNim, nimToLuna } from '../format/nim';
+import { BUG_ICON, openReportBugSheet, type ReportBugOptions } from './report-bug';
 
 export interface CornerControlOptions {
   /** The app's wallet. OMIT IT on pages that have no wallet concept at all
@@ -86,6 +87,18 @@ export interface CornerControlOptions {
    *  absent. Pass a function for URLs that depend on late state (e.g. an auth
    *  token that must ride along) — it is called at click time. */
   openInPay?: string | (() => string);
+  /** Wire the "Report a bug" row. Hidden when absent, like every other seam
+   *  here, so no app grows a dead button.
+   *
+   *  This is the fleet's ONE bug entry point by design: the corner is already
+   *  the only header control, so a reporter that added a second permanent
+   *  affordance (a floating dot, say) would cost every app a piece of its
+   *  screen. Object form = the shell owns the whole flow (row, sheet, POST to
+   *  your endpoint); function form = the host renders its own UI.
+   *
+   *  Present in EVERY presentation, including language-only and inside Nimiq
+   *  Pay: a bug on a wallet-less page is still a bug someone needs to report. */
+  reportBug?: ReportBugOptions | (() => void);
   /** Inject the component's <style> once. Default true. */
   injectStyles?: boolean;
 }
@@ -153,7 +166,7 @@ function ensureStyles(): void {
 .nq-cc-face-label { white-space:nowrap; }
 .nq-cc[data-connected] .nq-cc-face-label { font-family:ui-monospace,'Fira Mono',monospace; letter-spacing:.02em; }
 
-/* face (mini-app mode): flag only — the wallet is ambient */
+/* face (mini-app mode): flag only, the wallet is ambient */
 .nq-cc-face-flag { display:none; align-items:center; gap:7px; height:38px; padding:0 10px;
   border:none; border-radius:8px; background:none; cursor:pointer; color:inherit;
   transition:background .2s var(--nimiq-ease, cubic-bezier(.25,0,0,1)); }
@@ -163,7 +176,7 @@ function ensureStyles(): void {
 .nq-cc[data-mode="miniapp"] .nq-cc-face-flag { display:inline-flex; }
 
 /* face (language-only): the SAME outline pill as hub mode, holding the flag.
-   Chrome-less is a mini-app statement — inside Nimiq Pay the host wallet is the
+   Chrome-less is a mini-app statement: inside Nimiq Pay the host wallet is the
    context, so the control recedes. A wallet-less page (the kid app, the portal
    chooser) is not that: the language control is the header's only affordance and
    has to read as a control, exactly like the langpill it replaced and like the
@@ -178,7 +191,7 @@ function ensureStyles(): void {
 
 /* menu */
 /* stays a compact card hanging off the corner on EVERY viewport (Andjroo,
-   mobile review 7/23: full-width phone sheet rejected — "it should just come
+   mobile review 7/23: full-width phone sheet rejected, "it should just come
    out of the corner"); max-width only guards sub-300px screens */
 .nq-cc-menu { position:absolute; top:calc(100% + 8px); right:0; z-index:60; width:272px;
   max-width:calc(100vw - 24px); padding:6px;
@@ -256,7 +269,7 @@ button.nq-cc-name:focus-visible { outline:2px solid var(--nq-cc-accent, #0582ca)
 .nq-cc.nq-cc-show-receive .nq-cc-view-main { display:none; }
 .nq-cc.nq-cc-show-receive .nq-cc-view-receive { display:block; }
 
-/* send view: the mini-wallet send — recipient + amount here, the user's own
+/* send view: the mini-wallet send: recipient + amount here, the user's own
    wallet only appears for the approval (Hub checkout / Nimiq Pay confirm) */
 .nq-cc-view-send { display:none; }
 .nq-cc.nq-cc-show-send .nq-cc-view-main { display:none; }
@@ -301,7 +314,7 @@ button.nq-cc-name:focus-visible { outline:2px solid var(--nq-cc-accent, #0582ca)
 .nq-cc-qr > * { display:block; width:100%; height:100%; }
 .nq-cc-receive-hint { font-size:12px; font-weight:600; color:var(--nq-cc-menu-muted, rgba(31,35,72,.45)); margin:8px 0 2px; }
 
-/* tap-to-copy address: upstream Copyable verbatim — light-blue tooltip, tinted
+/* tap-to-copy address: upstream Copyable verbatim: light-blue tooltip, tinted
    field, and the blue HOLDS after copy until focus leaves */
 .nq-cc-copy-wrap { position:relative; display:block; margin-top:10px; width:100%; }
 .nq-cc-address { display:grid; grid-template-columns:repeat(3, 1fr); gap:3px 0; justify-items:center;
@@ -350,7 +363,7 @@ button.nq-cc-name:focus-visible { outline:2px solid var(--nq-cc-accent, #0582ca)
 
 /* flag-hex card grids on the faint well; ALWAYS-VISIBLE slim gutter slider.
    TRAP: standard scrollbar-width/scrollbar-color make Chrome 121+ ignore
-   ::-webkit-scrollbar — they live in the Firefox-only @supports block. */
+   ::-webkit-scrollbar, they live in the Firefox-only @supports block. */
 .nq-cc-grid-wrap { position:relative; margin-top:6px; }
 .nq-cc-grid { display:grid; gap:4px; padding:4px; padding-right:8px; max-height:196px; overflow-y:auto;
   background:rgba(31,35,72,.04); border-radius:6px; }
@@ -796,6 +809,27 @@ export function mountCornerControl(
       setOpen(false);
       const target = options.openInPay!;
       window.location.href = typeof target === 'function' ? target() : target;
+    });
+  }
+
+  // ---- Report a bug ---------------------------------------------------------
+  // No nq-cc-when-* gate: unlike the wallet rows above, this one is about the
+  // PAGE, not the account, so it shows connected or not, hub or mini-app.
+  if (options.reportBug) {
+    el('div', 'nq-cc-divider', viewMain);
+    const row = el('button', 'nq-cc-row nq-cc-report', viewMain);
+    row.type = 'button';
+    const glyph = el('span', 'nq-cc-cashlink-slot', row);
+    glyph.insertAdjacentHTML('beforeend', BUG_ICON);
+    const label = el('span', 'nq-cc-strong', row);
+    tNode(label, 'shell.reportBug');
+    row.addEventListener('click', () => {
+      // Close first: the sheet lands on top, and a menu left open underneath
+      // shows through its scrim.
+      setOpen(false);
+      const target = options.reportBug!;
+      if (typeof target === 'function') target();
+      else openReportBugSheet(document, i18n, target);
     });
   }
 
