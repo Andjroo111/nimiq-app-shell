@@ -125,10 +125,15 @@ export async function submitToBot(
   input: FeedbackInput,
 ): Promise<SubmitFeedbackResult> {
   const service = (bot.service ?? BOT_SERVICE).replace(/\/$/, '');
-  const text = scrubAddresses(
-    [`[${input.type}] ${input.title.trim()}`, '', input.description.trim()].join('\n'),
-  );
   const context = scrubDeep({ ...(input.pageContext ?? {}), ...(input.context ?? {}) });
+  const text = scrubAddresses(
+    [
+      `[${input.type}] ${input.title.trim()}`,
+      '',
+      input.description.trim(),
+      ...diagnosticLines(input),
+    ].join('\n'),
+  );
 
   const post = async (path: string, body: unknown): Promise<{ res: Response; json: Record<string, unknown> }> => {
     const res = await globalThis.fetch(`${service}${path}`, {
@@ -184,6 +189,36 @@ export async function submitToBot(
   } catch (e) {
     return { ok: false, status: 0, error: e instanceof Error ? e.message : String(e) };
   }
+}
+
+/** The half of the context that has to travel IN THE TEXT.
+ *
+ *  nimiq.bot renders an Environment block from `context` (URL, page, viewport,
+ *  browser, referrer) and drops everything else — verified against a real filed
+ *  issue: the console errors, the failed requests and the host's own fields were
+ *  accepted and then not shown. Those are the parts a maintainer actually needs,
+ *  and the reported text IS rendered, so they ride there instead. Send `context`
+ *  as well: the service's own block is better than re-typing it here, and if it
+ *  learns to render the rest this becomes belt and braces rather than a lie. */
+function diagnosticLines(input: FeedbackInput): string[] {
+  const ctx = input.pageContext as
+    | { consoleErrors?: string[]; networkFailures?: string[] }
+    | undefined;
+  const host = input.context ?? {};
+  const errors = ctx?.consoleErrors ?? [];
+  const failures = ctx?.networkFailures ?? [];
+  const hostLine = Object.entries(host).map(([k, v]) => `${k}: ${v}`).join(' · ');
+  if (!hostLine && !errors.length && !failures.length) return [];
+
+  const out = ['', '---'];
+  if (hostLine) out.push(hostLine);
+  if (errors.length) {
+    out.push('', `Console (last ${Math.min(errors.length, 5)}):`, '```', ...errors.slice(-5), '```');
+  }
+  if (failures.length) {
+    out.push('', 'Failed requests:', '```', ...failures.slice(-5), '```');
+  }
+  return out;
 }
 
 /** nimiq.bot answers with machine codes; these are the human versions, matching

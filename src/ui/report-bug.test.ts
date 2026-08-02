@@ -299,3 +299,63 @@ describe('submitToBot: a missing label must not swallow the report', () => {
     expect(fileAttempt).toBe(1);
   });
 });
+
+describe('submitToBot: what the service drops has to ride in the text', () => {
+  // Verified against a real filed issue: nimiq.bot renders URL/viewport/browser
+  // from `context` and shows nothing else, so console errors, failed requests
+  // and the host's own fields were arriving and then vanishing.
+  const calls: Array<Record<string, unknown>> = [];
+  function stub(): void {
+    calls.length = 0;
+    globalThis.fetch = (async (url: string, init?: RequestInit) => {
+      calls.push({ url: String(url), ...JSON.parse(String(init?.body ?? '{}')) });
+      return String(url).endsWith('/api/draft')
+        ? { ok: true, status: 200, json: async () => ({ reportId: 'r', draft: { title: 't', body: 'b', labels: [] } }) } as Response
+        : { ok: true, status: 200, json: async () => ({ url: 'u', number: 1 }) } as Response;
+    }) as unknown as typeof fetch;
+  }
+
+  test('surface, version, console errors and failed requests reach the text', async () => {
+    stub();
+    await submitToBot({ repo: 'nimiq.kids' }, {
+      ...valid,
+      context: { surface: 'kid', version: '0.99.0' },
+      pageContext: {
+        consoleErrors: ['TypeError: x is not a function'],
+        networkFailures: ['GET /api/rates -> 502'],
+      },
+    });
+    const text = String(calls[0]!.text);
+    expect(text).toContain('surface: kid');
+    expect(text).toContain('version: 0.99.0');
+    expect(text).toContain('TypeError: x is not a function');
+    expect(text).toContain('GET /api/rates -> 502');
+    expect((calls[0]!.context as Record<string, unknown>).surface).toBe('kid');
+  });
+
+  test('nothing to report adds no trailing rule', async () => {
+    stub();
+    await submitToBot({ repo: 'nimiq.kids' }, valid);
+    expect(String(calls[0]!.text).trim().endsWith('---')).toBe(false);
+    expect(String(calls[0]!.text)).not.toContain('Console');
+  });
+
+  test('the appended block is scrubbed like everything else', async () => {
+    stub();
+    await submitToBot({ repo: 'nimiq.kids' }, {
+      ...valid,
+      pageContext: { consoleErrors: ['send failed to NQ07 0000 0000 0000 0000 0000 0000 0000 0000'] },
+    });
+    expect(String(calls[0]!.text)).toContain('[address redacted]');
+    expect(String(calls[0]!.text)).not.toContain('NQ07 0000');
+  });
+
+  test('only the last few lines travel, so a noisy page cannot flood the issue', async () => {
+    stub();
+    const many = Array.from({ length: 20 }, (_, i) => `error ${i}`);
+    await submitToBot({ repo: 'nimiq.kids' }, { ...valid, pageContext: { consoleErrors: many } });
+    const text = String(calls[0]!.text);
+    expect(text).toContain('error 19');
+    expect(text).not.toContain('error 14');
+  });
+});
