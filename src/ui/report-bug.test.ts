@@ -238,3 +238,64 @@ describe('submitToBot (the nimiq.bot transport)', () => {
     expect(await submitToBot({ repo: 'nimiq.kids' }, valid)).toMatchObject({ ok: false, status: 0 });
   });
 });
+
+describe('submitToBot: a missing label must not swallow the report', () => {
+  // Found live: the draft asks for `user-report`, the repo does not have that
+  // label, GitHub 422s the whole create, and every report dies forever on a
+  // config detail nobody can see from the app.
+  test('retries without labels when the service reports github_failed', async () => {
+    const calls: Array<Record<string, unknown>> = [];
+    let fileAttempt = 0;
+    globalThis.fetch = (async (url: string, init?: RequestInit) => {
+      const body = JSON.parse(String(init?.body ?? '{}'));
+      calls.push({ url: String(url), ...body });
+      if (String(url).endsWith('/api/draft')) {
+        return { ok: true, status: 200, json: async () => ({
+          reportId: 'r1', draft: { title: 't', body: 'b', labels: ['bug', 'user-report'] } }) } as Response;
+      }
+      fileAttempt += 1;
+      return fileAttempt === 1
+        ? { ok: false, status: 502, json: async () => ({ error: 'github_failed' }) } as Response
+        : { ok: true, status: 200, json: async () => ({ url: 'https://github.test/i/5', number: 5 }) } as Response;
+    }) as unknown as typeof fetch;
+
+    const result = await submitToBot({ repo: 'nimiq.kids', labels: ['surface:kid'] }, valid);
+    expect(result).toMatchObject({ ok: true, issueNumber: 5 });
+    const fileCalls = calls.filter((c) => String(c.url).endsWith('/api/file'));
+    expect(fileCalls).toHaveLength(2);
+    expect(fileCalls[0]!.labels).toEqual(['bug', 'user-report', 'surface:kid']);
+    expect(fileCalls[1]!.labels).toEqual([]);
+  });
+
+  test('does not retry when there were no labels to blame', async () => {
+    let fileAttempt = 0;
+    globalThis.fetch = (async (url: string) => {
+      if (String(url).endsWith('/api/draft')) {
+        return { ok: true, status: 200, json: async () => ({
+          reportId: 'r1', draft: { title: 't', body: 'b', labels: [] } }) } as Response;
+      }
+      fileAttempt += 1;
+      return { ok: false, status: 502, json: async () => ({ error: 'github_failed' }) } as Response;
+    }) as unknown as typeof fetch;
+
+    const result = await submitToBot({ repo: 'nimiq.kids' }, valid);
+    expect(result.ok).toBe(false);
+    expect(fileAttempt).toBe(1);
+  });
+
+  test('does not retry a rate limit, which labels cannot fix', async () => {
+    let fileAttempt = 0;
+    globalThis.fetch = (async (url: string) => {
+      if (String(url).endsWith('/api/draft')) {
+        return { ok: true, status: 200, json: async () => ({
+          reportId: 'r1', draft: { title: 't', body: 'b', labels: ['bug'] } }) } as Response;
+      }
+      fileAttempt += 1;
+      return { ok: false, status: 429, json: async () => ({ error: 'rate_limited' }) } as Response;
+    }) as unknown as typeof fetch;
+
+    const result = await submitToBot({ repo: 'nimiq.kids' }, valid);
+    expect(result.error).toBe('Too many reports just now. Give it a minute.');
+    expect(fileAttempt).toBe(1);
+  });
+});
