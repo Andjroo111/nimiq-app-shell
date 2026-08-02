@@ -104,9 +104,17 @@ export {
   openReportBugSheet,
   validateFeedbackInput,
   submitFeedback,
+  submitToBot,
+  scrubAddresses,
   collectDiagnostics,
   type ReportBugOptions,
+  type ReportBugBot,
   type ReportBugType,
   type FeedbackInput,
   type SubmitFeedbackResult,
 } from './ui/report-bug';
+export {
+  installReportCapture,
+  pageContext,
+  type PageContext,
+} from './ui/report-capture';

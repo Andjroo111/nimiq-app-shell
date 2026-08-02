@@ -22,31 +22,74 @@
 // fleet include ones used by minors, and this payload leaves the device.
 
 import type { I18n } from '../i18n';
+import { pageContext } from './report-capture';
 
 export type ReportBugType = 'bug' | 'idea' | 'question';
 
+/** File through nimiq.bot, the fleet's shared issue service. This is the path
+ *  most apps want: no endpoint of your own, no GitHub token anywhere near your
+ *  server, an AI-written issue, and reports that read the same as the ones the
+ *  bot.nimiq.tech widget files. */
+export interface ReportBugBot {
+  /** The GitHub repo to file into, as nimiq.bot knows it (e.g. 'nimiq.kids'). */
+  repo: string;
+  /** Service origin. Default https://bot.nimiq.tech. */
+  service?: string;
+  /** Extra labels on every issue, on top of the ones the draft chooses. */
+  labels?: string[];
+}
+
 export interface ReportBugOptions {
-  /** Where to POST the JSON payload. Same-origin path or absolute URL. */
-  endpoint: string;
+  /** File through nimiq.bot. Mutually exclusive with `endpoint`. */
+  bot?: ReportBugBot;
+  /** POST the raw payload to your OWN server instead, which is then responsible
+   *  for filing it. Use this only when the report must not leave your origin. */
+  endpoint?: string;
   /** Static fields merged into every submission (surface, app version, …).
    *  Values are sent verbatim — never put a name, address or account id here. */
   context?: Record<string, string>;
-  /** Include page URL + browser info when the user leaves the box ticked.
-   *  Default true. The URL is sent WITHOUT its query string: query params are
-   *  where apps put ids, and this payload leaves the device. */
+  /** Attach page context: URL, browser, viewport, and the last few console
+   *  errors and failed requests (see report-capture.ts). Default true, and the
+   *  sheet still lets the person untick it. */
   diagnostics?: boolean;
   /** Called after a successful submit (analytics, a host toast, …). */
   onSubmitted?: (result: SubmitFeedbackResult) => void;
+}
+
+const BOT_SERVICE = 'https://bot.nimiq.tech';
+
+/** Redact anything address-shaped. This runs CLIENT-side and it has to, because
+ *  in bot mode the browser talks to the issue service directly — there is no
+ *  server of the app's own left in the path to scrub on the way out. Fleet apps
+ *  include one used by children, where an account id in a public issue is not an
+ *  acceptable debugging aid. Matches spaced and compact forms. */
+export function scrubAddresses(text: string): string {
+  return text.replace(/NQ\d{2}[\s]?(?:[0-9A-HJ-NP-VXY]{4}[\s]?){8}/gi, '[address redacted]');
+}
+
+function scrubDeep<T>(value: T): T {
+  if (typeof value === 'string') return scrubAddresses(value) as unknown as T;
+  if (Array.isArray(value)) return value.map(scrubDeep) as unknown as T;
+  if (value && typeof value === 'object') {
+    const out: Record<string, unknown> = {};
+    for (const [k, v] of Object.entries(value)) out[k] = scrubDeep(v);
+    return out as unknown as T;
+  }
+  return value;
 }
 
 export interface FeedbackInput {
   type: ReportBugType | '';
   title: string;
   description: string;
-  /** Free-text diagnostic block, built by the sheet when the box is ticked. */
+  /** Free-text diagnostic block, built by the sheet when the box is ticked.
+   *  Endpoint mode only — bot mode sends `pageContext` as structured JSON. */
   diagnostic?: string;
   /** Host-supplied context (surface, version). Flattened into the payload. */
   context?: Record<string, string>;
+  /** Captured page context (bot mode): URL, browser, console errors, failed
+   *  requests. Set by the sheet when diagnostics are on. */
+  pageContext?: Record<string, unknown>;
 }
 
 export interface SubmitFeedbackResult {
@@ -58,6 +101,94 @@ export interface SubmitFeedbackResult {
   fallbackMailto?: string;
   /** Issue number, when the server files one and says so. */
   issueNumber?: number;
+  /** Link to the filed issue, when the service returns one (bot mode). */
+  issueUrl?: string;
+}
+
+interface BotDraft {
+  title: string;
+  body: string;
+  labels?: string[];
+}
+
+/** File through nimiq.bot: draft, then file. Two calls because the service
+ *  writes the issue with an LLM and hands back a draft first; the widget shows
+ *  that draft to an internal user for editing, and files straight through in its
+ *  `data-mode="public"` path. This is the public path — the person reporting a
+ *  bug from a kid's tablet has no use for a GitHub issue draft, and asking them
+ *  to approve one is asking them to proofread our bug tracker.
+ *
+ *  Everything is scrubbed before it leaves, including the captured context:
+ *  in this mode there is no server of ours in the path to do it later. */
+export async function submitToBot(
+  bot: ReportBugBot,
+  input: FeedbackInput,
+): Promise<SubmitFeedbackResult> {
+  const service = (bot.service ?? BOT_SERVICE).replace(/\/$/, '');
+  const text = scrubAddresses(
+    [`[${input.type}] ${input.title.trim()}`, '', input.description.trim()].join('\n'),
+  );
+  const context = scrubDeep({ ...(input.pageContext ?? {}), ...(input.context ?? {}) });
+
+  const post = async (path: string, body: unknown): Promise<{ res: Response; json: Record<string, unknown> }> => {
+    const res = await globalThis.fetch(`${service}${path}`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+    });
+    let json: Record<string, unknown> = {};
+    try { json = (await res.json()) as Record<string, unknown>; } catch { /* not JSON */ }
+    return { res, json };
+  };
+
+  try {
+    const drafted = await post('/api/draft', { repo: bot.repo, text, context });
+    if (!drafted.res.ok) {
+      return { ok: false, status: drafted.res.status, error: botError(drafted.json) };
+    }
+    const draft = drafted.json.draft as BotDraft | undefined;
+    const reportId = drafted.json.reportId as string | undefined;
+    if (!draft || !reportId) {
+      return { ok: false, status: drafted.res.status, error: 'The issue service sent back nothing to file.' };
+    }
+
+    const labels = [...new Set([...(draft.labels ?? []), ...(bot.labels ?? [])])];
+    const filed = await post('/api/file', {
+      reportId,
+      repo: bot.repo,
+      title: scrubAddresses(draft.title),
+      body: scrubAddresses(draft.body),
+      labels,
+    });
+    // The service can answer non-2xx and STILL have filed the issue (it returns
+    // the url when that happens), which the widget also treats as success.
+    const url = filed.json.url as string | undefined;
+    if (!filed.res.ok && !url) {
+      return { ok: false, status: filed.res.status, error: botError(filed.json) };
+    }
+    return {
+      ok: true,
+      status: filed.res.status,
+      issueNumber: filed.json.number as number | undefined,
+      issueUrl: url,
+    };
+  } catch (e) {
+    return { ok: false, status: 0, error: e instanceof Error ? e.message : String(e) };
+  }
+}
+
+/** nimiq.bot answers with machine codes; these are the human versions, matching
+ *  the widget's wording so the fleet says the same thing about the same failure. */
+function botError(json: Record<string, unknown>): string {
+  const code = String(json.error ?? '');
+  return {
+    rate_limited: 'Too many reports just now. Give it a minute.',
+    unknown_repo: "The issue service doesn't know this app.",
+    empty_report: 'Please describe the problem first.',
+    github_not_configured: "The issue service isn't connected to GitHub yet.",
+    github_failed: 'GitHub rejected the issue. Try again shortly.',
+    already_filed: 'That report was already filed.',
+  }[code] ?? 'Something went wrong.';
 }
 
 /** Validation rules: type required from the fixed set, title ≥ 5 chars,
@@ -281,7 +412,10 @@ export function openReportBugSheet(doc: Document, i18n: I18n, options: ReportBug
       description: detailsEl.value,
       context: options.context,
     };
-    if (diagEl?.checked) input.diagnostic = collectDiagnostics();
+    if (diagEl?.checked) {
+      if (options.bot) input.pageContext = pageContext() as unknown as Record<string, unknown>;
+      else input.diagnostic = collectDiagnostics();
+    }
 
     const errKey = validateFeedbackInput(input);
     if (errKey) {
@@ -294,7 +428,9 @@ export function openReportBugSheet(doc: Document, i18n: I18n, options: ReportBug
     sendBtn.textContent = t('shell.fbSending');
     errEl.style.display = 'none';
 
-    const result = await submitFeedback(options.endpoint, input);
+    const result = options.bot
+      ? await submitToBot(options.bot, input)
+      : await submitFeedback(options.endpoint!, input);
     sendBtn.disabled = false;
     sendBtn.textContent = t('shell.fbSend');
 
