@@ -58,13 +58,42 @@ export interface ReportBugOptions {
 
 const BOT_SERVICE = 'https://bot.nimiq.tech';
 
-/** Redact anything address-shaped. This runs CLIENT-side and it has to, because
- *  in bot mode the browser talks to the issue service directly — there is no
- *  server of the app's own left in the path to scrub on the way out. Fleet apps
- *  include one used by children, where an account id in a public issue is not an
- *  acceptable debugging aid. Matches spaced and compact forms. */
+/** Redact anything identifier-shaped: NQ addresses (spaced and compact forms)
+ *  and UUIDs. This runs CLIENT-side and it has to, because in bot mode the
+ *  browser talks to the issue service directly — there is no server of the app's
+ *  own left in the path to scrub on the way out. Fleet apps include one used by
+ *  children, where an account id in a public issue is not an acceptable
+ *  debugging aid.
+ *
+ *  The UUID half was learned the hard way in nimiq.kids: nearly every call that
+ *  app makes is addressed by CHILD UUID, so a kid tapping Buy on a pack she
+ *  already owned put `POST /api/kids/8f3c…/buy → 400` — captured by
+ *  report-capture, sent as context, written up by an LLM — into a PUBLIC issue.
+ *  That app had to switch its diagnostics off wholesale because the shell's only
+ *  redaction was the address regex. This is the half that turns them back on.
+ *
+ *  Deliberately ANY UUID shape (8-4-4-4-12 hex), not just v4: the version and
+ *  variant nibbles are a generator's business, and a v7 or a non-conforming id
+ *  from some other system identifies a person just as well. Kept to the
+ *  hyphenated form — a bare 32-hex run is as likely to be a hash or a tx id, and
+ *  redacting those costs real diagnostics for no privacy gain.
+ *
+ *  The boundary is "no hex digit either side", not `\b`. `\b` counts `_` as a
+ *  word character, so `kid_<uuid>` — a cache key, a storage key, an avatar
+ *  filename — would sail straight through the very regex written to catch it.
+ *  Written as a captured leading character rather than a lookbehind on purpose:
+ *  a lookbehind is a SYNTAX error on Safari below 16.4, and a syntax error in a
+ *  regex literal takes the whole module down with it, in a shell every app in
+ *  the fleet loads.
+ *
+ *  The name stays `scrubAddresses` because fleet apps import it. */
 export function scrubAddresses(text: string): string {
-  return text.replace(/NQ\d{2}[\s]?(?:[0-9A-HJ-NP-VXY]{4}[\s]?){8}/gi, '[address redacted]');
+  return text
+    .replace(/NQ\d{2}[\s]?(?:[0-9A-HJ-NP-VXY]{4}[\s]?){8}/gi, '[address redacted]')
+    .replace(
+      /(^|[^0-9a-f])([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})(?![0-9a-f])/gi,
+      '$1[id redacted]',
+    );
 }
 
 function scrubDeep<T>(value: T): T {
