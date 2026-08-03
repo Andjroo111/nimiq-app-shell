@@ -49,9 +49,29 @@ function shortUrl(u: string): string {
   }
 }
 
+/** Everything before the first `?` or `#`. A query string is where an app leaks
+ *  the ids it never meant to send — `?child=…`, `?token=…`, a share code, a
+ *  session handle — and none of it is what a bug report is for. Neither is the
+ *  fragment, which is the route in every hash-routed app in the fleet and so
+ *  carries the same ids one layer down.
+ *
+ *  Which page it was is the diagnostic fact, and the path keeps that. The
+ *  scrubber in report-bug.ts catches the identifier shapes it knows; this catches
+ *  the ones it does not, because it does not need to know what a query means to
+ *  know it should not be in a public issue.
+ *
+ *  Split rather than parsed on purpose: `new URL()` has to be given a base, and
+ *  answers "null" for the origin of the odd scheme a WebView hands you. */
+function withoutQuery(u: string): string {
+  const cut = u.search(/[?#]/);
+  return cut === -1 ? u : u.slice(0, cut);
+}
+
 export interface PageContext {
+  /** Origin + path. Query and fragment are dropped — see `withoutQuery`. */
   url: string;
   title: string;
+  /** Origin + path, for the same reason `url` is. */
   referrer: string;
   userAgent: string;
   viewport: { w: number; h: number; dpr: number };
@@ -116,9 +136,9 @@ export function installReportCapture(ignoreOrigin?: string): void {
 /** Snapshot what has been captured so far, in the nimiq.bot context shape. */
 export function pageContext(hasScreenshot = false): PageContext {
   return {
-    url: typeof location !== 'undefined' ? location.href : '',
+    url: typeof location !== 'undefined' ? withoutQuery(location.href) : '',
     title: typeof document !== 'undefined' ? document.title : '',
-    referrer: typeof document !== 'undefined' ? document.referrer : '',
+    referrer: typeof document !== 'undefined' ? withoutQuery(document.referrer) : '',
     userAgent: typeof navigator !== 'undefined' ? navigator.userAgent : '',
     viewport: typeof window !== 'undefined'
       ? { w: window.innerWidth, h: window.innerHeight, dpr: window.devicePixelRatio || 1 }
