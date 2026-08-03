@@ -704,18 +704,36 @@ textarea.nq-fb-input { min-height:104px; resize:vertical; font-weight:400; line-
 .nq-cc[data-mode="miniapp"] .nq-cc-face { display:none; }
 .nq-cc[data-mode="miniapp"] .nq-cc-face-flag { display:inline-flex; }
 
-/* face (language-only): the SAME outline pill as hub mode, holding the flag.
+/* face (language-only): a SURFACE pill holding the flag.
    Chrome-less is a mini-app statement: inside Nimiq Pay the host wallet is the
    context, so the control recedes. A wallet-less page (the kid app, the portal
    chooser) is not that: the language control is the header's only affordance and
    has to read as a control, exactly like the langpill it replaced and like the
    pill sitting on every wallet page. Both share data-mode="miniapp" for the
-   MENU gating; only the face differs, so it keys off data-face. */
+   MENU gating; only the face differs, so it keys off data-face.
+
+   It reads as a control through ELEVATION, not an outline (Andjroo, 2026-08-03:
+   "remove the gray line ... around the actual white of the pill"). It used to
+   carry "border:1px solid currentColor 22%", which this same file already argues
+   against thirty lines down — "inputs: inset box-shadow border, never border
+   (rule 1)". Nimiq separates with a hairline, whitespace, or a separate surface,
+   and a raised white pill is the third.
+
+   The surface and the FOREGROUND ship together. This pill is color:inherit
+   and its caret is drawn in currentColor, so on a dark header the old
+   borderless-transparent pill inherited a light caret. Painting it white without
+   also pinning the text colour would hide the caret on exactly those pages. Both
+   are themeable, so a host that wants a dark pill sets the pair. */
 .nq-cc[data-face="lang"] .nq-cc-face-flag { height:40px; padding:0 12px;
-  border:1px solid color-mix(in srgb, currentColor 22%, transparent); border-radius:999px;
-  transition:border-color .15s var(--nimiq-ease, cubic-bezier(.25,0,0,1)), background-color .15s var(--nimiq-ease, cubic-bezier(.25,0,0,1)); }
-.nq-cc[data-face="lang"] .nq-cc-face-flag:hover { border-color: color-mix(in srgb, currentColor 45%, transparent);
-  background: color-mix(in srgb, currentColor 6%, transparent); }
+  border:none; border-radius:999px;
+  background:var(--nq-cc-face-bg, #fff);
+  color:var(--nq-cc-face-fg, #1f2348);
+  box-shadow:var(--nq-cc-face-shadow,
+    0 2px 2.5px rgba(31,35,72,.02), 0 7px 8.5px rgba(31,35,72,.04), 0 18px 38px rgba(31,35,72,.07));
+  transition:box-shadow .15s var(--nimiq-ease, cubic-bezier(.25,0,0,1)), background-color .15s var(--nimiq-ease, cubic-bezier(.25,0,0,1)); }
+.nq-cc[data-face="lang"] .nq-cc-face-flag:hover { background:var(--nq-cc-face-bg-hover, #fff);
+  box-shadow:var(--nq-cc-face-shadow-hover,
+    0 3px 3.5px rgba(31,35,72,.03), 0 9px 12px rgba(31,35,72,.06), 0 22px 46px rgba(31,35,72,.10)); }
 .nq-cc[data-face="lang"] .nq-cc-face-flag:focus-visible { outline-offset:3px; }
 
 /* menu */
