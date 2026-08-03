@@ -50,6 +50,22 @@ describe('corner-control data', () => {
     expect(src).toMatch(/\.nq-cc\[data-face="lang"\] \.nq-cc-face-flag \{[^}]*border-radius:999px/);
   });
 
+  // v0.9.0 traded the outline for elevation (Andjroo, 8/3: "remove the gray line
+  // ... around the actual white of the pill"). The pill must still READ as a
+  // control on the 16 hosts that style nothing themselves, so what replaced the
+  // border is pinned here: a surface and a shadow, and the foreground that has to
+  // travel with them — the caret is currentColor, so a white pill with an
+  // inherited light colour would be a blank white lozenge on a dark header.
+  test('the language pill reads through elevation, never a border', async () => {
+    const src = await Bun.file(new URL('./corner-control.ts', import.meta.url)).text();
+    const rule = src.match(/\.nq-cc\[data-face="lang"\] \.nq-cc-face-flag \{[^}]*\}/)?.[0] ?? '';
+    expect(rule).toContain('border:none');
+    expect(rule).not.toMatch(/border:\s*1px/);
+    expect(rule).toContain('--nq-cc-face-bg');
+    expect(rule).toContain('--nq-cc-face-fg');
+    expect(rule).toContain('--nq-cc-face-shadow');
+  });
+
   // The currency grid used to be gated on getBalanceLuna, which made it
   // unreachable on exactly the wallet-less pages above — a display preference
   // hidden behind being signed in. These pin the decoupled contract: `fiat`
