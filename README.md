@@ -258,9 +258,15 @@ Deliberate choices worth knowing:
   nimiq.bot widget does mount one — this is the same service without it.)
 - **Ungated by wallet state** — it shows connected or not, hub or mini-app,
   because a bug on a wallet-less page is still a bug.
-- **Addresses are redacted client-side**, from the text, the captured context and
-  the title the service returns. In bot mode nothing of yours sits between the
-  browser and the issue, so this cannot be a server's job.
+- **Identifiers are redacted client-side** — NQ addresses **and UUIDs** — from the
+  text, the captured context and the title the service returns. In bot mode
+  nothing of yours sits between the browser and the issue, so this cannot be a
+  server's job. The captured `url` and `referrer` are cut at the first `?` or `#`
+  for the same reason: a query string is where an app leaks the ids it never
+  meant to send, and a hash route carries them one layer down. (v0.9.2. nimiq.kids
+  had to run with `diagnostics: false` until this landed — nearly every call it
+  makes is addressed by child UUID, and `POST /api/kids/<uuid>/buy → 400` was
+  going into public issues.)
 - **No draft to approve.** The service can hand back an editable issue draft; the
   sheet files straight through. Asking a parent to proofread a GitHub issue is
   not a review step, it is an obstacle.

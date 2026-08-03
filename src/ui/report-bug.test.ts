@@ -7,6 +7,7 @@ import {
   validateFeedbackInput,
   submitFeedback,
   submitToBot,
+  scrubAddresses,
   type FeedbackInput,
 } from './report-bug';
 import { shellLocales } from '../locales';
@@ -61,6 +62,81 @@ describe('validateFeedbackInput', () => {
         expect((messages as Record<string, string>)[key], `${locale}:${key}`).toBeDefined();
       }
     }
+  });
+});
+
+describe('scrubAddresses', () => {
+  const UUID = '8f3c1d2e-4b5a-4c7d-8e9f-0a1b2c3d4e5f';
+
+  // The address half is the older clause; it is here so a change to the UUID one
+  // cannot quietly break it. (It eats the trailing space of a spaced address —
+  // long-standing, harmless, and pinned so nobody "fixes" it by accident.)
+  test('a spaced NQ address still goes, which is what it was written for', () => {
+    expect(scrubAddresses('paid NQ07 0000 0000 0000 0000 0000 0000 0000 0000 ok'))
+      .toBe('paid [address redacted]ok');
+  });
+
+  test('a UUID goes, wherever it sits in the line', () => {
+    expect(scrubAddresses(`GET /api/kids/${UUID}/jobs → 404`))
+      .toBe('GET /api/kids/[id redacted]/jobs → 404');
+  });
+
+  test('uppercase and mixed case go too — logs are not consistent about it', () => {
+    expect(scrubAddresses(UUID.toUpperCase())).toBe('[id redacted]');
+    expect(scrubAddresses('8F3c1D2e-4b5A-4c7D-8e9F-0a1B2c3D4e5F')).toBe('[id redacted]');
+  });
+
+  test('every one in a line goes, not just the first', () => {
+    expect(scrubAddresses(`${UUID} → ${UUID}`)).toBe('[id redacted] → [id redacted]');
+  });
+
+  // Not just v4. The version nibble is the generator's business and a v7 id, or
+  // one from a system that never read the RFC, names a child just as well.
+  test('any UUID shape goes, not only v4', () => {
+    for (const id of [
+      '00000000-0000-0000-0000-000000000000',            // nil
+      '01890a5d-ac96-774b-bcce-b302099a8057',            // v7
+      'ffffffff-ffff-ffff-ffff-ffffffffffff',            // no valid version nibble at all
+    ]) expect(scrubAddresses(id)).toBe('[id redacted]');
+  });
+
+  // The other direction. A scrub that eats hashes takes the diagnostics down
+  // with it, and hex that long is a tx hash or a digest, not a person.
+  test('hex that is merely long is left alone', () => {
+    const txHash = 'a'.repeat(64);
+    expect(scrubAddresses(`tx ${txHash} failed`)).toBe(`tx ${txHash} failed`);
+    expect(scrubAddresses('checksum d41d8cd98f00b204e9800998ecf8427e'))
+      .toBe('checksum d41d8cd98f00b204e9800998ecf8427e');
+  });
+
+  test('a UUID-shaped run with hex glued to its FRONT is not a UUID', () => {
+    const glued = `deadbeef${UUID}`;
+    expect(scrubAddresses(glued)).toBe(glued);
+  });
+
+  test('a UUID-shaped run with hex glued to its END is not a UUID either', () => {
+    const glued = `/avatars/${UUID}deadbeef.png`;
+    expect(scrubAddresses(glued)).toBe(glued);
+  });
+
+  // `\b` would fail this one: it counts `_` as a word character, so the boundary
+  // it draws sits in the wrong place for exactly the keys apps build out of ids.
+  test('an id embedded in a key or a filename still goes', () => {
+    expect(scrubAddresses(`GET /avatars/kid_${UUID}_v2.png → 404`))
+      .toBe('GET /avatars/kid_[id redacted]_v2.png → 404');
+  });
+
+  test('two ids separated by a single character both go', () => {
+    expect(scrubAddresses(`${UUID},${UUID}`)).toBe('[id redacted],[id redacted]');
+  });
+
+  test('an id at the very start of the string goes', () => {
+    expect(scrubAddresses(`${UUID} failed`)).toBe('[id redacted] failed');
+  });
+
+  test('ordinary text with hyphens and hex survives', () => {
+    const line = 'error-code 4b5a at 2026-08-03T10:00:00Z in build 1d2e-4b5a';
+    expect(scrubAddresses(line)).toBe(line);
   });
 });
 
@@ -203,6 +279,40 @@ describe('submitToBot (the nimiq.bot transport)', () => {
     stubBot({ reportId: 'r1', draft: { title: 'Sent to NQ07 0000 0000 0000 0000 0000 0000 0000 0000', body: 'b' } }, filedOk);
     await submitToBot({ repo: 'nimiq.kids' }, valid);
     expect(String(calls[1]!.body.title)).toContain('[address redacted]');
+  });
+
+  // The report that actually got filed, reconstructed: a kid taps Buy on a pack
+  // she already owns, the 400 lands in networkFailures as
+  // `POST /api/kids/<uuid>/buy → 400`, and a parent files "the treasure box
+  // won't let her buy anything" hours later. Nothing in that chain is the app's
+  // to fix — the id is in the captured context, not in anything anyone typed.
+  test('a child UUID in a captured failed request never reaches the service', async () => {
+    stubBot(draftOk, filedOk);
+    await submitToBot({ repo: 'nimiq.kids' }, {
+      ...valid,
+      pageContext: {
+        networkFailures: ['POST /api/kids/8f3c1d2e-4b5a-4c7d-8e9f-0a1b2c3d4e5f/buy → 400'],
+        consoleErrors: ['already_owned for 8F3C1D2E-4B5A-4C7D-8E9F-0A1B2C3D4E5F'],
+        url: 'https://nimiq.kids/kid/',
+      },
+    });
+    const sent = JSON.stringify(calls[0]!.body);
+    expect(sent).not.toContain('8f3c1d2e');
+    expect(sent.toLowerCase()).not.toContain('8f3c1d2e');
+    expect(sent).toContain('[id redacted]');
+    // The rest of the line is the diagnostic and has to survive: a redaction
+    // that ate the route and the status would just be diagnostics: false again.
+    expect(sent).toContain('POST /api/kids/[id redacted]/buy → 400');
+  });
+
+  test('a UUID typed into the description is redacted as well', async () => {
+    stubBot(draftOk, filedOk);
+    await submitToBot({ repo: 'nimiq.kids' }, {
+      ...valid,
+      description: 'support asked me to send this: 550e8400-e29b-41d4-a716-446655440000',
+    });
+    expect(String(calls[0]!.body.text)).toContain('[id redacted]');
+    expect(String(calls[0]!.body.text)).not.toContain('550e8400');
   });
 
   test('a service error code becomes a sentence, not a code', async () => {
