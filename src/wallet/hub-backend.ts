@@ -56,12 +56,8 @@ export interface HubClient {
   checkRedirectResponse?(): Promise<void>;
 }
 
-function isMobileUA(): boolean {
-  return (
-    typeof navigator !== 'undefined' &&
-    /Mobi|Android|iPhone|iPad|iPod/i.test(navigator.userAgent)
-  );
-}
+// A local isMobileUA() lived here to seed the unread `mobile` field; it went
+// with it. hub-api owns the popup-vs-redirect decision (see `isMobile` below).
 
 export interface HubBackendOptions {
   appName?: string;
@@ -70,7 +66,19 @@ export interface HubBackendOptions {
   client?: HubClient;
   /** Lazy client builder; defaults to constructing @nimiq/hub-api. */
   getClient?: () => Promise<HubClient>;
-  /** Override mobile detection (mainly for tests). */
+  /** Override mobile detection (mainly for tests).
+   *
+   *  CURRENTLY INERT, and deliberately kept in the signature. The backend used
+   *  to store this and never read it, which read like the popup-vs-redirect
+   *  choice described at the top of this file was ours to make. It is not:
+   *  @nimiq/hub-api's default RequestBehavior already picks the popup on
+   *  desktop and the full-page redirect on mobile, so a second detector here
+   *  only had the power to disagree with the one actually in charge.
+   *
+   *  It stays accepted because callers and tests pass it, and dropping it would
+   *  break them for no gain. Wire it only if the shell ever needs to FORCE a
+   *  behavior (passing an explicit RequestBehavior to the hub calls) rather
+   *  than detect one. */
   isMobile?: boolean;
   /** A current block height supplier for validityStartHeight when the caller
    *  doesn't pass one. Optional — when absent we pass 0 and let Keyguard fill. */
@@ -83,7 +91,6 @@ export class HubBackend implements WalletBackend {
   private endpoint: string;
   private client: HubClient | null;
   private getClientFn: () => Promise<HubClient>;
-  private mobile: boolean;
   private getBlockHeight?: () => Promise<number>;
   private onChange: ((account: Account | null) => void) | null = null;
   private current: Account | null = null;
@@ -92,7 +99,6 @@ export class HubBackend implements WalletBackend {
     this.appName = opts.appName ?? 'Nimiq App';
     this.endpoint = opts.hubEndpoint ?? DEFAULT_HUB_ENDPOINT;
     this.client = opts.client ?? null;
-    this.mobile = opts.isMobile ?? isMobileUA();
     this.getBlockHeight = opts.getBlockHeight;
     this.getClientFn =
       opts.getClient ??
