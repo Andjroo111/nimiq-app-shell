@@ -216,6 +216,11 @@ mountWalletPill(document.querySelector('#wallet')!, { wallet, i18n }); // connec
 - **`buildFlagHex(code)`** — the underlying renderer: a flag clipped into the Nimiq
   hexagon with a faint grey **flags-on-white** edge and per-flag fits (`FLAG_FIT`).
   Flag artwork is **inlined** (data URIs) — no CDN, no asset files to vendor.
+  The hexagon clip is applied to a `<g>` wrapping the `<image>`, never to the
+  `<image>` itself: WebKit skips a `clip-path` referenced directly by an `<image>`
+  whose data URI decodes after first paint, and the flag then renders as a rounded
+  rectangle (v0.9.3, seen on a real iPhone). `flagHexMarkup(code)` is the same
+  renderer returning a string, which is what the tests pin.
 
 All inject their own `<style>` once and return a handle with `destroy()`.
 
