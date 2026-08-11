@@ -6,6 +6,12 @@
 //
 // This is the single source of truth used by mountLanguageSwitcher (row) and
 // mountLanguagePill (dropdown). Mirrors nimiq.tech's FlagHex.vue.
+//
+// Safari regression, found on a real iPhone and fixed in nimiq.cool before it was
+// fixed here: the hexagon clip must be applied to a <g> wrapping the flag <image>,
+// not to the <image> element. WebKit skips a clip-path referenced directly by an
+// <image> whose data-URI artwork decodes after first paint, so the flag rendered as
+// a rounded rectangle in every fleet app's language switcher.
 
 import { flagDataUrl } from "../flags/data";
 import { FLAG_FIT, type FlagFit } from "../flags/fit";
@@ -35,8 +41,11 @@ export interface FlagHexOptions {
   fit?: FlagFit;
 }
 
-/** Build a flag-in-hexagon as a self-contained inline SVG element. */
-export function buildFlagHex(code: string, options: FlagHexOptions = {}): SVGSVGElement {
+/**
+ * The flag-hex SVG, as markup. Split out from `buildFlagHex` so the clip
+ * structure is pinnable without a DOM harness, which this repo does not have.
+ */
+export function flagHexMarkup(code: string, options: FlagHexOptions = {}): string {
   const size = options.size ?? 24;
   const fit = options.fit ?? FLAG_FIT[code.toLowerCase()];
   const { x, y, w, h } = flagBox(fit);
@@ -44,12 +53,25 @@ export function buildFlagHex(code: string, options: FlagHexOptions = {}): SVGSVG
   // small pill), never below 0.4 viewBox units.
   const stroke = Math.max(0.4, 22 / size);
   const id = `nq-flag-${(uid += 1)}`;
-  const tmp = document.createElement("div");
-  tmp.innerHTML =
+  return (
     `<svg class="nq-flag-hex" viewBox="0 0 20 18" width="${size}" height="${(size * 0.9).toFixed(2)}" aria-hidden="true" style="display:block;overflow:visible">` +
     `<defs><clipPath id="${id}"><path d="${HEX}"/></clipPath></defs>` +
-    `<image href="${flagDataUrl(code)}" x="${x}" y="${y}" width="${w}" height="${h}" preserveAspectRatio="xMidYMid slice" clip-path="url(#${id})"/>` +
+    // The clip goes on a <g> WRAPPER, never on the <image> itself. WebKit skips a
+    // clip-path referenced directly by an <image> whose data-URI artwork decodes
+    // after first paint, and the flag then paints as its raw unclipped rectangle.
+    // Clipping the group is the cross-browser-safe form and is pixel-identical in
+    // Chromium. See the regression note in the header.
+    `<g clip-path="url(#${id})">` +
+    `<image href="${flagDataUrl(code)}" x="${x}" y="${y}" width="${w}" height="${h}" preserveAspectRatio="xMidYMid slice"/>` +
+    `</g>` +
     `<path d="${HEX}" fill="none" stroke="rgba(31,35,72,0.4)" stroke-width="${stroke.toFixed(2)}" stroke-linejoin="round"/>` +
-    `</svg>`;
+    `</svg>`
+  );
+}
+
+/** Build a flag-in-hexagon as a self-contained inline SVG element. */
+export function buildFlagHex(code: string, options: FlagHexOptions = {}): SVGSVGElement {
+  const tmp = document.createElement("div");
+  tmp.innerHTML = flagHexMarkup(code, options);
   return tmp.firstElementChild as unknown as SVGSVGElement;
 }
