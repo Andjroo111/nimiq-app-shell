@@ -3,6 +3,7 @@ import {
   LUNA_PER_NIM,
   NIM_DECIMALS,
   fmtNim,
+  fmtUnits,
   fmtFiat,
   lunaToNim,
   nimToLuna,
@@ -158,5 +159,46 @@ describe('parseNim', () => {
 
   test('rejects amounts beyond the safe integer range', () => {
     expect(() => parseNim('99999999999999999999')).toThrow(/range/);
+  });
+});
+
+describe('fmtUnits (multi-asset)', () => {
+  test('formats each asset at its own decimals', () => {
+    expect(fmtUnits(45_200_000n, 6)).toBe('45.20'); // USDT
+    expect(fmtUnits(120_000n, 8)).toBe('0.0012'); // BTC
+    expect(fmtUnits(2_100_000_000_000_000_000n, 18)).toBe('2.10'); // POL
+    expect(fmtUnits(1234567890, 5)).toBe(`12${NNBSP}345.6789`); // NIM
+  });
+
+  // The reason maxDecimals defaults to the asset's own decimals rather than
+  // NIM's 5: an 8-decimal asset must not print 0.00120000, and a 5-decimal cap
+  // would round 0.0000012 BTC away to nothing.
+  test('trims trailing zeros instead of padding to the unit width', () => {
+    expect(fmtUnits(120_000n, 8)).not.toContain('0.00120000');
+    expect(fmtUnits(120n, 8)).toBe('0.0000012');
+  });
+
+  test('an asset with no decimals shows none', () => {
+    expect(fmtUnits(42n, 0)).toBe('42');
+  });
+
+  // The whole reason this is string math and not `Number(units) / 10 ** dec`.
+  // 2^53+1 is the first integer a double cannot hold, and a float path really
+  // does land on ...92 here — a silently wrong balance, which is the worst kind.
+  test('is exact past Number.MAX_SAFE_INTEGER', () => {
+    expect(fmtUnits(9007199254740993n, 8)).toBe(`90${NNBSP}071${NNBSP}992.54740993`);
+    expect(fmtUnits(BigInt(Number(9007199254740993n)), 8))
+      .toBe(`90${NNBSP}071${NNBSP}992.54740992`);
+  });
+
+  test('fmtNim is fmtUnits pinned to luna', () => {
+    for (const luna of [0, 1, 500_000, 1234567890, 21e14]) {
+      expect(fmtNim(luna)).toBe(fmtUnits(luna, NIM_DECIMALS));
+    }
+  });
+
+  test('rejects a nonsense unit width', () => {
+    expect(() => fmtUnits(1n, -1)).toThrow();
+    expect(() => fmtUnits(1n, 1.5)).toThrow();
   });
 });
