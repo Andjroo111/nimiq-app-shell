@@ -61,8 +61,17 @@ export interface CornerControlOptions {
   scan?: () => void;
   /** Wire the opt-in "Create a Cashlink" row (HubApi.createCashlink). Hidden when absent. */
   createCashlink?: () => void;
-  /** Wire the signed-out "New to Nimiq? Create a wallet" line (HubApi.onboard).
-   *  Hidden when absent. */
+  /** Wire the signed-out "New to Nimiq? Create a wallet" line. Hidden when absent.
+   *
+   *  NOT `HubApi.onboard`, whatever the older docs said. `ONBOARD` is commented
+   *  out of the Hub's `_3rdPartyRequestWhitelist` on purpose ("Do not allow
+   *  ONBOARD because it exposes internal accountIds"), so a fleet origin calling
+   *  it gets `unauthorized to call onboard`.
+   *
+   *  Wire it to `connect()` instead: the Hub's choose-address flow offers
+   *  wallet creation to a visitor who has none, which is the same funnel by a
+   *  route third parties are actually allowed to take. That is what nimiq.kids
+   *  does. */
   onboard?: () => void;
   /** Tap-name-to-rename is BUILT IN: the new label persists locally per address
    *  (localStorage) and shows on the face + menu. This hook is an optional
