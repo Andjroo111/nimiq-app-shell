@@ -1,0 +1,48 @@
+name: ci
+
+# The shell had NO CI until 2026-08-13. It is a git dependency consumed as raw
+# TypeScript by every fleet app, so a break here does not surface at publish
+# time; it surfaces as somebody else's build failing. That already happened:
+# a dead field in `hub-backend.ts` went unnoticed here and broke hashmark's
+# build, because hashmark sets `noUnusedLocals` and this repo did not (#113).
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  check:
+    name: typecheck + tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: oven-sh/setup-bun@v2
+        with:
+          # PINNED, and it must match the box that develops against this repo.
+          # hashmark ran 1.3.11 in CI while the Mac ran 1.3.14, and the two
+          # disagree about whether test files share one global object. A leaked
+          # `globalThis.window` was therefore green locally and red on Linux for
+          # a day (hashmark #1059/#1060). Bump this and the dev box together.
+          bun-version: 1.3.14
+
+      - name: Install
+        run: bun install --frozen-lockfile
+
+      - name: Typecheck
+        run: bun run check
+
+      - name: Tests
+        run: bun test
+
+      # The consumers import from `src/`, not from `dist/`, so a green
+      # typecheck is not proof the bundle builds. Cheap, and it catches an
+      # export that only resolves under the test runner.
+      - name: Build the browser bundle
+        run: bun run build:dist
