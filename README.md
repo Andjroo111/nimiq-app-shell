@@ -293,11 +293,12 @@ const account = await hub.chooseAddress({ appName, returnUsdcAddress: true });
 mountMiniWallet(el, {
   wallet, i18n,
   assets: () => [
-    { ticker: 'NIM',  name: 'Nimiq',     decimals: 5, balance: () => nimBalance() },
-    { ticker: 'USDC', name: 'USD Coin',  decimals: 6, balance: () => usdcBalance(),
-      address: account.usdcAddress },
-    { ticker: 'USDT', name: 'Tether USD', decimals: 6, balance: () => usdtBalance(),
-      address: account.usdcAddress },  // same Polygon address, two tokens
+    { ticker: 'NIM',  name: 'Nimiq',      network: 'Nimiq',   decimals: 5,
+      balance: () => nimBalance() },
+    { ticker: 'USDC', name: 'USD Coin',   network: 'Polygon', decimals: 6,
+      balance: () => usdcBalance(), address: account.usdcAddress },
+    { ticker: 'USDT', name: 'Tether USD', network: 'Polygon', decimals: 6,
+      balance: () => usdtBalance(), address: account.usdcAddress },
   ],
   fiat: { currencies: ['USD', 'EUR'], rate: (fiat, asset) => price(asset, fiat) },
 });
@@ -321,6 +322,41 @@ mountMiniWallet(el, {
 
 USDC and USDT deliberately share one `address`: Polygon is account-model, so
 both tokens live at the same address, and the ticker is what separates them.
+
+**`network` is required** (v0.13.0). A ticker is not enough information to
+receive safely: USDT exists on Ethereum, Tron, Polygon, Solana and BSC, and the
+mini wallet can only ever accept the one the connected account holds. Someone
+reading a bare `USDT` row and withdrawing from an exchange on Tron loses the
+money. An optional field is a field that gets forgotten, and the cost of
+forgetting this one is somebody's balance, so the compiler asks for it.
+
+It shows in the row (`Tether USD · Polygon`, deduplicated when the name and the
+network are the same word) and again on the receive screen, where the decision
+is actually made.
+
+### Receiving one asset (v0.13.0)
+
+With `assets` wired, the balance rows are tappable and each opens a receive
+screen for **that** asset: its own `address`, its own QR payload, and its chain
+named on the screen rather than only in the row it was reached from.
+
+Three things this gets right that one shared receive screen cannot:
+
+- **The address is the asset's.** Before v0.13.0 the receive view always showed
+  `wallet.account.address`, so a USDT row led to a NIM address, and
+  `ShellAsset.address` was declared but read by nothing.
+- **The 3x3 grid is a NIM format.** It assumes 36 characters in nine four-char
+  blocks, so a 42-character Polygon address forced through it renders as ragged
+  nonsense. Non-NIM addresses render as one wrapped monospace string instead.
+- **The QR payload is not guessed from the ticker.** `nimiq:` is right for NIM
+  and wrong for everything else, so it is only applied to the account address.
+  An asset's default payload is the bare address, which every scanner
+  understands, and `ShellAsset.uri` overrides it for hosts wanting EIP-681 or
+  `bitcoin:`.
+
+An asset without its own `address` falls back to the account address rather than
+rendering an empty screen. That is right for a token on the account's own chain
+and wrong for a foreign one, which is why the chain is named either way.
 
 Three things the shape is deliberate about:
 
