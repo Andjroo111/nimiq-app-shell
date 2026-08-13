@@ -1,0 +1,537 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Mini wallet · playground</title>
+<!-- Inline so the browser's implicit /favicon.ico request cannot 404. A dev
+     harness whose console is never clean trains you to ignore its console. -->
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Cpath d='M24 4H8L0 16l8 12h16l8-12z' fill='%230582CA'/%3E%3C/svg%3E">
+<!-- The mini wallet's CSS asks for Mulish and renders the receive address in
+     Fira Mono. Without both loaded here the component falls back to system-ui
+     and the 3x3 address grid drifts on the fallback monospace's metrics, so the
+     playground would be showing something the fleet never ships. -->
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Mulish:wght@400;600;700;800&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css?family=Fira+Mono&text=0123456789ABCDEFGHJKLMNPQRSTUVXY%20&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --navy: #1f2348;
+    --ink: #1f2348;
+    --line: #e4e6f0;
+    --muted: #5b5f85;
+    --blue: #0582ca;
+    --bg: #f4f5f9;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; }
+  body {
+    font-family: 'Mulish', 'Muli', system-ui, -apple-system, sans-serif;
+    background: var(--bg);
+    color: var(--ink);
+    -webkit-font-smoothing: antialiased;
+  }
+
+  /* The two header strips the mini wallet has to survive.
+     Theme-adaptivity is a CLAIM the component makes (it draws from
+     `currentColor`). Two strips side by side is how you falsify it in one
+     glance instead of trusting the README. */
+  .strip {
+    display: flex; align-items: center; justify-content: space-between;
+    gap: 16px; padding: 14px 20px; min-height: 68px;
+  }
+  .strip-navy  { background: var(--navy); color: #fff; }
+  .strip-light { background: #fff; color: var(--ink); border-bottom: 1px solid var(--line); }
+  .wordmark { font-weight: 700; font-size: 15px; letter-spacing: .01em; opacity: .9; }
+
+  main { max-width: 1180px; margin: 0 auto; padding: 28px 20px 80px; }
+  h1 { font-size: 20px; margin: 0 0 4px; }
+  .sub { color: var(--muted); font-size: 13px; margin: 0 0 24px; line-height: 1.5; max-width: 78ch; }
+  .sub code, .hint code { background: #e9ebf3; padding: 1px 5px; border-radius: 4px; font-size: 12px; }
+
+  .cols { display: grid; grid-template-columns: 300px 1fr; gap: 24px; align-items: start; }
+  @media (max-width: 860px) { .cols { grid-template-columns: 1fr; } }
+
+  .panel {
+    background: #fff; border: 1px solid var(--line); border-radius: 12px; padding: 16px 18px;
+  }
+  .panel + .panel { margin-top: 16px; }
+  /* Sentence case, not an uppercase eyebrow: rule 17 allows a short GREY
+     section label, and these read as kickers when they are coloured. */
+  .panel h2 {
+    font-size: 13px; color: var(--ink); margin: 0 0 12px; font-weight: 700;
+  }
+  fieldset { border: 0; padding: 0; margin: 0 0 16px; }
+  fieldset:last-child { margin-bottom: 0; }
+  legend { font-size: 12px; font-weight: 700; margin-bottom: 7px; padding: 0; }
+  label { display: flex; align-items: center; gap: 8px; font-size: 13px; padding: 3px 0; cursor: pointer; }
+  label input { accent-color: var(--blue); margin: 0; width: 18px; height: 18px; flex: none; }
+  .hint { color: var(--muted); font-size: 12px; margin: 4px 0 0; line-height: 1.45; }
+
+  /* Event log: the only way to see that a SEAM actually fired. */
+  #log {
+    font-family: ui-monospace, 'Fira Mono', monospace; font-size: 11.5px; line-height: 1.6;
+    background: #14172e; color: #cdd2f0; border-radius: 10px; padding: 12px 14px;
+    height: 260px; overflow: auto; margin: 0; white-space: pre-wrap; word-break: break-word;
+  }
+  #log .t { color: #6c7095; }
+  #log .k { color: #6ee7b7; }
+  #log .w { color: #fbbf24; }
+  #log .e { color: #fb7185; }
+  .logbar { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; }
+  button.mini {
+    font: inherit; font-size: 12px; font-weight: 700; padding: 5px 11px; cursor: pointer;
+    border: 1px solid var(--line); background: #fff; border-radius: 999px; color: var(--muted);
+  }
+  button.mini:hover { border-color: #c3c7db; color: var(--ink); }
+
+  .state { font-size: 12px; color: var(--muted); line-height: 1.7; }
+  .state b { color: var(--ink); font-weight: 700; font-family: ui-monospace, monospace; }
+
+  /* Rule 1: inputs are bordered with an inset box-shadow, never `border`. */
+  .nq-pg-select {
+    font: inherit; font-size: 12px; padding: 4px 8px; border: none; border-radius: 6px;
+    background: #fff; color: var(--ink);
+    box-shadow: inset 0 0 0 2px rgba(31, 35, 72, .1);
+  }
+  .nq-pg-select:focus-visible { outline: 2px solid var(--blue); outline-offset: 3px; }
+
+  /* Standalone asset list: the same stack, mounted outside the corner. */
+  #standalone { max-width: 340px; border: 1px solid var(--line); border-radius: 10px; overflow: hidden; }
+  .empty { color: var(--muted); font-size: 12px; font-style: italic; }
+</style>
+</head>
+<body>
+
+<!-- The mini wallet on a dark header and a light one. Same mount, same options. -->
+<div class="strip strip-navy">
+  <span class="wordmark">navy header</span>
+  <div id="corner-navy"></div>
+</div>
+<div class="strip strip-light">
+  <span class="wordmark">light header</span>
+  <div id="corner-light"></div>
+</div>
+
+<main>
+  <h1>Mini wallet playground</h1>
+  <p class="sub">
+    Every seam of <code>mountMiniWallet</code> as a switch. Flipping one remounts both corners
+    from the live <code>dist/app-shell.js</code>, so rebuild with <code>bun run build:dist</code> and reload.
+    The wallet is a <b>mock</b> by default, which lets you click through every state without a real Hub.
+    Switch it to <b>Real Hub</b> to drive the actual popup.
+  </p>
+
+  <div class="cols">
+    <div>
+      <div class="panel">
+        <h2>Wallet</h2>
+        <fieldset>
+          <legend>Backend</legend>
+          <label><input type="radio" name="backend" value="mock" checked> Mock (no network)</label>
+          <label><input type="radio" name="backend" value="hub"> Real Hub (opens popup)</label>
+          <p class="hint">Mock implements the same <code>Wallet</code> interface the corner consumes, the way Hashmark's betting-key adapter does.</p>
+        </fieldset>
+        <fieldset>
+          <legend>Runtime mode</legend>
+          <label><input type="radio" name="mode" value="hub" checked> hub (standalone web)</label>
+          <label><input type="radio" name="mode" value="miniapp"> miniapp (inside Nimiq Pay)</label>
+          <p class="hint">In miniapp mode the wallet is ambient: the face collapses to a flag and the menu keeps language only.</p>
+        </fieldset>
+        <fieldset>
+          <legend>Presence</legend>
+          <label><input type="checkbox" id="opt-wallet" checked> Pass a wallet at all</label>
+          <label><input type="checkbox" id="opt-connected"> Start connected</label>
+          <p class="hint">Unchecking the first is the language-only corner (a kid app on device pairing, a portal chooser).</p>
+        </fieldset>
+      </div>
+
+      <div class="panel">
+        <h2>Balances</h2>
+        <fieldset>
+          <label><input type="radio" name="bal" value="none"> No balance</label>
+          <label><input type="radio" name="bal" value="nim" checked> NIM only (<code>getBalanceLuna</code>)</label>
+          <label><input type="radio" name="bal" value="multi"> Multi-asset (<code>assets</code>)</label>
+          <p class="hint">Multi-asset shows NIM plus USDT plus BTC, each with its own decimals (5 / 6 / 8) and its own latency.</p>
+        </fieldset>
+        <fieldset>
+          <legend>Reader behaviour</legend>
+          <label><input type="checkbox" id="opt-slow"> Slow BTC read (3s)</label>
+          <label><input type="checkbox" id="opt-throw"> USDT reader throws</label>
+          <label><input type="checkbox" id="opt-nofiat-btc"> BTC has no price</label>
+          <p class="hint">A throwing reader must keep the last value on screen. An unpriced asset must be left OUT of the total, not counted as zero.</p>
+        </fieldset>
+        <fieldset>
+          <label><input type="checkbox" id="opt-fiat" checked> Fiat picker ("Show amounts in")</label>
+        </fieldset>
+      </div>
+
+      <div class="panel">
+        <h2>Seams</h2>
+        <fieldset>
+          <label><input type="checkbox" id="opt-receive" checked> Receive (address + QR)</label>
+          <label><input type="checkbox" id="opt-scan"> QR-scan button</label>
+          <label><input type="checkbox" id="opt-cashlink"> Create a Cashlink row</label>
+          <label><input type="checkbox" id="opt-onboard" checked> New-to-Nimiq line</label>
+          <label><input type="checkbox" id="opt-openinpay"> Open in Nimiq Pay</label>
+          <label><input type="checkbox" id="opt-identicon" checked> Real identicons</label>
+          <label><input type="checkbox" id="opt-qr" checked> QR renderer</label>
+          <label><input type="checkbox" id="opt-testnet"> Testnet (shows network row)</label>
+          <p class="hint">An unwired seam renders no row, which is the corner's no-dead-buttons rule. Toggle one off and watch it vanish.</p>
+        </fieldset>
+        <fieldset>
+          <legend>Send</legend>
+          <label><input type="radio" name="send" value="builtin" checked> Built-in send view</label>
+          <label><input type="radio" name="send" value="override"> Override with an app flow</label>
+          <p class="hint">Send is NOT an ordinary seam. The button is always there, and with no <code>send</code> option it opens the mini wallet's own recipient + amount view, which calls <code>wallet.pay()</code>. Passing <code>send</code> replaces that with your own flow.</p>
+          <legend style="margin-top:10px">Mock pay outcome</legend>
+          <label><input type="radio" name="pay" value="ok" checked> Succeeds</label>
+          <label><input type="radio" name="pay" value="cancel"> User cancels in wallet</label>
+          <label><input type="radio" name="pay" value="fail"> Fails</label>
+          <p class="hint">Only applies to the Mock backend. A cancel must stay silent (closing a wallet dialog is a normal outcome, not an error); a failure must say so.</p>
+        </fieldset>
+        <fieldset>
+          <legend>Report a bug</legend>
+          <label><input type="radio" name="bug" value="off"> No row</label>
+          <label><input type="radio" name="bug" value="stub" checked> Row, stubbed (logs only)</label>
+          <label><input type="radio" name="bug" value="real"> Row, REAL (files a GitHub issue)</label>
+          <label style="margin-top:6px">File into
+            <select id="bug-repo" class="nq-pg-select">
+              <option value="hashmark">hashmark</option>
+              <option value="nimiq.kids">nimiq.kids</option>
+              <option value="nimiq.cool">nimiq.cool</option>
+              <option value="nimiq.sale">nimiq.sale</option>
+              <option value="nimiq-app-shell">nimiq-app-shell (not registered)</option>
+            </select>
+          </label>
+          <p class="hint"><b>Real</b> posts to bot.nimiq.tech, which drafts the issue with an LLM and files it, labelled <code>playground</code>. It creates an actual issue, so close it afterwards. <code>nimiq-app-shell</code> is in the list on purpose: the service answers <code>unknown_repo</code> for it, which is how you see the reporter's error path.</p>
+        </fieldset>
+      </div>
+    </div>
+
+    <div>
+      <div class="panel">
+        <div class="logbar">
+          <h2 style="margin:0">Event log</h2>
+          <button class="mini" id="clear">clear</button>
+        </div>
+        <pre id="log"></pre>
+      </div>
+
+      <div class="panel">
+        <h2>Live state</h2>
+        <div class="state" id="state">...</div>
+      </div>
+
+      <div class="panel">
+        <h2>Standalone asset list (<code>mountAssetList</code>)</h2>
+        <div id="standalone"><p class="empty">Switch balances to Multi-asset to mount it.</p></div>
+        <p class="hint">The same stack the corner mounts internally, on a page of your own: a wallet screen, a funding view.</p>
+      </div>
+
+      <div class="panel">
+        <h2>Formatter (<code>fmtNim</code> / <code>fmtUnits</code>)</h2>
+        <div class="state" id="fmt">...</div>
+      </div>
+    </div>
+  </div>
+</main>
+
+<script type="module">
+import {
+  createI18n, createWallet, mergeLocales, shellLocales,
+  mountMiniWallet, mountAssetList,
+  fmtNim, fmtUnits, fmtFiat,
+} from '../dist/app-shell.js';
+
+/* ---------------------------------------------------------------- logging */
+const logEl = document.getElementById('log');
+function log(kind, msg, detail) {
+  const time = new Date().toTimeString().slice(0, 8);
+  const cls = kind === 'error' ? 'e' : kind === 'warn' ? 'w' : 'k';
+  const line = document.createElement('div');
+  line.innerHTML =
+    `<span class="t">${time}</span>  <span class="${cls}">${escapeHtml(msg)}</span>` +
+    (detail === undefined ? '' : `  <span class="t">${escapeHtml(
+      typeof detail === 'string' ? detail : JSON.stringify(detail))}</span>`);
+  logEl.appendChild(line);
+  logEl.scrollTop = logEl.scrollHeight;
+}
+function escapeHtml(s) {
+  return String(s).replace(/[&<>"']/g, (c) =>
+    ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]);
+}
+document.getElementById('clear').onclick = () => { logEl.textContent = ''; };
+
+/* ------------------------------------------------------------ mock wallet
+   The corner consumes the `Wallet` INTERFACE, never a concrete Hub client,
+   which is exactly why Hashmark can hand it a betting-key adapter instead.
+   That same seam is what makes a playground possible with no network at all. */
+const MOCK_ADDRESS  = 'NQ34 248H 8MB8 8QK2 5RVK EM8Q QJ8N 2Q5R 3XRK';
+const MOCK_POLYGON  = '0x71C7656EC7ab88b098defB751B7401B5f6d8976F';
+const MOCK_BTC      = 'bc1qar0srrr7xfkvy5l643lydnw9re59gtzzwf5mdq';
+
+function createMockWallet({ mode, connected }) {
+  let account = connected ? { address: MOCK_ADDRESS, label: 'Playground' } : null;
+  const listeners = new Set();
+  const emit = () => { for (const cb of listeners) cb(account); };
+  return {
+    mode,
+    get account() { return account; },
+    async connect() {
+      log('info', 'wallet.connect()');
+      await new Promise((r) => setTimeout(r, 400)); // the Hub popup's felt latency
+      account = { address: MOCK_ADDRESS, label: 'Playground' };
+      emit(); renderState();
+      log('info', '  -> connected', account.address);
+      return account;
+    },
+    async signAndSend(args) {
+      log('info', 'wallet.signAndSend()', args);
+      return { txHash: 'mock-tx-' + Math.random().toString(16).slice(2, 10) };
+    },
+    async pay(args) {
+      log('info', 'wallet.pay()', args);
+      /* The wallet dialog is a real pause and three real outcomes. The send
+         view treats them very differently, so all three have to be reachable
+         without a Hub: success paints the sent state, a cancel must stay
+         SILENT (closing a wallet dialog is a normal thing to do, not an
+         error), and only a genuine failure gets an error line. */
+      await new Promise((r) => setTimeout(r, 900));
+      const outcome = radio('pay');
+      if (outcome === 'cancel') {
+        log('warn', '  -> user cancelled in wallet');
+        throw new Error('User cancelled the request');
+      }
+      if (outcome === 'fail') {
+        log('error', '  -> pay failed');
+        throw new Error('network unreachable');
+      }
+      const txHash = 'mock-tx-' + Math.random().toString(16).slice(2, 10);
+      log('info', '  -> broadcast', txHash);
+      return { txHash };
+    },
+    async signMessage(message) {
+      log('info', 'wallet.signMessage()', message);
+      return { address: MOCK_ADDRESS, message, publicKeyHex: 'de'.repeat(32), signatureHex: 'ad'.repeat(64) };
+    },
+    onAccountChange(cb) { listeners.add(cb); return () => listeners.delete(cb); },
+    disconnect() { log('info', 'wallet.disconnect()'); account = null; emit(); renderState(); },
+  };
+}
+
+/* ------------------------------------------------------------- identicons
+   Loaded from a CDN on demand so the playground stays dependency-free. A
+   failure here must degrade to the built-in hexagon placeholder and SAY so,
+   rather than blank the face. */
+let iqonsPromise = null;
+function identiconEl(address, sizePx) {
+  const el = document.createElement('div');
+  el.style.cssText = `width:${sizePx}px;height:${sizePx}px;border-radius:50%;background:#e4e6f0`;
+  /* @nimiq/iqons is the same optional peer the shell's own profile widget
+     reaches for, so the playground exercises the real path rather than a
+     lookalike. Its default export carries toDataUrl. */
+  iqonsPromise ??= import('https://esm.sh/@nimiq/iqons@1.6.0')
+    .then((m) => {
+      const lib = m.default ?? m;
+      /* iqons fetches its sprite from a path relative to the PAGE by default,
+         which here means a node_modules/ URL this server has no reason to
+         serve. Point it at the published sprite instead. */
+      lib.svgPath = 'https://cdn.jsdelivr.net/npm/@nimiq/iqons@1.6.0/dist/iqons.min.svg';
+      return lib;
+    })
+    .catch((err) => { log('warn', 'iqons unavailable, using hexagon placeholder', String(err)); return null; });
+  iqonsPromise.then(async (lib) => {
+    if (!lib) return;
+    try {
+      const url = await lib.toDataUrl(address);
+      el.style.background = `center/contain no-repeat url("${url}")`;
+    } catch (err) { log('warn', 'identicon render failed', String(err)); }
+  });
+  return el;
+}
+
+/* -------------------------------------------------------------- QR (tiny)
+   Not a real encoder. It is a visible stand-in that proves the `qr` seam is
+   wired and sized right. Apps pass their own; the shell has no opinion. */
+function qrEl(text, sizePx) {
+  const el = document.createElement('div');
+  el.style.cssText = `width:${sizePx}px;height:${sizePx}px;display:grid;
+    grid-template-columns:repeat(21,1fr);background:#fff;padding:6px`;
+  let h = 0; for (const ch of text) h = (h * 31 + ch.charCodeAt(0)) >>> 0;
+  for (let i = 0; i < 441; i++) {
+    const cell = document.createElement('div');
+    h = (h * 1103515245 + 12345) >>> 0;
+    cell.style.background = (h >>> 16) & 1 ? '#1f2348' : '#fff';
+    el.appendChild(cell);
+  }
+  return el;
+}
+
+/* Shown in the Report a bug context so a filed issue says which build produced
+   it. Kept in step with package.json by hand; it is a label, not a dependency. */
+const SHELL_VERSION = '0.11.0';
+
+/* ------------------------------------------------------------ mock assets */
+const $ = (id) => document.getElementById(id);
+const opt = (id) => $(id).checked;
+const radio = (name) => document.querySelector(`input[name="${name}"]:checked`).value;
+
+const nimLuna    = 4_218_37500;         // 42 183.75 NIM
+const usdtUnits  = 1_250_450_000n;      // 1 250.45 USDT (6dp)
+const btcUnits   = 12_345_678n;         // 0.12345678 BTC (8dp)
+
+async function readNim()  { return nimLuna; }
+async function readUsdt() {
+  if (opt('opt-throw')) { log('error', 'USDT reader threw (on purpose)'); throw new Error('polygon rpc 503'); }
+  return usdtUnits;
+}
+async function readBtc() {
+  if (opt('opt-slow')) { log('warn', 'BTC read: sleeping 3s'); await new Promise((r) => setTimeout(r, 3000)); }
+  return btcUnits;
+}
+
+function buildAssets() {
+  return [
+    { ticker: 'NIM',  name: 'Nimiq',      decimals: 5, balance: readNim,  address: MOCK_ADDRESS },
+    { ticker: 'USDT', name: 'Tether USD', decimals: 6, balance: readUsdt, address: MOCK_POLYGON },
+    { ticker: 'BTC',  name: 'Bitcoin',    decimals: 8, balance: readBtc,  address: MOCK_BTC },
+  ];
+}
+
+/* One whole unit priced in `ticker`. Deliberately returns null for BTC when
+   the switch is on, so you can watch it drop OUT of the total rather than
+   being counted as zero. */
+const USD_PER = { NIM: 0.0021, USDT: 1.0, BTC: 96_400 };
+const FX = { USD: 1, EUR: 0.92, GBP: 0.79, BRL: 5.4 };
+async function rate(ticker, asset = 'NIM') {
+  if (asset === 'BTC' && opt('opt-nofiat-btc')) return null;
+  const usd = USD_PER[asset];
+  if (usd === undefined) return null;
+  return usd * (FX[ticker] ?? 1);
+}
+
+/* ------------------------------------------------------------------ mount */
+const i18n = createI18n({ locales: mergeLocales(shellLocales), fallback: 'en' });
+i18n.onChange((id) => { log('info', 'i18n.setLanguage()', id); renderState(); });
+
+let corners = [];
+let assetHandle = null;
+let wallet = null;
+
+function buildOptions() {
+  const bal = radio('bal');
+  const o = {
+    i18n,
+    receive: opt('opt-receive'),
+    network: opt('opt-testnet') ? 'test' : 'main',
+  };
+  if (opt('opt-wallet')) o.wallet = wallet;
+  if (opt('opt-identicon')) o.identicon = identiconEl;
+  if (opt('opt-qr')) o.qr = qrEl;
+
+  if (bal === 'nim') o.getBalanceLuna = async () => nimLuna;
+  if (bal === 'multi') o.assets = buildAssets;   // a FUNCTION: re-read every refresh
+
+  if (opt('opt-fiat')) {
+    o.fiat = {
+      currencies: ['USD', 'EUR', 'GBP', 'BRL'],
+      default: 'USD',
+      rate,
+      onChange: (t) => { log('info', 'fiat.onChange()', t); renderState(); },
+    };
+  }
+  /* Send is deliberately NOT passed by default. The button is always present,
+     and leaving the option off is what gives you the built-in recipient +
+     amount view. Passing a logger here replaces a working send with a dead
+     button, which is exactly the trap this radio exists to show. */
+  if (radio('send') === 'override') {
+    o.send = () => log('info', 'send() override, host opens its own flow');
+  }
+  if (opt('opt-scan'))      o.scan = () => log('info', 'scan(), host opens its camera');
+  if (opt('opt-cashlink'))  o.createCashlink = () => log('info', 'createCashlink()');
+  if (opt('opt-onboard'))   o.onboard = () => log('info', 'onboard(), HubApi.onboard');
+  if (opt('opt-openinpay')) o.openInPay = () => { log('info', 'openInPay() read at click time'); return 'https://pay.nimiq.com/'; };
+
+  const bug = radio('bug');
+  if (bug === 'stub') {
+    o.reportBug = () => log('warn', 'reportBug() stubbed. Switch to REAL to file an actual issue.');
+  } else if (bug === 'real') {
+    o.reportBug = {
+      bot: { repo: $('bug-repo').value, labels: ['playground'] },
+      context: { surface: 'playground', version: SHELL_VERSION },
+    };
+  }
+  o.onRename = (label) => log('info', 'onRename()', label);
+  return o;
+}
+
+function remount() {
+  for (const c of corners) c.destroy();
+  corners = [];
+
+  const mode = radio('mode');
+  const backend = radio('backend');
+  wallet = backend === 'mock'
+    ? createMockWallet({ mode, connected: opt('opt-connected') })
+    : createWallet({ appName: 'Mini wallet playground', mode });
+
+  if (backend === 'hub') log('warn', `real Hub wallet, detected mode: ${wallet.mode}`);
+  wallet.onAccountChange((acc) => { log('info', 'onAccountChange', acc ? acc.address : 'null'); renderState(); });
+
+  const o = buildOptions();
+  for (const id of ['corner-navy', 'corner-light']) {
+    corners.push(mountMiniWallet($(id), o));
+  }
+
+  const host = $('standalone');
+  assetHandle?.destroy();
+  assetHandle = null;
+  host.innerHTML = '';
+  if (radio('bal') === 'multi') {
+    assetHandle = mountAssetList(host, {
+      assets: buildAssets,
+      rate: (t) => rate(corners[0].fiatTicker ?? 'USD', t),
+      fiatTicker: () => corners[0].fiatTicker ?? 'USD',
+      onSelect: (a) => log('info', 'assetList.onSelect()', a.ticker),
+    });
+  } else {
+    host.innerHTML = '<p class="empty">Switch balances to Multi-asset to mount it.</p>';
+  }
+
+  log('info', `mounted. mode:${mode} backend:${backend} balance:${radio('bal')}`);
+  renderState();
+}
+
+function renderState() {
+  const acc = wallet?.account;
+  $('state').innerHTML = [
+    `wallet.mode      <b>${wallet?.mode ?? '(none)'}</b>`,
+    `wallet.account   <b>${acc ? escapeHtml(acc.address) : 'null'}</b>`,
+    `account.label    <b>${acc ? escapeHtml(acc.label || '(none)') : '(none)'}</b>`,
+    `i18n.language    <b>${i18n.language ?? document.documentElement.lang}</b>`,
+    `fiatTicker       <b>${corners[0]?.fiatTicker ?? 'null'}</b>`,
+  ].join('<br>');
+
+  $('fmt').innerHTML = [
+    `fmtNim(${nimLuna})            <b>${fmtNim(nimLuna)}</b>`,
+    `fmtUnits(${usdtUnits}n, 6)    <b>${fmtUnits(usdtUnits, 6)}</b>`,
+    `fmtUnits(${btcUnits}n, 8)     <b>${fmtUnits(btcUnits, 8)}</b>`,
+    `fmtUnits(9007199254740993n,8) <b>${fmtUnits(9007199254740993n, 8)}</b> <span style="color:#6c7095">exact past 2^53</span>`,
+    `fmtFiat(12.5,'USD','en-US')   <b>${fmtFiat(12.5, 'USD', 'en-US')}</b>`,
+  ].join('<br>');
+}
+
+/* select too, not just input: the bug-repo picker has to remount the corner or
+   the row keeps filing into whatever repo was chosen at load. */
+for (const el of document.querySelectorAll('input, select')) el.addEventListener('change', remount);
+
+window.addEventListener('error', (e) => log('error', 'window error', e.message));
+window.addEventListener('unhandledrejection', (e) => log('error', 'unhandled rejection', String(e.reason)));
+
+remount();
+log('info', 'playground ready, open the corner in either header');
+</script>
+</body>
+</html>

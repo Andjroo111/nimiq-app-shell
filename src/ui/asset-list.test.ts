@@ -1,10 +1,17 @@
-// Contract pins for the multi-asset seam. The rendering is verified by consumer
-// apps' browser passes (this repo has no DOM harness, by convention), so what is
-// pinned here is the SHAPE, which is the part a later refactor can quietly break
-// for every app at once.
+// Contract pins for the multi-asset seam. Most of what is pinned here is the
+// SHAPE, which is the part a later refactor can quietly break for every app at
+// once.
+//
+// The mount block at the bottom is the exception, and it exists because the
+// shape tests could not have caught the bug it pins: a standalone list mounted
+// with a dash in every row and stayed that way, because only the corner ever
+// called refresh(). Every type was correct. Found by the playground on its
+// first run (2026-08-13).
 import { describe, expect, test } from 'bun:test';
+import { Window } from 'happy-dom';
 import type { CornerControlOptions } from './corner-control';
 import type { AssetListOptions, ShellAsset } from './asset-list';
+import { mountAssetList } from './asset-list';
 
 const NIM: ShellAsset = {
   ticker: 'NIM',
@@ -63,5 +70,49 @@ describe('asset-list contract', () => {
     const bare: AssetListOptions = { assets: [NIM] };
     expect(bare.rate).toBeUndefined();
     expect(bare.onSelect).toBeUndefined();
+  });
+});
+
+describe('asset-list mounts with real balances', () => {
+  function withDom(): HTMLElement {
+    const w = new Window();
+    (globalThis as unknown as { document: unknown }).document = w.document;
+    (globalThis as unknown as { HTMLElement: unknown }).HTMLElement = w.HTMLElement;
+    return w.document.createElement('div') as unknown as HTMLElement;
+  }
+  const settle = () => new Promise((r) => setTimeout(r, 30));
+
+  // The regression. A wallet screen that mounts this and shows a dash forever
+  // is indistinguishable from a broken RPC, and the README advertises exactly
+  // that standalone use.
+  test('a standalone mount reads its balances without the host calling refresh', async () => {
+    const host = withDom();
+    mountAssetList(host, { assets: [NIM] });
+    await settle();
+    expect(host.textContent).toContain('1200');
+    expect(host.textContent).not.toContain('—');
+  });
+
+  // The corner reads on menu-open instead, so it must be able to opt out: a
+  // Polygon RPC and a BTC explorer on every page load, for a panel most
+  // visitors never open, is the cost the lazy read exists to avoid.
+  test('autoRefresh:false leaves the rows pending for the host to drive', async () => {
+    const host = withDom();
+    const handle = mountAssetList(host, { assets: [NIM], autoRefresh: false });
+    await settle();
+    expect(handle.units('NIM')).toBeNull();
+    await handle.refresh();
+    expect(handle.units('NIM')).toBe(120_000_000n);
+  });
+
+  // A throwing reader must keep the row rather than blank it, because a balance
+  // that vanishes reads as "your money is gone", not "the RPC is flaky".
+  test('a throwing reader still renders its row', async () => {
+    const host = withDom();
+    mountAssetList(host, {
+      assets: [{ ticker: 'USDT', decimals: 6, balance: async () => { throw new Error('rpc 503'); } }],
+    });
+    await settle();
+    expect(host.textContent).toContain('USDT');
   });
 });
