@@ -1330,13 +1330,15 @@ export function mountMiniWallet(
   /** Show the receive view. With an asset, it shows THAT asset's address, chain
    *  and QR payload; without one, the account's own NIM address as before.
    *
-   *  An asset with no address of its own falls back to the account address
-   *  rather than rendering an empty screen. That is right for a token on the
-   *  account's own chain and would be wrong for a foreign one, which is why the
-   *  chain is named on screen either way. */
+   *  An asset with no address of ITS OWN is refused rather than falling back to
+   *  the account address. The fallback looked harmless and was the opposite: it
+   *  printed "Send USDT on Polygon only" over a NIM address, and the warning
+   *  made that pairing read as deliberate. The row is also left unselectable
+   *  (see asset-list), so this is the second of two guards on the same hazard. */
   function openReceive(asset?: ShellAsset): void {
     const account = wallet?.account ?? null;
     if (!account) return;
+    if (asset && !asset.address) return;
     const address = asset?.address ?? account.address;
     if (!address) return;
     root.classList.add('nq-cc-show-receive');

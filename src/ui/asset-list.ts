@@ -220,14 +220,29 @@ export function mountAssetList(
   let destroyed = false;
 
   function render(assets: ShellAsset[]): void {
-    const next = assets.map((a) => a.ticker).join(' ');
+    // The signature carries whether each asset HAS an address, not just which
+    // assets there are, because that is what decides `button` vs `div`. On
+    // tickers alone a row that gains an address later never re-renders and
+    // stays unselectable for the rest of the session, which is precisely
+    // Hashmark's case: its EVM address appears only once a bet flow derives
+    // the key. Deliberately coarse: a CHANGED address does not rebuild rows
+    // and blank their balances, only the appearance or loss of one does.
+    const next = assets.map((a) => `${a.ticker}${a.address ? '+' : '-'}`).join(' ');
     if (next === signature) return;
     signature = next;
     root.textContent = '';
     const kept = new Map<string, RowState>();
 
     for (const asset of assets) {
-      const activatable = typeof options.onSelect === 'function';
+      // Selecting a row opens receive FOR THAT ASSET, so a row without its own
+      // address has nothing to open and must not pretend otherwise.
+      //
+      // The alternative, falling back to the account address, is worse than a
+      // dead button: the receive screen would print "Send USDT on Polygon only"
+      // over a NIM address, and the warning makes the pairing look deliberate.
+      // Hashmark is exactly this shape, since its EVM key is not derived until a
+      // bet flow runs, so its USDT row carries no address for most of a session.
+      const activatable = typeof options.onSelect === 'function' && !!asset.address;
       const row = el(activatable ? 'button' : 'div', 'nq-al-row', root);
       if (activatable) {
         (row as HTMLButtonElement).type = 'button';
