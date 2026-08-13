@@ -48,7 +48,14 @@ export interface CornerControlOptions {
   qr?: (text: string, sizePx: number) => HTMLElement;
   /** Show the Receive flow (address + QR behind the Receive button). Default true. */
   receive?: boolean;
-  /** Wire the Send button (e.g. a checkout flow). Button hidden when absent. */
+  /** OVERRIDE the Send button with an app-specific flow (e.g. a checkout).
+   *
+   *  The Send button is NOT a seam like the others: it is always present, and
+   *  without this option it opens the mini wallet's own BUILT-IN send view
+   *  (recipient + amount here, the wallet only for the approval, via
+   *  `wallet.pay()`). That built-in view is what makes this a wallet rather
+   *  than a connect button, so pass this only when the app genuinely owns the
+   *  flow. Passing a no-op replaces a working send with a dead button. */
   send?: () => void;
   /** Wire the QR-scan button. Hidden when absent. */
   scan?: () => void;
@@ -211,7 +218,7 @@ function ensureStyles(): void {
    It reads as a control through ELEVATION, not an outline (Andjroo, 2026-08-03:
    "remove the gray line ... around the actual white of the pill"). It used to
    carry "border:1px solid currentColor 22%", which this same file already argues
-   against thirty lines down — "inputs: inset box-shadow border, never border
+   against thirty lines down: "inputs: inset box-shadow border, never border
    (rule 1)". Nimiq separates with a hairline, whitespace, or a separate surface,
    and a raised white pill is the third.
 
@@ -518,8 +525,13 @@ function el<K extends keyof HTMLElementTagNameMap>(
   return node;
 }
 
-/** Mount the fleet corner control into `container`. Owns its state + listeners. */
-export function mountCornerControl(
+/** Mount the mini wallet into `container`. Owns its state + listeners.
+ *
+ *  NAMING (2026-08-13): the fleet calls this the **mini wallet**, and so does
+ *  everything written about it. `mountCornerControl` is kept as an alias below
+ *  because 25 apps import it by that name and a rename that breaks them all to
+ *  save a word is not a rename worth doing. New code should use this one. */
+export function mountMiniWallet(
   container: HTMLElement,
   options: CornerControlOptions,
 ): CornerControlHandle {
@@ -670,6 +682,11 @@ export function mountCornerControl(
       rate: hasFiat
         ? (asset) => options.fiat!.rate(fiatTicker, asset)
         : undefined,
+      // The corner reads on menu-open (refreshBalance below), so it opts out of
+      // the list's own mount read. Leaving it on would hit a Polygon RPC and a
+      // BTC explorer on every page load of every app, for a panel most visitors
+      // never open.
+      autoRefresh: false,
     });
   }
 
@@ -1217,3 +1234,11 @@ export function mountCornerControl(
     },
   };
 }
+
+/** Back-compat alias for {@link mountMiniWallet}.
+ *
+ *  The component was shipped as "corner control" (locked 2026-07-23) and 25
+ *  fleet apps import that name. The fleet calls the thing a mini wallet, so the
+ *  canonical export follows the fleet; this stays so no app has to change a
+ *  line to take a version bump. */
+export const mountCornerControl = mountMiniWallet;

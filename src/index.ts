@@ -95,10 +95,16 @@ export {
   type WalletPillOptions,
   type WalletPillHandle,
 } from './ui/wallet-pill';
+// The mini wallet: the fleet's ONE header control. `mountCornerControl` and the
+// CornerControl* types are the original names, kept as aliases so a version
+// bump never costs an app an edit.
 export {
+  mountMiniWallet,
   mountCornerControl,
   type CornerControlOptions,
+  type CornerControlOptions as MiniWalletOptions,
   type CornerControlHandle,
+  type CornerControlHandle as MiniWalletHandle,
 } from './ui/corner-control';
 // The corner mounts this itself from `assets`; exported for hosts that want the
 // balance stack on a page of their own (a wallet screen, a funding view).

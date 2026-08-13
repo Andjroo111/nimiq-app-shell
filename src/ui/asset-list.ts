@@ -70,6 +70,16 @@ export interface AssetListOptions {
   onSelect?: (asset: ShellAsset) => void;
   /** Milliseconds a balance stays fresh. Default 30_000, matching the corner. */
   cacheMs?: number;
+  /** Read every balance once at mount. Default TRUE.
+   *
+   *  Without this a standalone list mounts showing a dash in every row and
+   *  stays that way until the host happens to call `refresh()`, which is a
+   *  wallet screen that renders as broken. The corner passes `false` because it
+   *  reads on menu-open instead: firing a Polygon RPC and a BTC explorer on
+   *  every page load, for a panel most visitors never open, is exactly the cost
+   *  the lazy read exists to avoid. The default belongs with the caller that
+   *  has no other trigger, not with the one that does. */
+  autoRefresh?: boolean;
   /** Inject the component's <style> once. Default true. */
   injectStyles?: boolean;
 }
@@ -269,6 +279,9 @@ export function mountAssetList(
   }
 
   render(readAssets());
+  // Fire-and-forget: mount stays synchronous so the handle is in the caller's
+  // hands before the first RPC answers.
+  if (options.autoRefresh !== false) void refresh();
 
   return {
     el: root,
