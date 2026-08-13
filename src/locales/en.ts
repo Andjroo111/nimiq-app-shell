@@ -4,6 +4,8 @@ export default {
   'shell.connectWallet': 'Connect wallet',
   'shell.connecting': 'Connecting',
   'shell.disconnect': 'Disconnect',
+  'shell.switchAccount': 'Switch account',
+  'shell.saveContact': 'Save this recipient as?',
   'shell.profile': 'Profile',
   'shell.account': 'Account',
   'shell.address': 'Address',

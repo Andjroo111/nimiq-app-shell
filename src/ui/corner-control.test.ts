@@ -5,7 +5,7 @@
 // name is the one failure in this component that costs somebody money.
 import { describe, expect, test } from 'bun:test';
 import { Window } from 'happy-dom';
-import { FIAT_FLAGS, NATIVE_NAMES, mountMiniWallet, type CornerControlOptions } from './corner-control';
+import { FIAT_FLAGS, NATIVE_NAMES, mountMiniWallet, type CornerControlOptions, type ShellContact } from './corner-control';
 import { FLAG_SVG } from '../flags/data';
 import { SHELL_LANGUAGES, FEATURED_LANGUAGES, shellLocales, mergeLocales } from '../locales';
 import { createI18n } from '../i18n';
@@ -245,5 +245,160 @@ describe('receive view names the chain it is showing', () => {
     expect(warn).toContain('Polygon');
     expect(warn).toContain('USDT');
     expect(host.querySelector('.nq-cc-back')?.textContent).toContain('USDT');
+  });
+});
+
+describe('switching account drops the previous account money', () => {
+  const A = 'NQ34 248H 8MB8 8QK2 5RVK EM8Q QJ8N 2Q5R 3XRK';
+  const B = 'NQ21 8LNC MJD3 D7T4 8FSX N5M8 5V2M A9GY 4KUJ';
+
+  function mount(read: () => Promise<bigint> = async () => 4_218_37500n) {
+    const w = new Window();
+    for (const key of ['document', 'HTMLElement', 'navigator', 'localStorage', 'getComputedStyle', 'window']) {
+      (globalThis as unknown as Record<string, unknown>)[key] =
+        (w as unknown as Record<string, unknown>)[key];
+    }
+    const i18n = createI18n({ locales: mergeLocales(shellLocales), fallback: 'en' });
+    let account: { address: string; label: string } | null = { address: A, label: 'A' };
+    const listeners = new Set<(a: unknown) => void>();
+    const wallet = {
+      mode: 'hub',
+      get account() { return account; },
+      connect: async () => { account = { address: B, label: 'B' }; for (const l of listeners) l(account); return account; },
+      signAndSend: async () => ({ txHash: '' }),
+      pay: async () => ({ txHash: 'ok' }),
+      signMessage: async () => ({ address: '', message: '', publicKeyHex: '', signatureHex: '' }),
+      onAccountChange: (cb: (a: unknown) => void) => { listeners.add(cb); return () => listeners.delete(cb); },
+      disconnect: () => { account = null; for (const l of listeners) l(null); },
+    } as unknown as Wallet;
+    const host = w.document.createElement('div') as unknown as HTMLElement;
+    mountMiniWallet(host, {
+      wallet,
+      i18n,
+      assets: [{ ticker: 'NIM', name: 'Nimiq', network: 'Nimiq', decimals: 5,
+        address: A, balance: read }],
+    });
+    return { host, wallet };
+  }
+  const settle = () => new Promise((r) => setTimeout(r, 50));
+
+  // The bug this closes: the balance rows keep their last value on purpose (a
+  // flaky RPC must not blank a real balance), which across an account switch
+  // means showing one account's money under another account's name.
+  //
+  // The second account's read is held open so the WINDOW between the switch and
+  // the new figure is observable. That window is the whole bug: without the
+  // clear it shows the previous account's balance, confidently.
+  test('the previous balance does not survive the switch', async () => {
+    let releaseSecondRead: (v: bigint) => void = () => {};
+    let readCount = 0;
+    const { host, wallet } = mount(() => {
+      readCount += 1;
+      if (readCount === 1) return Promise.resolve(4_218_37500n);
+      return new Promise<bigint>((resolve) => { releaseSecondRead = resolve; });
+    });
+    await settle();
+    expect(host.querySelector('.nq-al-units')?.textContent).toContain('4');
+
+    await wallet.connect();
+    await settle();
+    const during = host.querySelector('.nq-al-units');
+    expect(during?.textContent).toBe('—');
+    expect(during?.className).toContain('nq-al-pending');
+
+    releaseSecondRead(11_100000n);
+    await settle();
+    expect(host.querySelector('.nq-al-units')?.textContent).toContain('11');
+  });
+
+  // A receive screen left open after a switch would be showing the previous
+  // account's address, which is where money arrives.
+  test('an open receive screen closes on the switch', async () => {
+    const { host, wallet } = mount();
+    await settle();
+    (host.querySelectorAll('.nq-al-row')[0] as HTMLElement).click();
+    await settle();
+    expect(host.querySelector('.nq-cc')?.className).toContain('nq-cc-show-receive');
+    await wallet.connect();
+    await settle();
+    expect(host.querySelector('.nq-cc')?.className).not.toContain('nq-cc-show-receive');
+  });
+
+  test('the switch row exists and is not the disconnect', async () => {
+    const { host } = mount();
+    await settle();
+    const labels = [...host.querySelectorAll('.nq-cc-row')].map((r) => r.textContent);
+    expect(labels.some((l) => l?.includes('Switch account'))).toBe(true);
+    expect(host.querySelector('.nq-cc-disconnect')?.textContent).toBe('Disconnect');
+  });
+});
+
+describe('saved recipients', () => {
+  const A = 'NQ34 248H 8MB8 8QK2 5RVK EM8Q QJ8N 2Q5R 3XRK';
+  const CONTACTS: ShellContact[] = [
+    { label: 'Mum', address: 'NQ21 8LNC MJD3 D7T4 8FSX N5M8 5V2M A9GY 4KUJ' },
+    { label: 'Polygon till', address: '0x71C7656EC7ab88b098defB751B7401B5f6d8976F', asset: 'USDT' },
+  ];
+
+  function mount(contacts?: CornerControlOptions['contacts']) {
+    const w = new Window();
+    for (const key of ['document', 'HTMLElement', 'navigator', 'localStorage', 'getComputedStyle', 'window']) {
+      (globalThis as unknown as Record<string, unknown>)[key] =
+        (w as unknown as Record<string, unknown>)[key];
+    }
+    const i18n = createI18n({ locales: mergeLocales(shellLocales), fallback: 'en' });
+    const wallet = {
+      mode: 'hub',
+      account: { address: A, label: 'A' },
+      connect: async () => null,
+      signAndSend: async () => ({ txHash: '' }),
+      pay: async () => ({ txHash: 'ok' }),
+      signMessage: async () => ({ address: '', message: '', publicKeyHex: '', signatureHex: '' }),
+      onAccountChange: () => () => {},
+      disconnect: () => {},
+    } as unknown as Wallet;
+    const host = w.document.createElement('div') as unknown as HTMLElement;
+    mountMiniWallet(host, { wallet, i18n, getBalanceLuna: async () => 100_000_000, contacts });
+    return host;
+  }
+  const settle = () => new Promise((r) => setTimeout(r, 50));
+  const openSend = async (host: HTMLElement) => {
+    (host.querySelector('.nq-cc-send') as HTMLElement).click();
+    await settle();
+  };
+
+  test('no contacts wired renders no chips', async () => {
+    const host = mount();
+    await openSend(host);
+    expect((host.querySelector('.nq-cc-contacts') as HTMLElement)?.hidden).toBe(true);
+  });
+
+  // Offering a Polygon address while sending NIM is offering a mistake.
+  test('only contacts for the asset being sent are offered', async () => {
+    const host = mount({ list: () => CONTACTS });
+    await openSend(host);
+    const chips = [...host.querySelectorAll('.nq-cc-contact')].map((c) => c.textContent);
+    expect(chips).toContain('Mum');
+    expect(chips).not.toContain('Polygon till');
+  });
+
+  // Picking fills the field rather than bypassing it, so the address stays
+  // visible and checkable before the send is confirmed.
+  test('picking a contact fills the recipient field', async () => {
+    const host = mount({ list: () => CONTACTS });
+    await openSend(host);
+    (host.querySelector('.nq-cc-contact') as HTMLElement).click();
+    await settle();
+    expect((host.querySelector('.nq-cc-input-addr') as HTMLInputElement).value)
+      .toBe(CONTACTS[0]!.address);
+  });
+
+  // A send view that refuses to open because the host address book threw is
+  // worse than one with no chips.
+  test('a throwing contacts read still opens the send view', async () => {
+    const host = mount({ list: () => { throw new Error('store offline'); } });
+    await openSend(host);
+    expect(host.querySelector('.nq-cc')?.className).toContain('nq-cc-show-send');
+    expect((host.querySelector('.nq-cc-contacts') as HTMLElement)?.hidden).toBe(true);
   });
 });

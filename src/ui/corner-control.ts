@@ -31,6 +31,20 @@ import { BUG_ICON, openReportBugSheet, type ReportBugOptions } from './report-bu
 import { installReportCapture } from './report-capture';
 import { mountAssetList, type AssetListHandle, type ShellAsset } from './asset-list';
 
+/** One saved recipient. The host owns the list and its storage. */
+export interface ShellContact {
+  /** What the person is called. This is what the chip shows. */
+  label: string;
+  /** The address to fill in. Shown on hover so a name never hides what it means. */
+  address: string;
+  /** Scope the entry to one asset's chain. Omitted means NIM.
+   *
+   *  Load-bearing: offering a Polygon address while sending NIM is offering a
+   *  mistake, and the two address formats are close enough in a small field
+   *  that a wrong pick is easy to miss. */
+  asset?: string;
+}
+
 export interface CornerControlOptions {
   /** The app's wallet. OMIT IT on pages that have no wallet concept at all
    *  (a kid app on device pairing, a portal chooser): the corner then renders
@@ -121,6 +135,24 @@ export interface CornerControlOptions {
     /** Called whenever the visitor picks a different ticker, and once at mount
      *  with the restored/default one, so a host can price its own UI. */
     onChange?: (ticker: string) => void;
+  };
+  /** Saved recipients for the send view. Hidden when absent.
+   *
+   *  A HOST seam, because there is no shared address book to read: the Hub
+   *  exposes no contacts API to a third-party origin and `LIST` is not
+   *  whitelisted. That is fine, because the host is the only party that knows
+   *  anything useful anyway (nimiq.kids knows a child by name, a POS knows the
+   *  till). Storage stays entirely the host's; this package should not grow a
+   *  second thing it persists.
+   *
+   *  `list` may be async and may throw; a failed read renders no chips rather
+   *  than breaking the send view. */
+  contacts?: {
+    list: () => ShellContact[] | Promise<ShellContact[]>;
+    /** Offer to save an unrecognised recipient after a send lands. Without it
+     *  the book is read-only, which is the right default for a host that
+     *  manages contacts on its own screens. */
+    add?: (entry: ShellContact) => void | Promise<void>;
   };
   /** 'test' renders the network row (mainnet says nothing). Default 'main'. */
   network?: 'main' | 'test';
@@ -402,6 +434,19 @@ button.nq-cc-name:focus-visible { outline:2px solid var(--nq-cc-accent, #0582ca)
   color:oklch(0.7387 0.179 56.67);
   font-size:11.5px; font-weight:700; line-height:1.4; text-align:center; }
 .nq-cc-net-warn[hidden] { display:none; }
+
+/* Saved recipients: a wrapping row of quiet pills under the address field.
+   Pills because every actionable thing in this menu is a pill, and quiet
+   because they are a shortcut, not the primary way to fill the field. */
+.nq-cc-contacts { display:flex; flex-wrap:wrap; gap:5px; margin:6px 0 2px; }
+.nq-cc-contacts[hidden] { display:none; }
+.nq-cc-contact { max-width:100%; padding:4px 10px; border:none; border-radius:999px;
+  background:rgba(31,35,72,.06); color:var(--nq-cc-menu-fg, #1f2348);
+  font-family:inherit; font-size:11.5px; font-weight:700; line-height:1.3; cursor:pointer;
+  white-space:nowrap; overflow:hidden; text-overflow:ellipsis;
+  transition:background .15s var(--nimiq-ease, cubic-bezier(.25,0,0,1)); }
+.nq-cc-contact:hover { background:rgba(5,130,202,.12); color:#0582ca; }
+.nq-cc-contact:focus-visible { outline:2px solid var(--nq-cc-accent, #0582ca); outline-offset:2px; }
 .nq-cc-copy-tooltip { position:absolute; left:50%; bottom:calc(100% + 10px);
   transform:translateX(-50%) translateY(4px); padding:8px 12px; border-radius:4px;
   background-image:radial-gradient(100% 100% at 100% 100%, #265dd7, #0582ca); color:#fff; font-size:13px;
@@ -953,6 +998,34 @@ export function mountMiniWallet(
     });
   }
 
+  // ---- switch account -------------------------------------------------------
+  // Connecting again IS the switcher: chooseAddress reopens the Hub's own
+  // account picker, which is the right screen for this and one we do not have
+  // to build. There is deliberately no in-menu account list, because a fleet
+  // app cannot enumerate the user's accounts (LIST is not third-party callable)
+  // and a worse copy of a screen the Hub already ships is not worth owning.
+  //
+  // Hub only. Inside Nimiq Pay the account is the host wallet's, not ours.
+  if (wallet) {
+    const switchRow = el('button', 'nq-cc-row nq-cc-when-connected nq-cc-when-hub', viewMain);
+    switchRow.type = 'button';
+    const switchLabel = el('span', 'nq-cc-strong', switchRow);
+    tNode(switchLabel, 'shell.switchAccount');
+    switchRow.addEventListener('click', async () => {
+      setOpen(false);
+      try {
+        // Cancelling the Hub picker resolves null and MUST be a no-op: the
+        // current account stays connected. Treating it as a disconnect would
+        // make an exploratory tap destructive, and this row sits one line above
+        // the actual Disconnect.
+        await wallet.connect();
+      } catch {
+        /* the picker was dismissed, or the popup was blocked. Either way the
+           account we already had is still the account we have. */
+      }
+    });
+  }
+
   // ---- footer ---------------------------------------------------------------
   el('div', 'nq-cc-divider nq-cc-footer-divider', viewMain);
   const footer = el('div', 'nq-cc-footer', viewMain);
@@ -1026,6 +1099,76 @@ export function mountMiniWallet(
   recipientInput.placeholder = 'NQ00 0000 0000 0000 0000 0000 0000 0000 0000';
   recipientInput.autocomplete = 'off';
   recipientInput.spellcheck = false;
+  // Saved recipients. Chips rather than a dropdown: there are only ever a
+  // handful of people you pay repeatedly, and a select would hide them behind a
+  // tap while a row of names is readable at a glance.
+  //
+  // Picking FILLS the field rather than bypassing it, so the address stays on
+  // screen and checkable before confirming. Handing an address straight to the
+  // signer because a name was tapped removes the last chance to notice it is
+  // the wrong one.
+  const contactsRow = el('div', 'nq-cc-contacts', sendBody);
+  contactsRow.hidden = true;
+
+  /** After a send lands, offer to save a recipient the book does not hold.
+   *
+   *  A prompt() rather than a bespoke sheet, deliberately: naming a contact is
+   *  one short string, the send has already succeeded so nothing is at stake,
+   *  and a second modal on top of the sent state would be a lot of component
+   *  for a rename box. Hosts wanting their own flow leave `add` unwired and
+   *  save from their own screens. */
+  async function offerToSave(address: string): Promise<void> {
+    const add = options.contacts?.add;
+    if (!add) return;
+    const compact = address.replace(/\s+/g, '').toUpperCase();
+    try {
+      const known = (await options.contacts!.list()) ?? [];
+      if (known.some((c) => c.address.replace(/\s+/g, '').toUpperCase() === compact)) return;
+      const label = window.prompt(i18n.t('shell.saveContact'))?.trim();
+      if (!label) return;
+      await add({ label, address, asset: 'NIM' });
+    } catch {
+      /* the host's book refused the read or the write. The money already moved,
+         so this must never surface as a send failure. */
+    }
+  }
+
+  async function renderContacts(): Promise<void> {
+    if (!options.contacts) return;
+    let entries: ShellContact[] = [];
+    try {
+      entries = (await options.contacts.list()) ?? [];
+    } catch {
+      // The host's address book is the host's problem. A send view that
+      // refuses to open because a contacts read failed is worse than one
+      // without chips.
+      entries = [];
+    }
+    // Only contacts for the asset being sent. Offering a Polygon address while
+    // sending NIM is offering a mistake; an entry with no asset is NIM, which
+    // is what the built-in send view moves.
+    const usable = entries.filter((c) => (c.asset ?? 'NIM') === 'NIM');
+    contactsRow.textContent = '';
+    contactsRow.hidden = usable.length === 0;
+    for (const contact of usable) {
+      const chip = el('button', 'nq-cc-contact', contactsRow);
+      chip.type = 'button';
+      chip.textContent = contact.label;
+      chip.title = contact.address;
+      chip.addEventListener('click', () => {
+        recipientInput.value = contact.address;
+        validateSend();
+        recipientInput.focus();
+        // Scroll back to the START. Filling an input leaves the caret at the
+        // end, so a 36-character address shows its last few blocks and hides
+        // the first, which is the half people actually recognise. The point of
+        // filling the field rather than bypassing it is that the address stays
+        // checkable, and it is not checkable if you cannot see where it begins.
+        recipientInput.setSelectionRange(0, 0);
+        recipientInput.scrollLeft = 0;
+      });
+    }
+  }
   const amountLabel = el('label', 'nq-cc-field-label', sendBody);
   tNode(amountLabel, 'shell.amount');
   const amountRow = el('div', 'nq-cc-amount-row', sendBody);
@@ -1075,6 +1218,9 @@ export function mountMiniWallet(
     validateSend();
     root.classList.add('nq-cc-show-send');
     recipientInput.focus();
+    // Read on open, not at mount: the host's book can change between sends, and
+    // a list captured at mount goes stale in a long-lived page.
+    void renderContacts();
   }
   function closeSend(): void {
     root.classList.remove('nq-cc-show-send');
@@ -1094,6 +1240,11 @@ export function mountMiniWallet(
       });
       if (result) {
         viewSend.classList.add('nq-cc-sent');
+        // Offer to save BEFORE the fields are cleared, and only for an address
+        // the book does not already hold. Asked after the send rather than
+        // before it, because a prompt between "Send" and the money moving is an
+        // obstacle at the worst possible moment.
+        void offerToSave(spaced);
         recipientInput.value = '';
         amountInput.value = '';
         balanceFetchedAt = 0; // the balance just changed — refetch on next look
@@ -1299,11 +1450,35 @@ export function mountMiniWallet(
   if (hasFiat) options.fiat!.onChange?.(fiatTicker);
   if (wallet?.account) renderWalletBlock();
 
+  // Every balance on screen belongs to ONE address. When that address changes,
+  // all of it stops being true at once: the NIM figure, the asset stack, the
+  // fiat total, and the receive screen if it happens to be open. Keeping any of
+  // it would show one account's money under another account's name, which is
+  // worse than showing nothing, and the list's keep-the-last-value rule (right
+  // for a flaky RPC) would otherwise do exactly that.
+  let shownAddress: string | null = wallet?.account?.address ?? null;
   const unsubWallet = wallet
     ? wallet.onAccountChange(() => {
+      const next = wallet.account?.address ?? null;
+      if (next !== shownAddress) {
+        shownAddress = next;
+        balanceLuna = null;
+        balanceFetchedAt = 0;
+        assetList?.clear();
+        // A receive screen left open now shows the previous account's address.
+        // Closed AND emptied: leaving the old address in the DOM behind a
+        // hidden class is a stale address waiting for the next thing that
+        // reveals the view without repainting it.
+        root.classList.remove('nq-cc-show-receive');
+        receiveAsset = null;
+        receiveAddress = null;
+        qrFor = '';
+        addressBtn.textContent = '';
+        qrSlot.textContent = '';
+      }
       renderFace();
-      if (wallet.account) renderWalletBlock();
-      else { balanceLuna = null; balanceStack.hidden = true; }
+      if (wallet.account) { renderWalletBlock(); void refreshBalance(true); }
+      else { balanceStack.hidden = true; }
     })
     : () => { /* language-only: no wallet to subscribe to */ };
   const unsubLang = i18n.onChange(() => {
