@@ -354,9 +354,12 @@ Three things this gets right that one shared receive screen cannot:
   understands, and `ShellAsset.uri` overrides it for hosts wanting EIP-681 or
   `bitcoin:`.
 
-An asset without its own `address` falls back to the account address rather than
-rendering an empty screen. That is right for a token on the account's own chain
-and wrong for a foreign one, which is why the chain is named either way.
+An asset without its own `address` is **not selectable**, and its row stays a
+plain `div`. Falling back to the account address looked harmless and was the
+opposite: the screen would print "Send USDT on Polygon only" over a NIM address,
+and the warning made that pairing read as deliberate rather than as a bug.
+Hashmark is exactly this shape, since its EVM key is not derived until a bet
+flow runs, so its USDT row carries no address for most of a session.
 
 ### The address grid (v0.14.0)
 

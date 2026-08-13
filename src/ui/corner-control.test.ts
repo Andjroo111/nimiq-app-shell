@@ -411,6 +411,95 @@ describe('saved recipients', () => {
   });
 });
 
+describe('an asset without its own address cannot open receive', () => {
+  const NIM = 'NQ34 248H 8MB8 8QK2 5RVK EM8Q QJ8N 2Q5R 3XRK';
+
+  function mount() {
+    const w = new Window();
+    for (const key of ['document', 'HTMLElement', 'navigator', 'localStorage', 'getComputedStyle', 'window']) {
+      (globalThis as unknown as Record<string, unknown>)[key] =
+        (w as unknown as Record<string, unknown>)[key];
+    }
+    const i18n = createI18n({ locales: mergeLocales(shellLocales), fallback: 'en' });
+    const wallet = {
+      mode: 'hub',
+      account: { address: NIM, label: 'Betting' },
+      connect: async () => null,
+      signAndSend: async () => ({ txHash: '' }),
+      pay: async () => ({ txHash: '' }),
+      signMessage: async () => ({ address: '', message: '', publicKeyHex: '', signatureHex: '' }),
+      onAccountChange: () => () => {},
+      disconnect: () => {},
+    } as unknown as Wallet;
+    const host = w.document.createElement('div') as unknown as HTMLElement;
+    mountMiniWallet(host, {
+      wallet,
+      i18n,
+      assets: [
+        { ticker: 'NIM', name: 'Nimiq', network: 'Nimiq', decimals: 5,
+          address: NIM, balance: async () => 1n },
+        // Hashmark's real shape: the EVM key is not derived until a bet flow
+        // runs, so this row carries no address for most of a session.
+        { ticker: 'USDT', name: 'Tether USD', network: 'Polygon', decimals: 6,
+          balance: async () => 1n },
+      ],
+    });
+    return host;
+  }
+  const settle = () => new Promise((r) => setTimeout(r, 40));
+
+  // The money-loss path. Falling back to the account address printed "Send USDT
+  // on Polygon only" over a NIM address, and the warning made that pairing read
+  // as deliberate rather than as a bug.
+  test('the row is not activatable, so it cannot show another chain address', async () => {
+    const host = mount();
+    await settle();
+    const rows = host.querySelectorAll('.nq-al-row');
+    expect(rows[0]?.tagName).toBe('BUTTON');   // NIM has its own address
+    expect(rows[1]?.tagName).toBe('DIV');      // USDT does not
+    (rows[1] as HTMLElement).click();
+    await settle();
+    expect(host.querySelector('.nq-cc')?.className).not.toContain('nq-cc-show-receive');
+  });
+
+  // Second guard on the same hazard, for a host calling the view directly.
+  test('the row becomes activatable once the address exists', async () => {
+    const w = new Window();
+    for (const key of ['document', 'HTMLElement', 'navigator', 'localStorage', 'getComputedStyle', 'window']) {
+      (globalThis as unknown as Record<string, unknown>)[key] =
+        (w as unknown as Record<string, unknown>)[key];
+    }
+    const i18n = createI18n({ locales: mergeLocales(shellLocales), fallback: 'en' });
+    let evmAddress: string | undefined;
+    const wallet = {
+      mode: 'hub',
+      account: { address: NIM, label: 'Betting' },
+      connect: async () => null,
+      signAndSend: async () => ({ txHash: '' }),
+      pay: async () => ({ txHash: '' }),
+      signMessage: async () => ({ address: '', message: '', publicKeyHex: '', signatureHex: '' }),
+      onAccountChange: () => () => {},
+      disconnect: () => {},
+    } as unknown as Wallet;
+    const host = w.document.createElement('div') as unknown as HTMLElement;
+    const handle = mountMiniWallet(host, {
+      wallet,
+      i18n,
+      assets: () => [
+        { ticker: 'USDT', name: 'Tether USD', network: 'Polygon', decimals: 6,
+          address: evmAddress, balance: async () => 1n },
+      ],
+    });
+    await settle();
+    expect(host.querySelector('.nq-al-row')?.tagName).toBe('DIV');
+
+    evmAddress = '0x71C7656EC7ab88b098defB751B7401B5f6d8976F';
+    handle.open();
+    await settle();
+    expect(host.querySelector('.nq-al-row')?.tagName).toBe('BUTTON');
+  });
+});
+
 describe('address grid', () => {
   const NIM = 'NQ34248H8MB88QK25RVKEM8QQJ8N2Q5R3XRK';           // 36
   const EVM = '0x71C7656EC7ab88b098defB751B7401B5f6d8976F';     // 42
