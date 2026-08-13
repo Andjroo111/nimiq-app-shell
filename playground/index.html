@@ -7,12 +7,20 @@
 <!-- Inline so the browser's implicit /favicon.ico request cannot 404. A dev
      harness whose console is never clean trains you to ignore its console. -->
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Cpath d='M24 4H8L0 16l8 12h16l8-12z' fill='%230582CA'/%3E%3C/svg%3E">
+<!-- The mini wallet's CSS asks for Mulish and renders the receive address in
+     Fira Mono. Without both loaded here the component falls back to system-ui
+     and the 3x3 address grid drifts on the fallback monospace's metrics, so the
+     playground would be showing something the fleet never ships. -->
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Mulish:wght@400;600;700;800&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css?family=Fira+Mono&text=0123456789ABCDEFGHJKLMNPQRSTUVXY%20&display=swap" rel="stylesheet">
 <style>
   :root {
     --navy: #1f2348;
     --ink: #1f2348;
     --line: #e4e6f0;
-    --muted: #6c7095;
+    --muted: #5b5f85;
     --blue: #0582ca;
     --bg: #f4f5f9;
   }
@@ -39,7 +47,7 @@
 
   main { max-width: 1180px; margin: 0 auto; padding: 28px 20px 80px; }
   h1 { font-size: 20px; margin: 0 0 4px; }
-  .sub { color: var(--muted); font-size: 13px; margin: 0 0 24px; line-height: 1.5; }
+  .sub { color: var(--muted); font-size: 13px; margin: 0 0 24px; line-height: 1.5; max-width: 78ch; }
   .sub code, .hint code { background: #e9ebf3; padding: 1px 5px; border-radius: 4px; font-size: 12px; }
 
   .cols { display: grid; grid-template-columns: 300px 1fr; gap: 24px; align-items: start; }
@@ -49,16 +57,17 @@
     background: #fff; border: 1px solid var(--line); border-radius: 12px; padding: 16px 18px;
   }
   .panel + .panel { margin-top: 16px; }
+  /* Sentence case, not an uppercase eyebrow: rule 17 allows a short GREY
+     section label, and these read as kickers when they are coloured. */
   .panel h2 {
-    font-size: 11px; text-transform: uppercase; letter-spacing: .09em;
-    color: var(--muted); margin: 0 0 12px; font-weight: 700;
+    font-size: 13px; color: var(--ink); margin: 0 0 12px; font-weight: 700;
   }
   fieldset { border: 0; padding: 0; margin: 0 0 16px; }
   fieldset:last-child { margin-bottom: 0; }
   legend { font-size: 12px; font-weight: 700; margin-bottom: 7px; padding: 0; }
   label { display: flex; align-items: center; gap: 8px; font-size: 13px; padding: 3px 0; cursor: pointer; }
-  label input { accent-color: var(--blue); margin: 0; }
-  .hint { color: var(--muted); font-size: 11px; margin: 4px 0 0; line-height: 1.45; }
+  label input { accent-color: var(--blue); margin: 0; width: 18px; height: 18px; flex: none; }
+  .hint { color: var(--muted); font-size: 12px; margin: 4px 0 0; line-height: 1.45; }
 
   /* Event log: the only way to see that a SEAM actually fired. */
   #log {
@@ -72,13 +81,21 @@
   #log .e { color: #fb7185; }
   .logbar { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; }
   button.mini {
-    font: inherit; font-size: 11px; font-weight: 700; padding: 4px 10px; cursor: pointer;
+    font: inherit; font-size: 12px; font-weight: 700; padding: 5px 11px; cursor: pointer;
     border: 1px solid var(--line); background: #fff; border-radius: 999px; color: var(--muted);
   }
   button.mini:hover { border-color: #c3c7db; color: var(--ink); }
 
   .state { font-size: 12px; color: var(--muted); line-height: 1.7; }
   .state b { color: var(--ink); font-weight: 700; font-family: ui-monospace, monospace; }
+
+  /* Rule 1: inputs are bordered with an inset box-shadow, never `border`. */
+  .nq-pg-select {
+    font: inherit; font-size: 12px; padding: 4px 8px; border: none; border-radius: 6px;
+    background: #fff; color: var(--ink);
+    box-shadow: inset 0 0 0 2px rgba(31, 35, 72, .1);
+  }
+  .nq-pg-select:focus-visible { outline: 2px solid var(--blue); outline-offset: 3px; }
 
   /* Standalone asset list: the same stack, mounted outside the corner. */
   #standalone { max-width: 340px; border: 1px solid var(--line); border-radius: 10px; overflow: hidden; }
@@ -180,7 +197,7 @@
           <label><input type="radio" name="bug" value="stub" checked> Row, stubbed (logs only)</label>
           <label><input type="radio" name="bug" value="real"> Row, REAL (files a GitHub issue)</label>
           <label style="margin-top:6px">File into
-            <select id="bug-repo" style="font:inherit;font-size:12px;padding:3px 6px;border:1px solid var(--line);border-radius:6px">
+            <select id="bug-repo" class="nq-pg-select">
               <option value="hashmark">hashmark</option>
               <option value="nimiq.kids">nimiq.kids</option>
               <option value="nimiq.cool">nimiq.cool</option>
