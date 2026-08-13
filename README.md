@@ -7,20 +7,21 @@ Framework-agnostic vanilla-TS **shell** for the Nimiq app fleet. One small
 package that gives every chain app the same four things, with no framework
 lock-in (the chain apps are vanilla, not Vue):
 
-1. **Dual-mode wallet** — one unified API that auto-detects whether it's running
+1. A **dual-mode wallet**, one unified API that auto-detects whether it's running
    inside **Nimiq Pay** (the official mini-app SDK) or as a **standalone web app**
    (the Nimiq **Hub**), and routes every call to the right backend.
-2. **nim-format** — `fmtNim` / `fmtFiat` / `lunaToNim` / `nimToLuna` / `parseNim`:
-   the fleet-canonical luna/NIM formatter (registry `amount` component semantics,
-   U+202F grouping, no float loss).
-3. **i18n engine** — a zero-dependency translator with `?lang=` / Nimiq-Pay /
+2. **nim-format**, the `fmtNim` / `fmtFiat` / `lunaToNim` / `nimToLuna` /
+   `parseNim` luna formatter (registry `amount` component semantics, U+202F
+   grouping, no float loss).
+3. An **i18n engine**, a zero-dependency translator with `?lang=` / Nimiq-Pay /
    `localStorage` / browser language resolution, runtime switching, and no reload.
-4. **Vanilla UI** — a profile widget (identicon + label + address + balance) and a
-   flag-hex language switcher, both mountable into any container.
+4. The **mini wallet**, the fleet's ONE header control. Wallet state on the
+   face; language, reference currency, balances, receive/send and the bug
+   reporter one click away in a single menu. Mountable into any container.
 
 It is built for **Bun** and for **no-bundler vanilla PWAs**. It does **no chain
-reads** (balances, settlement watching) — that's
-[`nimiq-settlement`](https://github.com/Andjroo111/nimiq-settlement)'s job — and it
+reads** (balances, settlement watching), that's
+[`nimiq-settlement`](https://github.com/Andjroo111/nimiq-settlement)'s job, and it
 has **no cashlink method**: apps mint cashlinks via `signAndSend` plus their own
 offline codec.
 
@@ -41,11 +42,11 @@ offline codec.
 bun add github:Andjroo111/nimiq-app-shell#v0.1.0
 ```
 
-The package exports source TypeScript (`"exports": "./src/index.ts"`) — Bun and
+The package exports source TypeScript (`"exports": "./src/index.ts"`), Bun and
 modern bundlers consume it directly, the same pattern as `nimiq-settlement`.
 
 Peer deps: `@nimiq/hub-api` and `@nimiq/mini-app-sdk` are runtime dependencies and
-come along automatically. `@nimiq/iqons` is an **optional** peer — install it only
+come along automatically. `@nimiq/iqons` is an **optional** peer, install it only
 if you want real identicons in the profile widget (otherwise it shows the Nimiq
 hexagon placeholder).
 
@@ -88,7 +89,7 @@ wallet.disconnect();
 | `window.nimiq` provider present | **miniapp** mode |
 | neither present | **hub** mode → `@nimiq/hub-api` (popup on desktop, redirect on mobile) |
 
-Detection is **synchronous** (`detectModeSync`) — it never blocks boot on the
+Detection is **synchronous** (`detectModeSync`), it never blocks boot on the
 mini-app SDK's `init()` poll (which times out ~10s standalone). You can force a
 backend with `createWallet({ mode: 'hub' })` and inject fakes via the advanced
 options (used by the tests).
@@ -110,14 +111,14 @@ path is interop-verified against `@nimiq-captcha/core`'s signed-message verifier
 verifier's canonical challenge string **unmodified**.
 
 The mini-app SDK returns the serialized transaction (not a hash), so in miniapp
-mode `txHash` carries that serialized form and `serializedTx` is set too — callers
+mode `txHash` carries that serialized form and `serializedTx` is set too, callers
 always get a non-empty handle.
 
 ---
 
 ## NIM formatting (`nim-format`)
 
-The fleet-canonical luna/NIM formatter — the single most re-implemented snippet
+The fleet-canonical luna/NIM formatter, the single most re-implemented snippet
 in the fleet, now implemented once. String-based digit math (no float loss,
 bigint-safe) following the `nq` registry `amount` component's semantics exactly:
 half-up rounding, trailing-zero trim padded to `minDecimals`, and integer digit
@@ -152,7 +153,7 @@ parseNim('12 345.6789');               // 1234567890 (validates; throws on junk,
 **Vendored bundle:** apps on the scaffold's `build:shell` pattern (esbuild →
 `public/vendor/app-shell.js`) get all of this in the same single file:
 `import { fmtNim } from './vendor/app-shell.js'`. There is no separate
-standalone build — the module rides the shell bundle.
+standalone build, the module rides the shell bundle.
 
 ---
 
@@ -175,10 +176,10 @@ i18n.onChange((id) => rerender());
 
 ### Language resolution priority (on init)
 
-1. `?lang=` URL param — for deep-links and the **nimiq.life** handoff
-2. `window.nimiqPay?.language` — the language the user picked in Nimiq Pay
-3. `localStorage` — the visitor's last explicit choice
-4. `navigator.language.split('-')[0]` — e.g. `pt-BR` → `pt`
+1. `?lang=` URL param, for deep-links and the **nimiq.life** handoff
+2. `window.nimiqPay?.language`, the language the user picked in Nimiq Pay
+3. `localStorage`, the visitor's last explicit choice
+4. `navigator.language.split('-')[0]`, e.g. `pt-BR` → `pt`
 5. `fallback` (default `'en'`)
 
 The resolved language is persisted to `localStorage`, mirrored to
@@ -189,7 +190,7 @@ key itself.
 #### `?lang=` and the nimiq.life handoff
 
 A directory/hub like **nimiq.life** can link to any app with `?lang=es`, and the
-app boots in Spanish without the visitor touching a switcher — the URL param is
+app boots in Spanish without the visitor touching a switcher, the URL param is
 the highest-priority signal, and it persists so subsequent plain visits keep the
 language.
 
@@ -202,29 +203,76 @@ profile widget and switcher render in the active language.
 
 ---
 
-## Vanilla UI
+## The mini wallet
+
+**This is the standard.** One control in the header corner, not a language
+picker next to a wallet button. Mount it and you are done:
 
 ```ts
-import { mountLanguagePill, mountWalletPill } from 'nimiq-app-shell';
+import { mountMiniWallet } from 'nimiq-app-shell';
 
-// The fleet-standard topbar chrome: a compact language pill + a wallet connect.
-mountLanguagePill(document.querySelector('#lang')!, { i18n });        // 11 featured langs
-mountWalletPill(document.querySelector('#wallet')!, { wallet, i18n }); // connect ↔ profile
+mountMiniWallet(document.querySelector('#corner')!, { wallet, i18n });
 ```
 
-- **`mountLanguagePill`** — the compact control: current flag + caret → a
+The face shows wallet state: outline **Connect wallet ▾**, then identicon +
+short label once connected. Everything else lives one click away in a single
+menu. That menu holds the balance block, a Receive / Send action bar, the
+address behind Receive, Language and **Show amounts in** as collapsed rows, an
+opt-in cashlink row, a network row on testnet only, Report a bug, and a quiet
+Disconnect.
+
+Inside Nimiq Pay (`wallet.mode === 'miniapp'`) the wallet is ambient, so the
+face collapses to the current-language flag and the menu keeps language alone.
+Omit `wallet` and you get the same pill in language-only form, for pages with no
+wallet concept at all.
+
+> **Naming.** The component is the **mini wallet** and every doc here calls it
+> that. `mountCornerControl` is its original name, kept as an alias so a version
+> bump never costs an app an edit. `MiniWalletOptions` / `MiniWalletHandle`
+> alias the `CornerControl*` types the same way. New code should use the mini
+> wallet names.
+
+### Single-asset and multi-asset are the SAME component
+
+There is one mini wallet, not a NIM edition and a multi-chain edition. Which one
+an app gets is decided by which balance seam it wires, and nothing else:
+
+| The app holds | Wire | The account row shows |
+| --- | --- | --- |
+| NIM only | `getBalanceLuna` | the NIM balance |
+| more than NIM | `assets` | the fiat **total** over a per-asset stack |
+| nothing to show | neither | no balance block at all |
+
+Two components would mean two things to keep pixel-identical forever, which is
+the exact drift this package exists to end. A betting app that adds USDC next
+quarter changes one option; it does not migrate to a different control.
+
+### The older pills
+
+`mountLanguagePill`, `mountWalletPill` and `mountLanguageSwitcher` are the
+**superseded** v0.2.x chrome: a separate language control and a separate wallet
+control. They still work and are still exported, but they are not the standard
+and new apps should not reach for them.
+
+```ts
+// superseded — prefer mountMiniWallet
+mountLanguagePill(document.querySelector('#lang')!, { i18n });
+mountWalletPill(document.querySelector('#wallet')!, { wallet, i18n });
+```
+
+- **`mountLanguagePill`**, the compact control: current flag + caret → a
   scrollable white dropdown of the 11 `FEATURED_LANGUAGES`. **Theme-adaptive**
   (`currentColor`), so it reads on a navy header or a light one.
-- **`mountWalletPill`** — hashmark-style **Connect wallet** pill that becomes a
+- **`mountWalletPill`**, hashmark-style **Connect wallet** pill that becomes a
   compact identicon pill + profile dropdown (address / copy / disconnect) once
   connected. Theme-adaptive.
-- **`mountLanguageSwitcher`** — the flag-hex **row** (one button per language), for
+- **`mountLanguageSwitcher`**, the flag-hex **row** (one button per language), for
   headers that prefer a row over the pill.
-- **`mountProfileWidget`** — identicon + label + address + optional balance + copy /
+- **`mountProfileWidget`**, identicon + label + address + optional balance + copy /
   disconnect, for embedding a full profile.
-- **`buildFlagHex(code)`** — the underlying renderer: a flag clipped into the Nimiq
+- **`buildFlagHex(code)`**, the underlying renderer: a flag clipped into the Nimiq
   hexagon with a faint grey **flags-on-white** edge and per-flag fits (`FLAG_FIT`).
-  Flag artwork is **inlined** (data URIs) — no CDN, no asset files to vendor.
+  Flag artwork is **inlined** (data URIs), no CDN, no asset files to vendor.
   The hexagon clip is applied to a `<g>` wrapping the `<image>`, never to the
   `<image>` itself: WebKit skips a `clip-path` referenced directly by an `<image>`
   whose data URI decodes after first paint, and the flag then renders as a rounded
@@ -235,12 +283,12 @@ All inject their own `<style>` once and return a handle with `destroy()`.
 
 ### Multi-asset balances (v0.10.0)
 
-The corner's mini wallet was NIM-only: `getBalanceLuna?: (address) => Promise<number>`
+The mini wallet was NIM-only: `getBalanceLuna?: (address) => Promise<number>`
 is one address, one chain, luna's 5 decimals. Apps holding more than NIM pass
 `assets` instead, and the account row's figure becomes the fiat **total**:
 
 ```ts
-mountCornerControl(el, {
+mountMiniWallet(el, {
   wallet, i18n,
   assets: () => [
     { ticker: 'NIM',  name: 'Nimiq',  decimals: 5, balance: () => nimBalance() },
@@ -266,14 +314,18 @@ Three things the shape is deliberate about:
   `fmtUnits`. A 6- or 8-decimal token through a float is exactly the drift
   `nim-format` exists to end.
 
-A reader that throws or resolves `null` keeps the last known value on screen —
-a balance that vanishes reads as *your money is gone*, not *the RPC is flaky* —
-and an asset that never priced is left **out** of the total rather than counted
+A reader that throws or resolves `null` keeps the last known value on screen, a balance that vanishes reads as *your money is gone*, not *the RPC is flaky*, and an asset that never priced is left **out** of the total rather than counted
 as zero. `getBalanceLuna` still works on its own and still supplies the Send
 view's cap; pass `assets` alone and the cap comes from its `NIM` row.
 
 The same stack mounts standalone via `mountAssetList` for a wallet or funding
-screen of your own.
+screen of your own. A standalone list reads its balances **at mount**. The mini
+wallet passes `autoRefresh: false` because it reads on menu-open instead: firing
+a Polygon RPC and a BTC explorer on every page load, for a panel most visitors
+never open, is the cost that lazy read exists to avoid.
+
+Before v0.11.0 there was no mount read at all, so a standalone list sat at a
+dash in every row until the host happened to call `refresh()`.
 
 ### Report a bug (v0.8.0)
 
@@ -282,7 +334,7 @@ The corner control carries the fleet's bug reporter. Pass `reportBug` and a
 is no row, like every other seam here.
 
 ```ts
-mountCornerControl(document.querySelector('#wallet-slot')!, {
+mountMiniWallet(document.querySelector('#wallet-slot')!, {
   wallet, i18n,
   reportBug: {
     bot: { repo: 'nimiq.kids', labels: ['surface:parent'] },  // files via bot.nimiq.tech
@@ -311,16 +363,16 @@ Deliberate choices worth knowing:
 
 - **No floating button.** The corner is the fleet's one header control; a
   reporter doesn't get to add a second permanent affordance to every page. (The
-  nimiq.bot widget does mount one — this is the same service without it.)
-- **Ungated by wallet state** — it shows connected or not, hub or mini-app,
+  nimiq.bot widget does mount one, this is the same service without it.)
+- **Ungated by wallet state**, it shows connected or not, hub or mini-app,
   because a bug on a wallet-less page is still a bug.
-- **Identifiers are redacted client-side** — NQ addresses **and UUIDs** — from the
+- **Identifiers are redacted client-side**, NQ addresses **and UUIDs**, from the
   text, the captured context and the title the service returns. In bot mode
   nothing of yours sits between the browser and the issue, so this cannot be a
   server's job. The captured `url` and `referrer` are cut at the first `?` or `#`
   for the same reason: a query string is where an app leaks the ids it never
   meant to send, and a hash route carries them one layer down. (v0.9.2. nimiq.kids
-  had to run with `diagnostics: false` until this landed — nearly every call it
+  had to run with `diagnostics: false` until this landed, nearly every call it
   makes is addressed by child UUID, and `POST /api/kids/<uuid>/buy → 400` was
   going into public issues.)
 - **No draft to approve.** The service can hand back an editable issue draft; the
@@ -338,7 +390,7 @@ render your own UI. `openReportBugSheet`, `submitToBot`, `submitFeedback` and
 Apps with **no build step** (raw `<script type="module">`, no bundler) can't
 import the TS source. For them the shell ships a **prebuilt, self-contained browser
 ESM** (`dist/app-shell.js`, all deps inlined) that jsDelivr serves straight from a
-git tag — no install, no bundler, no vendored assets:
+git tag, no install, no bundler, no vendored assets:
 
 ```html
 <div id="lang"></div>
@@ -364,20 +416,56 @@ it at the tagged ref). Bundled apps should keep importing the TS source instead.
 ## What's intentionally NOT here
 
 - **Chain reads** (balance, settlement watching) → use `nimiq-settlement`.
-- **Cashlinks** — no cashlink method; mint via `signAndSend` + your own offline
+- **Cashlinks**, no cashlink method; mint via `signAndSend` + your own offline
   codec.
-- **HTLC / contract-creation signing** — the Hub backend signs basic transfers
+- **HTLC / contract-creation signing**, the Hub backend signs basic transfers
   only; apps needing HTLC drop to `@nimiq/hub-api` directly (see Hashmark).
 
 ---
+
+## Playground
+
+```bash
+bun run playground     # builds dist/, serves http://localhost:4321
+```
+
+A blank page with the mini wallet in two headers, navy and light, because
+theme-adaptivity is a claim worth falsifying in one glance. Alongside them sits
+**every seam as a live switch**: hub vs miniapp, connected vs not, wallet vs
+language-only, no balance vs NIM-only vs multi-asset, and each of send / scan /
+cashlink / onboard / openInPay / reportBug / receive / identicon / qr / testnet.
+Flipping one remounts both corners.
+
+The wallet is a **mock** by default, implementing the same `Wallet` interface
+the mini wallet consumes, the way Hashmark's betting-key adapter does. That
+means you can click through every state with no Hub, no chain and no network.
+Switch the backend to **Real Hub** to drive the actual popup.
+
+Three things worth using it for:
+
+- **Failure modes.** Toggle *USDT reader throws* and watch the row keep its last
+  value rather than blanking. Toggle *BTC has no price* and watch it drop out of
+  the fiat total instead of counting as zero. Toggle *Slow BTC read* and watch
+  the other rows land without waiting on it.
+- **The event log**, which is the only way to see that a seam fired.
+- **Console cleanliness.** It ends at zero errors; if it does not, something
+  regressed.
+
+It loads the real `dist/app-shell.js`, so it tests the artifact jsDelivr serves
+rather than a separately-compiled copy that could drift. After editing `src/`,
+run `bun run build:dist` and reload.
 
 ## Develop
 
 ```bash
 bun install
-bun test        # bun:test — wallet mode detection + routing, i18n resolution
+bun test        # bun:test — wallet mode detection + routing, i18n, asset-list DOM
 bun run check   # tsc --noEmit
 ```
+
+The DOM-level tests use `happy-dom`. Most of the suite pins SHAPE rather than
+rendering, but the mini wallet's balance stack has real mount behaviour that a
+type test cannot reach, and did ship a bug there once.
 
 ## License
 
