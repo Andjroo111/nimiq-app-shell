@@ -178,6 +178,7 @@
           <label><input type="checkbox" id="opt-identicon" checked> Real identicons</label>
           <label><input type="checkbox" id="opt-qr" checked> QR renderer</label>
           <label><input type="checkbox" id="opt-testnet"> Testnet (shows network row)</label>
+          <label><input type="checkbox" id="opt-contacts" checked> Saved recipients (address book)</label>
           <p class="hint">An unwired seam renders no row, which is the corner's no-dead-buttons rule. Toggle one off and watch it vanish.</p>
         </fieldset>
         <fieldset>
@@ -269,6 +270,7 @@ document.getElementById('clear').onclick = () => { logEl.textContent = ''; };
    which is exactly why Hashmark can hand it a betting-key adapter instead.
    That same seam is what makes a playground possible with no network at all. */
 const MOCK_ADDRESS  = 'NQ34 248H 8MB8 8QK2 5RVK EM8Q QJ8N 2Q5R 3XRK';
+const MOCK_ADDRESS_B = 'NQ21 8LNC MJD3 D7T4 8FSX N5M8 5V2M A9GY 4KUJ';
 const MOCK_POLYGON  = '0x71C7656EC7ab88b098defB751B7401B5f6d8976F';
 /* No BTC row on purpose. Through the Hub, chooseAddress hands back a fresh
    unused BTC address on every call, so a balance read against it is not the
@@ -284,7 +286,12 @@ function createMockWallet({ mode, connected }) {
     async connect() {
       log('info', 'wallet.connect()');
       await new Promise((r) => setTimeout(r, 400)); // the Hub popup's felt latency
-      account = { address: MOCK_ADDRESS, label: 'Playground' };
+      /* Connecting again IS the account switcher, so a second call has to hand
+         back a DIFFERENT account or the Switch row cannot be exercised. */
+      const second = account?.address === MOCK_ADDRESS;
+      account = second
+        ? { address: MOCK_ADDRESS_B, label: 'Second account' }
+        : { address: MOCK_ADDRESS, label: 'Playground' };
       emit(); renderState();
       log('info', '  -> connected', account.address);
       return account;
@@ -384,7 +391,11 @@ const nimLuna    = 4_218_37500;         // 42 183.75 NIM
 const usdtUnits  = 1_250_450_000n;      // 1 250.45 USDT (6dp)
 const usdcUnits  = 402_110_000n;        // 402.11 USDC (6dp)
 
-async function readNim()  { return nimLuna; }
+async function readNim() {
+  /* Different money per account, so the Switch row visibly does something and
+     a stale balance would be obvious. */
+  return wallet?.account?.address === MOCK_ADDRESS_B ? 91_500 : nimLuna;
+}
 async function readUsdt() {
   if (opt('opt-throw')) { log('error', 'USDT reader threw (on purpose)'); throw new Error('polygon rpc 503'); }
   return usdtUnits;
@@ -416,6 +427,14 @@ async function rate(ticker, asset = 'NIM') {
   if (usd === undefined) return null;
   return usd * (FX[ticker] ?? 1);
 }
+
+/* The host owns the address book. This one is in memory and starts with a
+   Polygon entry on purpose: it must NOT be offered when sending NIM. */
+const contacts = [
+  { label: 'Mum', address: 'NQ21 8LNC MJD3 D7T4 8FSX N5M8 5V2M A9GY 4KUJ' },
+  { label: 'Savings', address: 'NQ73 6XLE 6VTP U4TX D3H0 UAKG 9YKR NRHR YVFB' },
+  { label: 'Polygon till', address: '0x71C7656EC7ab88b098defB751B7401B5f6d8976F', asset: 'USDT' },
+];
 
 /* ------------------------------------------------------------------ mount */
 const i18n = createI18n({ locales: mergeLocales(shellLocales), fallback: 'en' });
@@ -458,6 +477,12 @@ function buildOptions() {
   if (opt('opt-cashlink'))  o.createCashlink = () => log('info', 'createCashlink()');
   if (opt('opt-onboard'))   o.onboard = () => log('info', 'onboard(), HubApi.onboard');
   if (opt('opt-openinpay')) o.openInPay = () => { log('info', 'openInPay() read at click time'); return 'https://pay.nimiq.com/'; };
+  if (opt('opt-contacts')) {
+    o.contacts = {
+      list: () => { log('info', `contacts.list() -> ${contacts.length}`); return contacts; },
+      add: (entry) => { contacts.push(entry); log('info', 'contacts.add()', entry); },
+    };
+  }
 
   const bug = radio('bug');
   if (bug === 'stub') {

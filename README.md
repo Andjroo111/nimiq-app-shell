@@ -345,9 +345,9 @@ Three things this gets right that one shared receive screen cannot:
 - **The address is the asset's.** Before v0.13.0 the receive view always showed
   `wallet.account.address`, so a USDT row led to a NIM address, and
   `ShellAsset.address` was declared but read by nothing.
-- **The 3x3 grid is a NIM format.** It assumes 36 characters in nine four-char
-  blocks, so a 42-character Polygon address forced through it renders as ragged
-  nonsense. Non-NIM addresses render as one wrapped monospace string instead.
+- **Every address gets the house grid**, at the row count its length calls for
+  (see below). A 42-character Polygon address used to wrap as one ragged string
+  with a stub second line.
 - **The QR payload is not guessed from the ticker.** `nimiq:` is right for NIM
   and wrong for everything else, so it is only applied to the account address.
   An asset's default payload is the bare address, which every scanner
@@ -358,31 +358,34 @@ An asset without its own `address` falls back to the account address rather than
 rendering an empty screen. That is right for a token on the account's own chain
 and wrong for a foreign one, which is why the chain is named either way.
 
-Three things the shape is deliberate about:
+### The address grid (v0.14.0)
 
-- **One address and one reader per asset.** The shell cannot derive a Polygon
-  address from a NIM one, and has no business knowing what an RPC is. The Hub
-  hands the Polygon address back from the same `chooseAddress` with **no**
-  balances attached, so reading them is always the host's job.
-- **Rows resolve independently, not as one batched read.** Nimiq consensus and
-  a Polygon RPC answer at very different speeds; a single
-  `read(): Promise<Balance[]>` would pin the list to the slowest chain.
-- **Smallest units as bigint, with the asset's own decimals**, formatted through
-  `fmtUnits`. A 6- or 8-decimal token through a float is exactly the drift
-  `nim-format` exists to end.
+Ported from the `nq` registry `address-display`, whose two formats agree on one
+thing that is easy to miss: **the block is always three rows**. NIM is nine
+four-character chunks in three columns; Ethereum is three fourteen-character
+chunks in one. Keeping the row count constant is what makes a NIM address and a
+Polygon one read as siblings at the same height.
 
-A reader that throws or resolves `null` keeps the last known value on screen, a balance that vanishes reads as *your money is gone*, not *the RPC is flaky*, and an asset that never priced is left **out** of the total rather than counted
-as zero. `getBalanceLuna` still works on its own and still supplies the Send
-view's cap; pass `assets` alone and the cap comes from its `NIM` row.
+| Address | Cells | Columns |
+| --- | --- | --- |
+| NIM, 36 chars | 9 of 4 | 3 |
+| EVM / bech32, 42 chars | 3 of 14 | 1, upstream verbatim |
+| legacy BTC, 34 chars | 3 of 12 and 11 | 1 |
+| bech32m, 62 chars | 3 of 21 and 20 | 1 |
 
-The same stack mounts standalone via `mountAssetList` for a wallet or funding
-screen of your own. A standalone list reads its balances **at mount**. The mini
-wallet passes `autoRefresh: false` because it reads on menu-open instead: firing
-a Polygon RPC on every page load, for a panel most visitors never open, is the
-cost that lazy read exists to avoid.
+`addressGrid(address)` returns `{ cells, columns }` and is exported for hosts
+rendering an address of their own.
 
-Before v0.11.0 there was no mount read at all, so a standalone list sat at a
-dash in every row until the host happened to call `refresh()`.
+**One upstream behaviour is deliberately not ported.** The registry does
+`address.match(/.{14}/g)`, which returns only whole fourteen-character groups
+and silently discards the tail: a 34-character legacy BTC address renders as 28
+characters, truncated, and looks perfectly tidy while doing it. For a string
+people paste money into that is not a rounding error. Rows here are near-equal
+thirds instead, so every character survives at any length, and the 42-character
+case still produces exactly the upstream split.
+
+The invariant that matters: **the cells always rejoin to the input**, pinned
+across five address formats.
 
 ### Report a bug (v0.8.0)
 
