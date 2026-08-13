@@ -42,6 +42,7 @@ export {
   LUNA_PER_NIM,
   NIM_DECIMALS,
   fmtNim,
+  fmtUnits,
   fmtFiat,
   lunaToNim,
   nimToLuna,
@@ -99,6 +100,14 @@ export {
   type CornerControlOptions,
   type CornerControlHandle,
 } from './ui/corner-control';
+// The corner mounts this itself from `assets`; exported for hosts that want the
+// balance stack on a page of their own (a wallet screen, a funding view).
+export {
+  mountAssetList,
+  type ShellAsset,
+  type AssetListOptions,
+  type AssetListHandle,
+} from './ui/asset-list';
 // The corner's Report a bug row wires itself from `reportBug`; these are for
 // hosts that want the sheet from their own entry point, or the validator alone.
 export {
