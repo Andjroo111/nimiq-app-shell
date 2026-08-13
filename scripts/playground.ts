@@ -1,13 +1,22 @@
 // Static server for the mini-wallet playground (`bun run playground`).
 //
-// It serves the REPO ROOT, not just playground/, because the page imports the
-// real bundle at ../dist/app-shell.js. That is the point: the playground has to
+// It reaches OUTSIDE playground/ on purpose, because the page imports the real
+// bundle at ../dist/app-shell.js. That is the point: the playground has to
 // exercise the artifact the fleet actually loads from jsDelivr, not a
 // separately-compiled copy that could drift from it. Rebuild with
-// `bun run build:dist` and reload — no server restart.
+// `bun run build:dist` and reload, no server restart.
+//
+// SERVING IS ALLOW-LISTED, not rooted at the repo. This gets put behind a
+// Cloudflare tunnel so it can be reviewed from a phone, and a repo-rooted static
+// server on a public hostname hands out `.git/`, `node_modules/`, and every
+// source file to anyone who guesses a path. Two directories is all the page
+// needs, so two directories is all it gets.
 
 const ROOT = new URL('..', import.meta.url).pathname;
 const PORT = Number(process.env.PORT ?? 4321);
+
+/** The only prefixes reachable over HTTP. Everything else is a 404. */
+const ALLOWED = ['playground/', 'dist/'];
 
 const TYPES: Record<string, string> = {
   '.html': 'text/html; charset=utf-8',
@@ -15,6 +24,7 @@ const TYPES: Record<string, string> = {
   '.css': 'text/css; charset=utf-8',
   '.svg': 'image/svg+xml',
   '.json': 'application/json',
+  '.png': 'image/png',
 };
 
 const server = Bun.serve({
@@ -25,28 +35,35 @@ const server = Bun.serve({
     if (path === '/' || path === '/playground' || path === '/playground/') {
       path = '/playground/index.html';
     }
-    // Refuse to climb out of the repo. This binds to localhost, but a traversal
-    // that reads ~/.ssh because someone typed the URL wrong is not a tradeoff
-    // worth making for six lines saved.
-    const file = Bun.file(ROOT + path.replace(/^\/+/, ''));
-    const resolved = ROOT + path.replace(/^\/+/, '');
-    if (!resolved.startsWith(ROOT) || path.includes('..')) {
-      return new Response('nope', { status: 403 });
+    const rel = path.replace(/^\/+/, '');
+
+    // Resolve first, THEN check: a check against the raw string is defeated by
+    // any encoding the URL parser normalises afterwards.
+    const resolved = new URL(rel, `file://${ROOT}`).pathname;
+    if (!resolved.startsWith(ROOT)) return new Response('not found', { status: 404 });
+    const inRepo = resolved.slice(ROOT.length);
+    if (!ALLOWED.some((p) => inRepo.startsWith(p))) {
+      return new Response('not found', { status: 404 });
     }
+
+    const file = Bun.file(resolved);
     if (!(await file.exists())) return new Response('not found', { status: 404 });
 
     const ext = path.slice(path.lastIndexOf('.'));
     return new Response(file, {
       headers: {
         'content-type': TYPES[ext] ?? 'application/octet-stream',
-        // The whole workflow is edit → rebuild → reload. A cached bundle here
+        // The whole workflow is edit, rebuild, reload. A cached bundle here
         // means testing the previous build and not knowing it.
         'cache-control': 'no-store',
+        // It is a dev harness, not a page anyone should be framing.
+        'x-frame-options': 'DENY',
+        'x-content-type-options': 'nosniff',
       },
     });
   },
 });
 
-console.log(`\n  mini wallet playground → http://localhost:${server.port}/\n`);
-console.log(`  serving ${ROOT}`);
+console.log(`\n  mini wallet playground -> http://localhost:${server.port}/\n`);
+console.log(`  serving ${ALLOWED.map((p) => ROOT + p).join('\n          ')}`);
 console.log(`  rebuild the bundle with:  bun run build:dist\n`);
