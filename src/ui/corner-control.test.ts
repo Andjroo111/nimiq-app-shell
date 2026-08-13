@@ -5,7 +5,7 @@
 // name is the one failure in this component that costs somebody money.
 import { describe, expect, test } from 'bun:test';
 import { Window } from 'happy-dom';
-import { FIAT_FLAGS, NATIVE_NAMES, mountMiniWallet, type CornerControlOptions } from './corner-control';
+import { FIAT_FLAGS, NATIVE_NAMES, addressGrid, mountMiniWallet, type CornerControlOptions, type ShellContact } from './corner-control';
 import { FLAG_SVG } from '../flags/data';
 import { SHELL_LANGUAGES, FEATURED_LANGUAGES, shellLocales, mergeLocales } from '../locales';
 import { createI18n } from '../i18n';
@@ -209,17 +209,25 @@ describe('receive view names the chain it is showing', () => {
     expect(warn?.textContent).toContain('USDT');
   });
 
-  // The 3x3 grid assumes 36 characters in nine four-char blocks. A 42-character
-  // Polygon address forced through it renders as ragged nonsense.
-  test('a non-NIM address drops the 3x3 grid', async () => {
+  // Both are three-row blocks, which is what upstream keeps constant: NIM as
+  // nine four-char cells in three columns, Polygon as three fourteens in one.
+  // Neither wraps as a ragged string.
+  test('each address renders as a three-row block', async () => {
     const { host } = mount();
     await settle();
+
     (host.querySelectorAll('.nq-al-row')[1] as HTMLElement).click();
     await settle();
-    expect(host.querySelector('.nq-cc-address')?.className).toContain('nq-cc-address-flat');
+    const polygonCells = host.querySelectorAll('.nq-cc-address span');
+    expect(polygonCells).toHaveLength(3);
+    expect([...polygonCells].map((c) => c.textContent).join(''))
+      .toBe('0x71C7656EC7ab88b098defB751B7401B5f6d8976F');
+
     (host.querySelectorAll('.nq-al-row')[0] as HTMLElement).click();
     await settle();
-    expect(host.querySelector('.nq-cc-address')?.className).not.toContain('nq-cc-address-flat');
+    const nimCells = host.querySelectorAll('.nq-cc-address span');
+    expect(nimCells).toHaveLength(9);
+    expect([...new Set([...nimCells].map((c) => c.textContent?.length))]).toEqual([4]);
   });
 
   // The account's own NIM address is not a wrong-chain hazard, and a warning on
@@ -245,5 +253,239 @@ describe('receive view names the chain it is showing', () => {
     expect(warn).toContain('Polygon');
     expect(warn).toContain('USDT');
     expect(host.querySelector('.nq-cc-back')?.textContent).toContain('USDT');
+  });
+});
+
+describe('switching account drops the previous account money', () => {
+  const A = 'NQ34 248H 8MB8 8QK2 5RVK EM8Q QJ8N 2Q5R 3XRK';
+  const B = 'NQ21 8LNC MJD3 D7T4 8FSX N5M8 5V2M A9GY 4KUJ';
+
+  function mount(read: () => Promise<bigint> = async () => 4_218_37500n) {
+    const w = new Window();
+    for (const key of ['document', 'HTMLElement', 'navigator', 'localStorage', 'getComputedStyle', 'window']) {
+      (globalThis as unknown as Record<string, unknown>)[key] =
+        (w as unknown as Record<string, unknown>)[key];
+    }
+    const i18n = createI18n({ locales: mergeLocales(shellLocales), fallback: 'en' });
+    let account: { address: string; label: string } | null = { address: A, label: 'A' };
+    const listeners = new Set<(a: unknown) => void>();
+    const wallet = {
+      mode: 'hub',
+      get account() { return account; },
+      connect: async () => { account = { address: B, label: 'B' }; for (const l of listeners) l(account); return account; },
+      signAndSend: async () => ({ txHash: '' }),
+      pay: async () => ({ txHash: 'ok' }),
+      signMessage: async () => ({ address: '', message: '', publicKeyHex: '', signatureHex: '' }),
+      onAccountChange: (cb: (a: unknown) => void) => { listeners.add(cb); return () => listeners.delete(cb); },
+      disconnect: () => { account = null; for (const l of listeners) l(null); },
+    } as unknown as Wallet;
+    const host = w.document.createElement('div') as unknown as HTMLElement;
+    mountMiniWallet(host, {
+      wallet,
+      i18n,
+      assets: [{ ticker: 'NIM', name: 'Nimiq', network: 'Nimiq', decimals: 5,
+        address: A, balance: read }],
+    });
+    return { host, wallet };
+  }
+  const settle = () => new Promise((r) => setTimeout(r, 50));
+
+  // The bug this closes: the balance rows keep their last value on purpose (a
+  // flaky RPC must not blank a real balance), which across an account switch
+  // means showing one account's money under another account's name.
+  //
+  // The second account's read is held open so the WINDOW between the switch and
+  // the new figure is observable. That window is the whole bug: without the
+  // clear it shows the previous account's balance, confidently.
+  test('the previous balance does not survive the switch', async () => {
+    let releaseSecondRead: (v: bigint) => void = () => {};
+    let readCount = 0;
+    const { host, wallet } = mount(() => {
+      readCount += 1;
+      if (readCount === 1) return Promise.resolve(4_218_37500n);
+      return new Promise<bigint>((resolve) => { releaseSecondRead = resolve; });
+    });
+    await settle();
+    expect(host.querySelector('.nq-al-units')?.textContent).toContain('4');
+
+    await wallet.connect();
+    await settle();
+    const during = host.querySelector('.nq-al-units');
+    expect(during?.textContent).toBe('—');
+    expect(during?.className).toContain('nq-al-pending');
+
+    releaseSecondRead(11_100000n);
+    await settle();
+    expect(host.querySelector('.nq-al-units')?.textContent).toContain('11');
+  });
+
+  // A receive screen left open after a switch would be showing the previous
+  // account's address, which is where money arrives.
+  test('an open receive screen closes on the switch', async () => {
+    const { host, wallet } = mount();
+    await settle();
+    (host.querySelectorAll('.nq-al-row')[0] as HTMLElement).click();
+    await settle();
+    expect(host.querySelector('.nq-cc')?.className).toContain('nq-cc-show-receive');
+    await wallet.connect();
+    await settle();
+    expect(host.querySelector('.nq-cc')?.className).not.toContain('nq-cc-show-receive');
+  });
+
+  test('the switch row exists and is not the disconnect', async () => {
+    const { host } = mount();
+    await settle();
+    const labels = [...host.querySelectorAll('.nq-cc-row')].map((r) => r.textContent);
+    expect(labels.some((l) => l?.includes('Switch account'))).toBe(true);
+    expect(host.querySelector('.nq-cc-disconnect')?.textContent).toBe('Disconnect');
+  });
+});
+
+describe('saved recipients', () => {
+  const A = 'NQ34 248H 8MB8 8QK2 5RVK EM8Q QJ8N 2Q5R 3XRK';
+  const CONTACTS: ShellContact[] = [
+    { label: 'Mum', address: 'NQ21 8LNC MJD3 D7T4 8FSX N5M8 5V2M A9GY 4KUJ' },
+    { label: 'Polygon till', address: '0x71C7656EC7ab88b098defB751B7401B5f6d8976F', asset: 'USDT' },
+  ];
+
+  function mount(contacts?: CornerControlOptions['contacts']) {
+    const w = new Window();
+    for (const key of ['document', 'HTMLElement', 'navigator', 'localStorage', 'getComputedStyle', 'window']) {
+      (globalThis as unknown as Record<string, unknown>)[key] =
+        (w as unknown as Record<string, unknown>)[key];
+    }
+    const i18n = createI18n({ locales: mergeLocales(shellLocales), fallback: 'en' });
+    const wallet = {
+      mode: 'hub',
+      account: { address: A, label: 'A' },
+      connect: async () => null,
+      signAndSend: async () => ({ txHash: '' }),
+      pay: async () => ({ txHash: 'ok' }),
+      signMessage: async () => ({ address: '', message: '', publicKeyHex: '', signatureHex: '' }),
+      onAccountChange: () => () => {},
+      disconnect: () => {},
+    } as unknown as Wallet;
+    const host = w.document.createElement('div') as unknown as HTMLElement;
+    mountMiniWallet(host, { wallet, i18n, getBalanceLuna: async () => 100_000_000, contacts });
+    return host;
+  }
+  const settle = () => new Promise((r) => setTimeout(r, 50));
+  const openSend = async (host: HTMLElement) => {
+    (host.querySelector('.nq-cc-send') as HTMLElement).click();
+    await settle();
+  };
+
+  test('no contacts wired renders no chips', async () => {
+    const host = mount();
+    await openSend(host);
+    expect((host.querySelector('.nq-cc-contacts') as HTMLElement)?.hidden).toBe(true);
+  });
+
+  // Offering a Polygon address while sending NIM is offering a mistake.
+  test('only contacts for the asset being sent are offered', async () => {
+    const host = mount({ list: () => CONTACTS });
+    await openSend(host);
+    const chips = [...host.querySelectorAll('.nq-cc-contact')].map((c) => c.textContent);
+    expect(chips).toContain('Mum');
+    expect(chips).not.toContain('Polygon till');
+  });
+
+  // Picking fills the field rather than bypassing it, so the address stays
+  // visible and checkable before the send is confirmed.
+  test('picking a contact fills the recipient field', async () => {
+    const host = mount({ list: () => CONTACTS });
+    await openSend(host);
+    (host.querySelector('.nq-cc-contact') as HTMLElement).click();
+    await settle();
+    expect((host.querySelector('.nq-cc-input-addr') as HTMLInputElement).value)
+      .toBe(CONTACTS[0]!.address);
+  });
+
+  // A send view that refuses to open because the host address book threw is
+  // worse than one with no chips.
+  test('a throwing contacts read still opens the send view', async () => {
+    const host = mount({ list: () => { throw new Error('store offline'); } });
+    await openSend(host);
+    expect(host.querySelector('.nq-cc')?.className).toContain('nq-cc-show-send');
+    expect((host.querySelector('.nq-cc-contacts') as HTMLElement)?.hidden).toBe(true);
+  });
+});
+
+describe('address grid', () => {
+  const NIM = 'NQ34248H8MB88QK25RVKEM8QQJ8N2Q5R3XRK';           // 36
+  const EVM = '0x71C7656EC7ab88b098defB751B7401B5f6d8976F';     // 42
+  const P2WPKH = 'bc1qar0srrr7xfkvy5l643lydnw9re59gtzzwf5mdq';  // 42
+  const P2TR = 'bc1p5cyxnuxmeuwuvkwfem96l0bqtnhh0hxk8x8gu9v0nc4jqhq8fq3q9k5cxn'; // 62
+  const LEGACY = '1BvBMSEYstWetqTFn5Au4m4GFg7xJaNVN2';          // 34
+  const ALL = [NIM, EVM, P2WPKH, P2TR, LEGACY];
+
+  // THE invariant, and the one upstream gets wrong. These cells are
+  // concatenated back into an address people send money to, so a dropped
+  // character is a lost payment that looks perfectly tidy on screen.
+  test('the cells always rejoin to exactly the original address', () => {
+    for (const address of ALL) {
+      expect(addressGrid(address).cells.join(''), address).toBe(address);
+    }
+  });
+
+  // The registry does address.match(/.{14}/g), which returns only whole
+  // 14-character groups and silently discards the tail. A 34-character legacy
+  // BTC address renders as 28. This is the case that proves we do not.
+  test('a length that is not a multiple of 14 keeps every character', () => {
+    const cells = addressGrid(LEGACY).cells;
+    expect(cells.join('')).toBe(LEGACY);
+    expect(cells.join('').length).toBe(34);
+    expect(LEGACY.match(/.{14}/g)!.join('').length).toBe(28); // what upstream would show
+  });
+
+  // The block is always three ROWS. That is what upstream keeps constant
+  // between its nimiq and ethereum formats, and it is what makes a NIM address
+  // and a Polygon one read as siblings at the same height.
+  test('every address is three rows', () => {
+    for (const address of ALL) {
+      const { cells, columns } = addressGrid(address);
+      expect(cells.length / columns, address).toBe(3);
+    }
+  });
+
+  // The wallet ships a 3x3 of four-character blocks for NIM. Changing that
+  // would be a visible regression in every app on the shell.
+  test('a NIM address is still nine four-character blocks in three columns', () => {
+    const { cells, columns } = addressGrid(NIM);
+    expect(cells).toHaveLength(9);
+    expect(columns).toBe(3);
+    expect([...new Set(cells.map((c) => c.length))]).toEqual([4]);
+  });
+
+  // 42 characters in three rows of fourteen, one column: upstream's
+  // format-ethereum verbatim, which is the point.
+  test('a 42-character address matches the upstream ethereum split', () => {
+    for (const address of [EVM, P2WPKH]) {
+      const { cells, columns } = addressGrid(address);
+      expect(columns, address).toBe(1);
+      expect(cells, address).toEqual(address.match(/.{14}/g)!);
+    }
+  });
+
+  // Rows within one character of each other read as even. A wider spread does
+  // not, and neither does a short orphan final row.
+  test('row lengths never differ by more than one', () => {
+    for (const address of ALL) {
+      const { cells, columns } = addressGrid(address);
+      const rows: number[] = [];
+      for (let i = 0; i < cells.length; i += columns) {
+        rows.push(cells.slice(i, i + columns).join('').length);
+      }
+      expect(Math.max(...rows) - Math.min(...rows), address).toBeLessThanOrEqual(1);
+    }
+  });
+
+  test('spaces in the input do not become cells', () => {
+    expect(addressGrid('NQ34 248H 8MB8 8QK2 5RVK EM8Q QJ8N 2Q5R 3XRK').cells.join(''))
+      .toBe(NIM);
+  });
+
+  test('an empty address yields no cells', () => {
+    expect(addressGrid('').cells).toEqual([]);
   });
 });

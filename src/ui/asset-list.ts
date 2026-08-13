@@ -108,6 +108,14 @@ export interface AssetListHandle {
   el: HTMLDivElement;
   /** Re-read every asset. `force` ignores the freshness cache (after a send). */
   refresh(force?: boolean): Promise<void>;
+  /** Drop every cached balance and repaint the rows as pending.
+   *
+   *  For when the balances stopped being about the same person. The
+   *  keep-the-last-value rule is right for a flaky RPC and exactly wrong across
+   *  an account switch, where it would show one account's money under another
+   *  account's name until the new reads land. A dash is honest; a stale number
+   *  is not. */
+  clear(): void;
   /** Summed fiat value of the assets that priced, or null when none did.
    *  Deliberately NOT a sum over "assets that failed to price as 0" — a total
    *  that silently omits a row is worse than no total. */
@@ -331,6 +339,16 @@ export function mountAssetList(
       return sum;
     },
     units: (ticker) => rows.get(ticker)?.units ?? null,
+    clear() {
+      for (const state of rows.values()) {
+        state.units = null;
+        state.fiat = null;
+        state.fetchedAt = 0;
+        state.unitsEl.classList.add('nq-al-pending');
+        state.unitsEl.textContent = '—';
+        state.fiatEl.textContent = '';
+      }
+    },
     destroy() {
       destroyed = true;
       root.remove();

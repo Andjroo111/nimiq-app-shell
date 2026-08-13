@@ -3,6 +3,8 @@ export default {
   'shell.connectWallet': 'Connecter le portefeuille',
   'shell.connecting': 'Connexion',
   'shell.disconnect': 'Déconnecter',
+  'shell.switchAccount': 'Changer de compte',
+  'shell.saveContact': 'Enregistrer ce destinataire sous ?',
   'shell.profile': 'Profil',
   'shell.account': 'Compte',
   'shell.address': 'Adresse',
