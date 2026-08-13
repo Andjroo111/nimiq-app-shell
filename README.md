@@ -390,6 +390,72 @@ case still produces exactly the upstream split.
 The invariant that matters: **the cells always rejoin to the input**, pinned
 across five address formats.
 
+### Switching account (v0.14.0)
+
+A quiet **Switch account** row above Disconnect. Connecting again IS the
+switcher: `chooseAddress` reopens the Hub's own account picker, which is the
+right screen for this and one we do not have to build. It needs no wiring and
+appears on any mini wallet with a wallet, hub mode only.
+
+Pass **`switchAccount: false`** when `connect()` means something other than
+"choose an account". Hashmark is the case: its wallet is an adapter over a
+betting key, so connect() means "set up betting", changes the funding address
+and can route to onboarding. Offering that as "Switch account" would describe an
+action the app does not have, one line above the real Disconnect.
+
+There is deliberately no in-menu account list. A fleet app cannot enumerate the
+user's accounts (`LIST` is not third-party callable), and a worse copy of a
+screen the Hub already ships is not worth owning.
+
+Two things it gets right that are easy to get wrong:
+
+- **Cancelling is a no-op.** Dismissing the Hub picker leaves the current
+  account connected. This row sits one line above Disconnect, so an exploratory
+  tap must never be destructive.
+- **The previous account's money does not survive the switch.** Every balance on
+  screen belongs to one address, and the asset list keeps its last value on
+  purpose (a flaky RPC must not blank a real balance). Across a switch that rule
+  is exactly wrong, so the NIM figure, the asset stack, the fiat total and any
+  open receive screen are all cleared the moment the address changes. A dash is
+  honest; a stale number is not. `mountAssetList` gained `clear()` for this.
+
+This applies to ANY account change, not only the new row. An app calling
+`connect()` again for its own reasons was already showing the old balance.
+
+### Saved recipients (v0.14.0)
+
+Sending means typing 36 characters, or pasting them and hoping. The send view
+validates the format, which catches a typo but not a wrong address.
+
+```ts
+mountMiniWallet(el, {
+  wallet, i18n,
+  contacts: {
+    list: () => myAddressBook(),                 // may be async, may throw
+    add: (entry) => saveToMyAddressBook(entry),  // optional
+  },
+});
+```
+
+Wired, the recipient field grows a row of quiet name pills. Absent, the field is
+exactly as it was.
+
+It is a **host** seam because there is no shared address book to read: the Hub
+exposes no contacts API to a third-party origin. That is fine, because the host
+is the only party that knows anything useful anyway (nimiq.kids knows a child by
+name, a POS knows the till), and this package should not grow a second thing it
+persists.
+
+- **`asset` scopes an entry to one chain**, and entries without it are NIM.
+  Offering a Polygon address while sending NIM is offering a mistake.
+- **Picking fills the field rather than bypassing it**, and scrolls it back to
+  the start, because an address you cannot see the beginning of is not one you
+  can check. Handing an address straight to the signer because a name was tapped
+  removes the last chance to notice it is the wrong one.
+- **`add` is asked after the send lands**, never between Send and the money
+  moving, and only for an address the book does not already hold.
+- **A failed contacts read renders no chips** rather than breaking the send view.
+
 ### Report a bug (v0.8.0)
 
 The corner control carries the fleet's bug reporter. Pass `reportBug` and a

@@ -201,6 +201,18 @@ export interface CornerControlOptions {
      *  manages contacts on its own screens. */
     add?: (entry: ShellContact) => void | Promise<void>;
   };
+  /** Show the "Switch account" row. Default TRUE.
+   *
+   *  The row calls `wallet.connect()` again, which for a real Hub wallet
+   *  reopens the account picker, so it is correct with no wiring and that is
+   *  why it defaults on.
+   *
+   *  Pass `false` when `connect()` means something other than "choose an
+   *  account". Hashmark is the case: its wallet is an adapter over a betting
+   *  key, and connect() means "set up betting", changing the funding address
+   *  and possibly routing to onboarding. Offering that as "Switch account"
+   *  describes an action the app does not have. */
+  switchAccount?: boolean;
   /** 'test' renders the network row (mainnet says nothing). Default 'main'. */
   network?: 'main' | 'test';
   /** "Open in Nimiq Pay" deeplink URL (standalone web only). Hidden when
@@ -1048,7 +1060,7 @@ export function mountMiniWallet(
   // and a worse copy of a screen the Hub already ships is not worth owning.
   //
   // Hub only. Inside Nimiq Pay the account is the host wallet's, not ours.
-  if (wallet) {
+  if (wallet && options.switchAccount !== false) {
     const switchRow = el('button', 'nq-cc-row nq-cc-when-connected nq-cc-when-hub', viewMain);
     switchRow.type = 'button';
     const switchLabel = el('span', 'nq-cc-strong', switchRow);
