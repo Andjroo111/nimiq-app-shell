@@ -31,66 +31,51 @@ import { BUG_ICON, openReportBugSheet, type ReportBugOptions } from './report-bu
 import { installReportCapture } from './report-capture';
 import { mountAssetList, type AssetListHandle, type ShellAsset } from './asset-list';
 
-/** Split an address into the cells of the fleet's THREE-COLUMN address grid.
+/** A NIM address: NQ + 2 check digits + 32 base32 chars. */
+const NIM_ADDRESS_SHAPE = /^NQ[0-9]{2}[0-9A-HJ-NP-VXY]{32}$/;
+
+/** Split an address into the cells of the wallet's address block.
  *
- *  The wallet shows a NIM address as nine four-character blocks in a 3x3 grid.
- *  The load-bearing part of that is the three columns, not the number nine: it
- *  is what makes an address read as a balanced block instead of a long string.
- *  So every address gets the same grid, and only the row count changes with the
- *  length.
+ *  Ported from the nq registry `address-display`, whose two formats agree on
+ *  one thing that is easy to miss: **the block is always THREE ROWS**. NIM is
+ *  nine four-character chunks in three columns; Ethereum is three fourteen-
+ *  character chunks in one. Keeping the row count constant is what makes a NIM
+ *  address and a Polygon one read as siblings and occupy the same height.
  *
- *    NIM, 36 chars  ->  9 blocks of 4   ->  3 x 3   (identical to today)
- *    EVM, 42 chars  ->  6 blocks of 7   ->  3 x 2
- *    bech32m, 62    -> 12 blocks of 5-6 ->  3 x 4
+ *    NIM, 36 chars  ->  9 cells of 4      ->  3 columns
+ *    EVM, 42 chars  ->  3 cells of 14     ->  1 column   (upstream, verbatim)
+ *    legacy, 34     ->  3 cells of 12/11  ->  1 column
+ *    bech32m, 62    ->  3 cells of 21/20  ->  1 column
  *
- *  Chunk counts are tried in multiples of three so the last row is never a
- *  short orphan, which is the ragged wrap this replaces. Exact divisions win,
- *  then whichever leaves cells closest to the NIM standard of four. When
- *  nothing divides evenly the remainder is spread one character at a time, so
- *  cells differ by at most one and the equal-width columns still centre them
- *  into a tidy block. */
-export function addressChunks(address: string): string[] {
+ *  UPSTREAM BUG NOT PORTED: the registry does `address.match(/.{14}/g)`, which
+ *  returns only whole 14-character groups and silently DROPS the tail. A
+ *  34-character legacy BTC address renders as 28 characters, truncated, and
+ *  looks perfectly tidy while doing it. For a string people paste money into
+ *  that is not a rounding error. Rows here are near-equal thirds instead, so
+ *  every character survives at any length. */
+export function addressGrid(address: string): { cells: string[]; columns: number } {
   const compact = address.replace(/\s+/g, '');
-  const n = compact.length;
-  if (n === 0) return [];
+  if (!compact) return { cells: [], columns: 1 };
 
-  let chunks = 0;
-  let bestScore = Infinity;
-  for (const candidate of [3, 6, 9, 12, 15]) {
-    const size = n / candidate;
-    // Below ~4 the cells stop reading as blocks; above ~7 the row outgrows the
-    // 272px menu at the address font size.
-    if (size < 3.5 || size > 7.5) continue;
-    // An exact division always wins, and among exact ones the cell closest to
-    // four keeps NIM on the nine-block grid the wallet ships. Among inexact
-    // ones prefer FEWER cells, because a ragged split is easier to forgive in
-    // two tidy rows than in five thin ones.
-    const score = n % candidate === 0
-      ? Math.abs(size - 4)
-      : 100 + candidate;
-    if (score < bestScore) { bestScore = score; chunks = candidate; }
+  // NIM keeps its own four-character rhythm, which is the format the wallet
+  // shows and the one people read their own address in.
+  if (NIM_ADDRESS_SHAPE.test(compact.toUpperCase())) {
+    return { cells: compact.match(/.{4}/g) ?? [compact], columns: 3 };
   }
-  // Nothing in range (a very short or very long string): fall back to fours,
-  // which is the NIM rhythm and never worse than one unbroken line.
-  if (!chunks) return compact.match(/.{1,4}/g) ?? [compact];
 
-  const base = Math.floor(n / chunks);
-  const wide = n % chunks; // this many cells carry one extra character
-
-  // Spread the wide cells EVENLY rather than front-loading them. Taking the
-  // remainder off the top makes the first row visibly denser than the last,
-  // which is the raggedness this whole function exists to remove.
-  const isWide = new Set<number>();
-  for (let i = 0; i < wide; i += 1) isWide.add(Math.round((i * chunks) / wide));
-
-  const out: string[] = [];
+  // Everything else: three rows, near-equal, one cell each.
+  const n = compact.length;
+  const base = Math.floor(n / 3);
+  const wide = n % 3;
+  const cells: string[] = [];
   let at = 0;
-  for (let i = 0; i < chunks; i += 1) {
-    const size = base + (isWide.has(i) ? 1 : 0);
-    out.push(compact.slice(at, at + size));
+  for (let i = 0; i < 3; i += 1) {
+    const size = base + (i < wide ? 1 : 0);
+    if (size === 0) continue; // an address shorter than three characters
+    cells.push(compact.slice(at, at + size));
     at += size;
   }
-  return out;
+  return { cells, columns: 1 };
 }
 
 /** One saved recipient. The host owns the list and its storage. */
@@ -470,7 +455,7 @@ button.nq-cc-name:focus-visible { outline:2px solid var(--nq-cc-accent, #0582ca)
 /* tap-to-copy address: upstream Copyable verbatim: light-blue tooltip, tinted
    field, and the blue HOLDS after copy until focus leaves */
 .nq-cc-copy-wrap { position:relative; display:block; margin-top:10px; width:100%; }
-.nq-cc-address { display:grid; grid-template-columns:repeat(3, 1fr); gap:3px 0; justify-items:center;
+.nq-cc-address { display:grid; grid-template-columns:repeat(var(--nq-cc-addr-cols, 3), 1fr); gap:3px 0; justify-items:center;
   width:100%; padding:8px 6px; border:none; border-radius:6px; background:rgba(31,35,72,.04); cursor:pointer;
   font-family:'Fira Mono',ui-monospace,monospace; font-size:12px; color:var(--nq-cc-menu-muted, rgba(31,35,72,.7));
   transition:background .15s var(--nimiq-ease, cubic-bezier(.25,0,0,1)), color .15s var(--nimiq-ease, cubic-bezier(.25,0,0,1)); }
@@ -1360,7 +1345,11 @@ export function mountMiniWallet(
     receiveAddress = compact;
 
     addressBtn.textContent = '';
-    for (const block of addressChunks(compact)) {
+    const grid = addressGrid(compact);
+    // The column count is the format's, not a constant: NIM is three columns of
+    // four, everything else is one column of three rows.
+    addressBtn.style.setProperty('--nq-cc-addr-cols', String(grid.columns));
+    for (const block of grid.cells) {
       const span = el('span', undefined, addressBtn);
       span.textContent = block;
     }

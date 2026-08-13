@@ -360,118 +360,32 @@ and wrong for a foreign one, which is why the chain is named either way.
 
 ### The address grid (v0.14.0)
 
-The wallet shows a NIM address as nine four-character blocks in a 3x3 grid. The
-load-bearing part of that is the **three columns**, not the number nine: it is
-what makes an address read as a balanced block rather than a long string. So
-every address gets the same grid and only the row count changes.
+Ported from the `nq` registry `address-display`, whose two formats agree on one
+thing that is easy to miss: **the block is always three rows**. NIM is nine
+four-character chunks in three columns; Ethereum is three fourteen-character
+chunks in one. Keeping the row count constant is what makes a NIM address and a
+Polygon one read as siblings at the same height.
 
-| Address | Cells | Grid |
+| Address | Cells | Columns |
 | --- | --- | --- |
-| NIM, 36 chars | 9 of 4 | 3 x 3, byte-identical to before |
-| EVM / bech32, 42 chars | 6 of 7 | 3 x 2 |
-| bech32m, 62 chars | 9 of 7 and 6 | 3 x 3 |
-| legacy BTC, 34 chars | 6 of 6 and 5 | 3 x 2 |
+| NIM, 36 chars | 9 of 4 | 3 |
+| EVM / bech32, 42 chars | 3 of 14 | 1, upstream verbatim |
+| legacy BTC, 34 chars | 3 of 12 and 11 | 1 |
+| bech32m, 62 chars | 3 of 21 and 20 | 1 |
 
-`addressChunks(address)` is exported for hosts rendering an address of their own.
+`addressGrid(address)` returns `{ cells, columns }` and is exported for hosts
+rendering an address of their own.
 
-Chunk counts are tried in multiples of three, so the last row is never a short
-orphan. An exact division wins, and among exact ones the cell closest to four
-keeps NIM on the grid the wallet ships. When nothing divides evenly the
-remainder is spread one character at a time across the whole sequence, never
-taken off the top, because front-loading it makes the first row visibly denser
-than the last. Cells then differ by at most one character, which the
-equal-width columns centre into a tidy block.
+**One upstream behaviour is deliberately not ported.** The registry does
+`address.match(/.{14}/g)`, which returns only whole fourteen-character groups
+and silently discards the tail: a 34-character legacy BTC address renders as 28
+characters, truncated, and looks perfectly tidy while doing it. For a string
+people paste money into that is not a rounding error. Rows here are near-equal
+thirds instead, so every character survives at any length, and the 42-character
+case still produces exactly the upstream split.
 
-The invariant that matters: **the cells always rejoin to exactly the input**.
-These are concatenated back into an address people send money to, so a dropped
-character would be a lost payment that looked perfectly tidy on screen. It is
-pinned across all five address formats.
-
-Three things the shape is deliberate about:
-
-- **One address and one reader per asset.** The shell cannot derive a Polygon
-  address from a NIM one, and has no business knowing what an RPC is. The Hub
-  hands the Polygon address back from the same `chooseAddress` with **no**
-  balances attached, so reading them is always the host's job.
-- **Rows resolve independently, not as one batched read.** Nimiq consensus and
-  a Polygon RPC answer at very different speeds; a single
-  `read(): Promise<Balance[]>` would pin the list to the slowest chain.
-- **Smallest units as bigint, with the asset's own decimals**, formatted through
-  `fmtUnits`. A 6- or 8-decimal token through a float is exactly the drift
-  `nim-format` exists to end.
-
-A reader that throws or resolves `null` keeps the last known value on screen, a balance that vanishes reads as *your money is gone*, not *the RPC is flaky*, and an asset that never priced is left **out** of the total rather than counted
-as zero. `getBalanceLuna` still works on its own and still supplies the Send
-view's cap; pass `assets` alone and the cap comes from its `NIM` row.
-
-The same stack mounts standalone via `mountAssetList` for a wallet or funding
-screen of your own. A standalone list reads its balances **at mount**. The mini
-wallet passes `autoRefresh: false` because it reads on menu-open instead: firing
-a Polygon RPC on every page load, for a panel most visitors never open, is the
-cost that lazy read exists to avoid.
-
-Before v0.11.0 there was no mount read at all, so a standalone list sat at a
-dash in every row until the host happened to call `refresh()`.
-
-### Switching account (v0.14.0)
-
-A quiet **Switch account** row above Disconnect. Connecting again IS the
-switcher: `chooseAddress` reopens the Hub's own account picker, which is the
-right screen for this and one we do not have to build. It needs no wiring and
-appears on any mini wallet with a wallet, hub mode only.
-
-There is deliberately no in-menu account list. A fleet app cannot enumerate the
-user's accounts (`LIST` is not third-party callable), and a worse copy of a
-screen the Hub already ships is not worth owning.
-
-Two things it gets right that are easy to get wrong:
-
-- **Cancelling is a no-op.** Dismissing the Hub picker leaves the current
-  account connected. This row sits one line above Disconnect, so an exploratory
-  tap must never be destructive.
-- **The previous account's money does not survive the switch.** Every balance on
-  screen belongs to one address, and the asset list keeps its last value on
-  purpose (a flaky RPC must not blank a real balance). Across a switch that rule
-  is exactly wrong, so the NIM figure, the asset stack, the fiat total and any
-  open receive screen are all cleared the moment the address changes. A dash is
-  honest; a stale number is not. `mountAssetList` gained `clear()` for this.
-
-This applies to ANY account change, not only the new row. An app calling
-`connect()` again for its own reasons was already showing the old balance.
-
-### Saved recipients (v0.14.0)
-
-Sending means typing 36 characters, or pasting them and hoping. The send view
-validates the format, which catches a typo but not a wrong address.
-
-```ts
-mountMiniWallet(el, {
-  wallet, i18n,
-  contacts: {
-    list: () => myAddressBook(),                 // may be async, may throw
-    add: (entry) => saveToMyAddressBook(entry),  // optional
-  },
-});
-```
-
-Wired, the recipient field grows a row of quiet name pills. Absent, the field is
-exactly as it was.
-
-It is a **host** seam because there is no shared address book to read: the Hub
-exposes no contacts API to a third-party origin. That is fine, because the host
-is the only party that knows anything useful anyway (nimiq.kids knows a child by
-name, a POS knows the till), and this package should not grow a second thing it
-persists.
-
-- **`asset` scopes an entry to one chain**, and entries without it are NIM.
-  Offering a Polygon address while sending NIM is offering a mistake.
-- **Picking fills the field rather than bypassing it**, and scrolls it back to
-  the start, because an address you cannot see the beginning of is not one you
-  can check. Handing an address straight to the signer because a name was tapped
-  removes the last chance to notice it is the wrong one.
-- **`add` is asked after the send lands**, never between Send and the money
-  moving, and only for an address the book does not already hold.
-- **A failed contacts read renders no chips** rather than breaking the send view.
+The invariant that matters: **the cells always rejoin to the input**, pinned
+across five address formats.
 
 ### Report a bug (v0.8.0)
 

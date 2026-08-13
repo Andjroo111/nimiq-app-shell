@@ -5,7 +5,7 @@
 // name is the one failure in this component that costs somebody money.
 import { describe, expect, test } from 'bun:test';
 import { Window } from 'happy-dom';
-import { FIAT_FLAGS, NATIVE_NAMES, addressChunks, mountMiniWallet, type CornerControlOptions, type ShellContact } from './corner-control';
+import { FIAT_FLAGS, NATIVE_NAMES, addressGrid, mountMiniWallet, type CornerControlOptions, type ShellContact } from './corner-control';
 import { FLAG_SVG } from '../flags/data';
 import { SHELL_LANGUAGES, FEATURED_LANGUAGES, shellLocales, mergeLocales } from '../locales';
 import { createI18n } from '../i18n';
@@ -209,17 +209,17 @@ describe('receive view names the chain it is showing', () => {
     expect(warn?.textContent).toContain('USDT');
   });
 
-  // Both addresses use the house three-column grid; only the row count differs
-  // with the length. A 42-character Polygon address is 6 cells (2 rows), a
-  // 36-character NIM one is 9 (3 rows), and neither wraps as a ragged string.
-  test('each address fills the three-column grid at its own row count', async () => {
+  // Both are three-row blocks, which is what upstream keeps constant: NIM as
+  // nine four-char cells in three columns, Polygon as three fourteens in one.
+  // Neither wraps as a ragged string.
+  test('each address renders as a three-row block', async () => {
     const { host } = mount();
     await settle();
 
     (host.querySelectorAll('.nq-al-row')[1] as HTMLElement).click();
     await settle();
     const polygonCells = host.querySelectorAll('.nq-cc-address span');
-    expect(polygonCells).toHaveLength(6);
+    expect(polygonCells).toHaveLength(3);
     expect([...polygonCells].map((c) => c.textContent).join(''))
       .toBe('0x71C7656EC7ab88b098defB751B7401B5f6d8976F');
 
@@ -419,57 +419,73 @@ describe('address grid', () => {
   const LEGACY = '1BvBMSEYstWetqTFn5Au4m4GFg7xJaNVN2';          // 34
   const ALL = [NIM, EVM, P2WPKH, P2TR, LEGACY];
 
-  // THE invariant. These cells are concatenated back into an address people
-  // copy and send money to; a dropped or duplicated character is a lost
-  // payment, and it would look perfectly tidy on screen.
+  // THE invariant, and the one upstream gets wrong. These cells are
+  // concatenated back into an address people send money to, so a dropped
+  // character is a lost payment that looks perfectly tidy on screen.
   test('the cells always rejoin to exactly the original address', () => {
     for (const address of ALL) {
-      expect(addressChunks(address).join(''), address).toBe(address);
+      expect(addressGrid(address).cells.join(''), address).toBe(address);
     }
   });
 
-  // The wallet ships a 3x3 for NIM. Changing that would be a visible
-  // regression across every app on the shell.
-  test('a NIM address is still nine four-character blocks', () => {
-    const cells = addressChunks(NIM);
+  // The registry does address.match(/.{14}/g), which returns only whole
+  // 14-character groups and silently discards the tail. A 34-character legacy
+  // BTC address renders as 28. This is the case that proves we do not.
+  test('a length that is not a multiple of 14 keeps every character', () => {
+    const cells = addressGrid(LEGACY).cells;
+    expect(cells.join('')).toBe(LEGACY);
+    expect(cells.join('').length).toBe(34);
+    expect(LEGACY.match(/.{14}/g)!.join('').length).toBe(28); // what upstream would show
+  });
+
+  // The block is always three ROWS. That is what upstream keeps constant
+  // between its nimiq and ethereum formats, and it is what makes a NIM address
+  // and a Polygon one read as siblings at the same height.
+  test('every address is three rows', () => {
+    for (const address of ALL) {
+      const { cells, columns } = addressGrid(address);
+      expect(cells.length / columns, address).toBe(3);
+    }
+  });
+
+  // The wallet ships a 3x3 of four-character blocks for NIM. Changing that
+  // would be a visible regression in every app on the shell.
+  test('a NIM address is still nine four-character blocks in three columns', () => {
+    const { cells, columns } = addressGrid(NIM);
     expect(cells).toHaveLength(9);
+    expect(columns).toBe(3);
     expect([...new Set(cells.map((c) => c.length))]).toEqual([4]);
   });
 
-  // Three columns is the load-bearing part of the house grid: it is what makes
-  // an address read as a block. A count off a multiple of three leaves a short
-  // orphan row, which is the ragged wrap this replaces.
-  test('every address fills whole rows of three', () => {
-    for (const address of ALL) {
-      expect(addressChunks(address).length % 3, address).toBe(0);
-    }
-  });
-
-  // Cells within one character of each other read as even once the equal-width
-  // columns centre them. A wider spread does not.
-  test('cell lengths never differ by more than one', () => {
-    for (const address of ALL) {
-      const lengths = addressChunks(address).map((c) => c.length);
-      expect(Math.max(...lengths) - Math.min(...lengths), address).toBeLessThanOrEqual(1);
-    }
-  });
-
-  // A 42-character address is the case that prompted this: it used to wrap as
-  // one ragged string with a stub second line.
-  test('a 42-character address is two rows of three', () => {
+  // 42 characters in three rows of fourteen, one column: upstream's
+  // format-ethereum verbatim, which is the point.
+  test('a 42-character address matches the upstream ethereum split', () => {
     for (const address of [EVM, P2WPKH]) {
-      const cells = addressChunks(address);
-      expect(cells, address).toHaveLength(6);
-      expect([...new Set(cells.map((c) => c.length))], address).toEqual([7]);
+      const { cells, columns } = addressGrid(address);
+      expect(columns, address).toBe(1);
+      expect(cells, address).toEqual(address.match(/.{14}/g)!);
+    }
+  });
+
+  // Rows within one character of each other read as even. A wider spread does
+  // not, and neither does a short orphan final row.
+  test('row lengths never differ by more than one', () => {
+    for (const address of ALL) {
+      const { cells, columns } = addressGrid(address);
+      const rows: number[] = [];
+      for (let i = 0; i < cells.length; i += columns) {
+        rows.push(cells.slice(i, i + columns).join('').length);
+      }
+      expect(Math.max(...rows) - Math.min(...rows), address).toBeLessThanOrEqual(1);
     }
   });
 
   test('spaces in the input do not become cells', () => {
-    expect(addressChunks('NQ34 248H 8MB8 8QK2 5RVK EM8Q QJ8N 2Q5R 3XRK').join(''))
+    expect(addressGrid('NQ34 248H 8MB8 8QK2 5RVK EM8Q QJ8N 2Q5R 3XRK').cells.join(''))
       .toBe(NIM);
   });
 
   test('an empty address yields no cells', () => {
-    expect(addressChunks('')).toEqual([]);
+    expect(addressGrid('').cells).toEqual([]);
   });
 });
