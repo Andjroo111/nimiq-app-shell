@@ -119,20 +119,48 @@ function renderDigits(
 // --- public API ---------------------------------------------------------------
 
 /**
+ * Format an amount in an asset's SMALLEST unit as a human-readable string,
+ * given how many decimals separate that unit from one whole coin:
+ * `fmtUnits(45_200_000n, 6)` → `'45.20'` (USDT), `fmtUnits(120000n, 8)` →
+ * `'0.0012'` (BTC), `fmtUnits(1234567890, 5)` → `'12 345.6789'` (NIM).
+ *
+ * This is the digit engine `fmtNim` has always run; `unitDecimals` is the only
+ * thing that was ever NIM-specific about it. Multi-asset callers (the corner
+ * control's asset list) need the same string-based, precision-loss-free math on
+ * 6- and 8-decimal tokens, and re-deriving it per asset is exactly the
+ * float-based `x / 1e8` drift this module exists to end.
+ *
+ * `maxDecimals` defaults to `unitDecimals` — full precision, with trailing
+ * zeros trimmed — so an 8-decimal asset does not print `0.00120000`.
+ */
+export function fmtUnits(
+  units: number | bigint,
+  unitDecimals: number,
+  options: FmtNimOptions = {},
+): string {
+  if (!Number.isInteger(unitDecimals) || unitDecimals < 0) {
+    throw new Error('fmtUnits: unitDecimals must be a non-negative integer');
+  }
+  const {
+    maxDecimals = unitDecimals, minDecimals = 2, grouping = true, signed = false,
+  } = options;
+  if (!Number.isInteger(maxDecimals) || maxDecimals < 0
+    || !Number.isInteger(minDecimals) || minDecimals < 0) {
+    throw new Error('fmtUnits: minDecimals/maxDecimals must be non-negative integers');
+  }
+  const d = toDigits(units);
+  moveSep(d, -unitDecimals); // smallest unit → whole coin
+  const out = renderDigits(d, { maxDecimals, minDecimals, grouping });
+  return signed && !out.startsWith('-') && /[1-9]/.test(out) ? `+${out}` : out;
+}
+
+/**
  * Format an amount of luna as a human-readable NIM string:
  * `fmtNim(1234567890)` → `'12 345.6789'` (U+202F grouping, trailing zeros
  * trimmed, padded to minDecimals). Precision-loss-free for number and bigint.
  */
 export function fmtNim(luna: number | bigint, options: FmtNimOptions = {}): string {
-  const { maxDecimals = NIM_DECIMALS, minDecimals = 2, grouping = true, signed = false } = options;
-  if (!Number.isInteger(maxDecimals) || maxDecimals < 0
-    || !Number.isInteger(minDecimals) || minDecimals < 0) {
-    throw new Error('fmtNim: minDecimals/maxDecimals must be non-negative integers');
-  }
-  const d = toDigits(luna);
-  moveSep(d, -NIM_DECIMALS); // luna → NIM
-  const out = renderDigits(d, { maxDecimals, minDecimals, grouping });
-  return signed && !out.startsWith('-') && /[1-9]/.test(out) ? `+${out}` : out;
+  return fmtUnits(luna, NIM_DECIMALS, options);
 }
 
 /**

@@ -29,6 +29,7 @@ import { buildFlagHex } from './flag-hex';
 import { fmtNim, fmtFiat, lunaToNim, nimToLuna } from '../format/nim';
 import { BUG_ICON, openReportBugSheet, type ReportBugOptions } from './report-bug';
 import { installReportCapture } from './report-capture';
+import { mountAssetList, type AssetListHandle, type ShellAsset } from './asset-list';
 
 export interface CornerControlOptions {
   /** The app's wallet. OMIT IT on pages that have no wallet concept at all
@@ -61,8 +62,26 @@ export interface CornerControlOptions {
    *  EXTRA — called with the committed label for hosts that can sync it further
    *  (see header note on why Hub rename can't be the default). */
   onRename?: (label: string) => void | Promise<void>;
-  /** Balance source in luna. Without it the balance stack is hidden. */
+  /** Balance source in luna. Without it the balance stack is hidden.
+   *
+   *  NIM-only by construction: one address, one chain, luna's 5 decimals. Apps
+   *  that hold more than NIM pass `assets` instead (this stays for the fleet
+   *  already on it, and for the Send view's available-balance cap). */
   getBalanceLuna?: (address: string) => Promise<number>;
+  /** Multi-asset balances. Supersedes `getBalanceLuna`: when present the mini
+   *  wallet shows a per-asset stack, and the account row's right-hand figure
+   *  becomes the fiat TOTAL across them.
+   *
+   *  Each asset carries its OWN address and its OWN reader because the shell
+   *  cannot derive one from the other: the Hub hands back a BTC and a Polygon
+   *  address alongside the NIM one from a single chooseAddress, with no
+   *  balances attached, and reading them means a Polygon RPC and a BTC explorer
+   *  that this package has no business knowing about. Rows resolve
+   *  independently, so the slowest chain does not hold up the rest.
+   *
+   *  Pass a function for a list that changes with app state; it is re-read on
+   *  every refresh, so adding a row never means remounting the corner. */
+  assets?: ShellAsset[] | (() => ShellAsset[]);
   /** Reference-currency support: offered tickers + a 1-NIM price feed. Enables
    *  the "Show amounts in" grid.
    *
@@ -75,9 +94,14 @@ export interface CornerControlOptions {
     currencies: string[];
     /** Default ticker. Default 'USD'. */
     default?: string;
-    /** Price of 1 NIM in `ticker`, or null when unknown. Only called when a
-     *  balance is being rendered; a fiat-only host may return null. */
-    rate: (ticker: string) => Promise<number | null>;
+    /** Price of ONE WHOLE unit of `asset` in `ticker`, or null when unknown.
+     *  Only called when a balance is being rendered; a fiat-only host may
+     *  return null.
+     *
+     *  `asset` defaults to 'NIM' and is only ever passed when the host wired
+     *  `assets`, so the existing 1-arg feeds across the fleet keep working
+     *  unchanged. */
+    rate: (ticker: string, asset?: string) => Promise<number | null>;
     /** Called whenever the visitor picks a different ticker, and once at mount
      *  with the restored/default one, so a host can price its own UI. */
     onChange?: (ticker: string) => void;
@@ -502,7 +526,11 @@ export function mountCornerControl(
   const { wallet, i18n } = options;
   const languages = options.languages ?? SHELL_LANGUAGES;
   const showReceive = options.receive !== false;
-  const hasBalance = typeof options.getBalanceLuna === 'function';
+  const hasAssets = !!options.assets;
+  // The asset stack carries its own balances, so it satisfies the same "there
+  // is a balance to show" gate the single NIM line used to. Both are true only
+  // while a host is migrating; the stack wins the account row either way.
+  const hasBalance = typeof options.getBalanceLuna === 'function' || hasAssets;
   // Currency choice stands on its own: a wallet-less page (the language-only
   // corner from v0.5.0) still wants to offer it, so this is gated on the fiat
   // feed alone. It used to require hasBalance, which made the picker
@@ -630,6 +658,20 @@ export function mountCornerControl(
   balanceStack.hidden = true;
   const balanceNim = el('span', 'nq-cc-balance-nim', balanceStack);
   const balanceFiat = el('span', 'nq-cc-balance-fiat', balanceStack);
+
+  // Multi-asset: the per-asset stack sits under the account row and above the
+  // action bar, and the account row's figure becomes the fiat total. Mounted
+  // once here rather than per render, so balances survive a name change.
+  let assetList: AssetListHandle | null = null;
+  if (hasAssets) {
+    assetList = mountAssetList(walletSection, {
+      assets: options.assets!,
+      fiatTicker: () => fiatTicker,
+      rate: hasFiat
+        ? (asset) => options.fiat!.rate(fiatTicker, asset)
+        : undefined,
+    });
+  }
 
   function startRename(btn: HTMLElement): void {
     if (btn.querySelector('input')) return;
@@ -1049,6 +1091,20 @@ export function mountCornerControl(
   async function refreshBalance(force = false): Promise<void> {
     const account = wallet?.account ?? null;
     if (!hasBalance || !account) return;
+    if (assetList) {
+      // The stack owns the rows; the account row shows their fiat total. It is
+      // painted AFTER the refresh rather than per row, so the headline figure
+      // never counts a half-filled list and jumps as the slow chains land.
+      await assetList.refresh(force);
+      const total = assetList.total();
+      balanceStack.hidden = total === null;
+      balanceNim.textContent = total === null ? '' : fmtFiat(total, fiatTicker);
+      balanceFiat.hidden = true;
+      // Keep the NIM figure the Send view caps against in sync with the stack.
+      const nimUnits = assetList.units('NIM');
+      if (nimUnits !== null) balanceLuna = Number(nimUnits);
+      if (!options.getBalanceLuna) return;
+    }
     const now = Date.now();
     if (!force && now - balanceFetchedAt < 30_000 && balanceLuna !== null) {
       renderBalance();
@@ -1059,7 +1115,7 @@ export function mountCornerControl(
       balanceFetchedAt = now;
     } catch { /* keep the last known value */ }
     renderBalance();
-    if (hasFiat && balanceLuna !== null) {
+    if (hasFiat && !assetList && balanceLuna !== null) {
       try {
         const rate = await options.fiat!.rate(fiatTicker);
         if (rate !== null && wallet?.account) {
@@ -1074,6 +1130,9 @@ export function mountCornerControl(
     }
   }
   function renderBalance(): void {
+    // With a stack mounted, the account row belongs to its fiat total and this
+    // NIM line would clobber it. balanceLuna is still tracked, for the Send cap.
+    if (assetList) return;
     if (balanceLuna === null) { balanceStack.hidden = true; return; }
     balanceStack.hidden = false;
     balanceNim.textContent = `${fmtNim(balanceLuna)} NIM`;
@@ -1151,6 +1210,9 @@ export function mountCornerControl(
       unsubWallet();
       unsubLang();
       setOpen(false);
+      // Before root.remove(): the list has in-flight chain reads that must see
+      // the destroyed flag, or a slow RPC repaints a detached node.
+      assetList?.destroy();
       root.remove();
     },
   };

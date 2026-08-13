@@ -134,6 +134,15 @@ fmtNim(1234567890, { grouping: false }) // '12345.6789'
 
 fmtFiat(12.5, 'USD', 'en-US');         // '$12.50' (narrow symbol, Intl decimals)
 
+// Same engine at any asset's decimals (v0.10.0) — `fmtNim` is this, pinned to 5.
+fmtUnits(45200000n, 6);                // '45.20'    (USDT)
+fmtUnits(120000n, 8);                  // '0.0012'   (BTC — maxDecimals defaults
+                                       //  to the asset's own width, then trims,
+                                       //  so never '0.00120000')
+fmtUnits(9007199254740993n, 8);        // '90 071 992.54740993' — exact past
+                                       //  2^53, where `Number(x) / 1e8` lands
+                                       //  on ...92 and shows a wrong balance
+
 lunaToNim(100000);                     // 1
 nimToLuna(12.5);                       // 1250000
 parseNim('12 345.6789');               // 1234567890 (validates; throws on junk,
@@ -223,6 +232,48 @@ mountWalletPill(document.querySelector('#wallet')!, { wallet, i18n }); // connec
   renderer returning a string, which is what the tests pin.
 
 All inject their own `<style>` once and return a handle with `destroy()`.
+
+### Multi-asset balances (v0.10.0)
+
+The corner's mini wallet was NIM-only: `getBalanceLuna?: (address) => Promise<number>`
+is one address, one chain, luna's 5 decimals. Apps holding more than NIM pass
+`assets` instead, and the account row's figure becomes the fiat **total**:
+
+```ts
+mountCornerControl(el, {
+  wallet, i18n,
+  assets: () => [
+    { ticker: 'NIM',  name: 'Nimiq',  decimals: 5, balance: () => nimBalance() },
+    { ticker: 'USDT', name: 'Tether', decimals: 6, balance: () => usdtBalance(),
+      address: polygonAddress },
+    { ticker: 'BTC',  name: 'Bitcoin', decimals: 8, balance: () => btcBalance(),
+      address: btcAddress },
+  ],
+  fiat: { currencies: ['USD', 'EUR'], rate: (fiat, asset) => price(asset, fiat) },
+});
+```
+
+Three things the shape is deliberate about:
+
+- **One address and one reader per asset.** The shell cannot derive a Polygon
+  address from a NIM one, and has no business knowing what an RPC is. The Hub
+  hands all three addresses back from a single `chooseAddress` with **no**
+  balances attached, so reading them is always the host's job.
+- **Rows resolve independently, not as one batched read.** Nimiq consensus, a
+  Polygon RPC and a BTC explorer answer at very different speeds; a single
+  `read(): Promise<Balance[]>` would pin the list to the slowest chain.
+- **Smallest units as bigint, with the asset's own decimals**, formatted through
+  `fmtUnits`. A 6- or 8-decimal token through a float is exactly the drift
+  `nim-format` exists to end.
+
+A reader that throws or resolves `null` keeps the last known value on screen —
+a balance that vanishes reads as *your money is gone*, not *the RPC is flaky* —
+and an asset that never priced is left **out** of the total rather than counted
+as zero. `getBalanceLuna` still works on its own and still supplies the Send
+view's cap; pass `assets` alone and the cap comes from its `NIM` row.
+
+The same stack mounts standalone via `mountAssetList` for a wallet or funding
+screen of your own.
 
 ### Report a bug (v0.8.0)
 
