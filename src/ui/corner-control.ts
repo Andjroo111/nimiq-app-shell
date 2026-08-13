@@ -31,6 +31,68 @@ import { BUG_ICON, openReportBugSheet, type ReportBugOptions } from './report-bu
 import { installReportCapture } from './report-capture';
 import { mountAssetList, type AssetListHandle, type ShellAsset } from './asset-list';
 
+/** Split an address into the cells of the fleet's THREE-COLUMN address grid.
+ *
+ *  The wallet shows a NIM address as nine four-character blocks in a 3x3 grid.
+ *  The load-bearing part of that is the three columns, not the number nine: it
+ *  is what makes an address read as a balanced block instead of a long string.
+ *  So every address gets the same grid, and only the row count changes with the
+ *  length.
+ *
+ *    NIM, 36 chars  ->  9 blocks of 4   ->  3 x 3   (identical to today)
+ *    EVM, 42 chars  ->  6 blocks of 7   ->  3 x 2
+ *    bech32m, 62    -> 12 blocks of 5-6 ->  3 x 4
+ *
+ *  Chunk counts are tried in multiples of three so the last row is never a
+ *  short orphan, which is the ragged wrap this replaces. Exact divisions win,
+ *  then whichever leaves cells closest to the NIM standard of four. When
+ *  nothing divides evenly the remainder is spread one character at a time, so
+ *  cells differ by at most one and the equal-width columns still centre them
+ *  into a tidy block. */
+export function addressChunks(address: string): string[] {
+  const compact = address.replace(/\s+/g, '');
+  const n = compact.length;
+  if (n === 0) return [];
+
+  let chunks = 0;
+  let bestScore = Infinity;
+  for (const candidate of [3, 6, 9, 12, 15]) {
+    const size = n / candidate;
+    // Below ~4 the cells stop reading as blocks; above ~7 the row outgrows the
+    // 272px menu at the address font size.
+    if (size < 3.5 || size > 7.5) continue;
+    // An exact division always wins, and among exact ones the cell closest to
+    // four keeps NIM on the nine-block grid the wallet ships. Among inexact
+    // ones prefer FEWER cells, because a ragged split is easier to forgive in
+    // two tidy rows than in five thin ones.
+    const score = n % candidate === 0
+      ? Math.abs(size - 4)
+      : 100 + candidate;
+    if (score < bestScore) { bestScore = score; chunks = candidate; }
+  }
+  // Nothing in range (a very short or very long string): fall back to fours,
+  // which is the NIM rhythm and never worse than one unbroken line.
+  if (!chunks) return compact.match(/.{1,4}/g) ?? [compact];
+
+  const base = Math.floor(n / chunks);
+  const wide = n % chunks; // this many cells carry one extra character
+
+  // Spread the wide cells EVENLY rather than front-loading them. Taking the
+  // remainder off the top makes the first row visibly denser than the last,
+  // which is the raggedness this whole function exists to remove.
+  const isWide = new Set<number>();
+  for (let i = 0; i < wide; i += 1) isWide.add(Math.round((i * chunks) / wide));
+
+  const out: string[] = [];
+  let at = 0;
+  for (let i = 0; i < chunks; i += 1) {
+    const size = base + (isWide.has(i) ? 1 : 0);
+    out.push(compact.slice(at, at + size));
+    at += size;
+  }
+  return out;
+}
+
 /** One saved recipient. The host owns the list and its storage. */
 export interface ShellContact {
   /** What the person is called. This is what the chip shows. */
@@ -416,11 +478,6 @@ button.nq-cc-name:focus-visible { outline:2px solid var(--nq-cc-accent, #0582ca)
 .nq-cc-copy-wrap.nq-cc-copied .nq-cc-address, .nq-cc-copy-wrap.nq-cc-copied-hold .nq-cc-address {
   background:rgba(5,130,202,.08); color:#0582ca; }
 .nq-cc-address:focus-visible { outline:2px solid #0582ca; outline-offset:2px; }
-/* Non-NIM addresses are not 9 four-char blocks, so they drop the 3x3 grid and
-   wrap as one string. break-all, not break-word: an address has no word breaks
-   and must not push the 272px card wider. */
-.nq-cc-address-flat { display:block; text-align:center; line-height:1.55;
-  word-break:break-all; letter-spacing:.01em; }
 /* The wrong-chain guard. Orange because it is a WARNING: red would read as an
    error that already happened, and grey would read as fine print, which is
    exactly what this must not be.
@@ -1268,9 +1325,6 @@ export function mountMiniWallet(
   });
 
   let qrFor = '';
-  /** A NIM address: NQ + 2 check digits + 32 base32 chars, spaces optional. Only
-   *  this shape gets the 3×3 grid; see openReceive. */
-  const NIM_ADDRESS_SHAPE = /^NQ[0-9]{2}[0-9A-HJ-NP-VXY]{32}$/;
 
   /** The asset the receive view is showing, or null for the account's own NIM
    *  address. Held so a language switch can restate the label and warning. */
@@ -1305,20 +1359,10 @@ export function mountMiniWallet(
     const compact = address.replace(/\s+/g, '');
     receiveAddress = compact;
 
-    // The 3×3 grid is a NIM address format, not a universal one: it assumes 36
-    // characters in 9 four-char blocks. A 42-character Polygon address forced
-    // through it renders as ragged nonsense, so anything that is not a NIM
-    // address is shown as one wrapped monospace string instead.
     addressBtn.textContent = '';
-    const isNim = NIM_ADDRESS_SHAPE.test(compact.toUpperCase());
-    addressBtn.classList.toggle('nq-cc-address-flat', !isNim);
-    if (isNim) {
-      for (const block of compact.match(/.{1,4}/g) ?? []) {
-        const span = el('span', undefined, addressBtn);
-        span.textContent = block;
-      }
-    } else {
-      addressBtn.textContent = compact;
+    for (const block of addressChunks(compact)) {
+      const span = el('span', undefined, addressBtn);
+      span.textContent = block;
     }
 
     receiveAsset = asset ?? null;

@@ -345,9 +345,9 @@ Three things this gets right that one shared receive screen cannot:
 - **The address is the asset's.** Before v0.13.0 the receive view always showed
   `wallet.account.address`, so a USDT row led to a NIM address, and
   `ShellAsset.address` was declared but read by nothing.
-- **The 3x3 grid is a NIM format.** It assumes 36 characters in nine four-char
-  blocks, so a 42-character Polygon address forced through it renders as ragged
-  nonsense. Non-NIM addresses render as one wrapped monospace string instead.
+- **Every address gets the house grid**, at the row count its length calls for
+  (see below). A 42-character Polygon address used to wrap as one ragged string
+  with a stub second line.
 - **The QR payload is not guessed from the ticker.** `nimiq:` is right for NIM
   and wrong for everything else, so it is only applied to the account address.
   An asset's default payload is the bare address, which every scanner
@@ -357,6 +357,35 @@ Three things this gets right that one shared receive screen cannot:
 An asset without its own `address` falls back to the account address rather than
 rendering an empty screen. That is right for a token on the account's own chain
 and wrong for a foreign one, which is why the chain is named either way.
+
+### The address grid (v0.14.0)
+
+The wallet shows a NIM address as nine four-character blocks in a 3x3 grid. The
+load-bearing part of that is the **three columns**, not the number nine: it is
+what makes an address read as a balanced block rather than a long string. So
+every address gets the same grid and only the row count changes.
+
+| Address | Cells | Grid |
+| --- | --- | --- |
+| NIM, 36 chars | 9 of 4 | 3 x 3, byte-identical to before |
+| EVM / bech32, 42 chars | 6 of 7 | 3 x 2 |
+| bech32m, 62 chars | 9 of 7 and 6 | 3 x 3 |
+| legacy BTC, 34 chars | 6 of 6 and 5 | 3 x 2 |
+
+`addressChunks(address)` is exported for hosts rendering an address of their own.
+
+Chunk counts are tried in multiples of three, so the last row is never a short
+orphan. An exact division wins, and among exact ones the cell closest to four
+keeps NIM on the grid the wallet ships. When nothing divides evenly the
+remainder is spread one character at a time across the whole sequence, never
+taken off the top, because front-loading it makes the first row visibly denser
+than the last. Cells then differ by at most one character, which the
+equal-width columns centre into a tidy block.
+
+The invariant that matters: **the cells always rejoin to exactly the input**.
+These are concatenated back into an address people send money to, so a dropped
+character would be a lost payment that looked perfectly tidy on screen. It is
+pinned across all five address formats.
 
 Three things the shape is deliberate about:
 
