@@ -48,7 +48,14 @@ export interface CornerControlOptions {
   qr?: (text: string, sizePx: number) => HTMLElement;
   /** Show the Receive flow (address + QR behind the Receive button). Default true. */
   receive?: boolean;
-  /** Wire the Send button (e.g. a checkout flow). Button hidden when absent. */
+  /** OVERRIDE the Send button with an app-specific flow (e.g. a checkout).
+   *
+   *  The Send button is NOT a seam like the others: it is always present, and
+   *  without this option it opens the mini wallet's own BUILT-IN send view
+   *  (recipient + amount here, the wallet only for the approval, via
+   *  `wallet.pay()`). That built-in view is what makes this a wallet rather
+   *  than a connect button, so pass this only when the app genuinely owns the
+   *  flow. Passing a no-op replaces a working send with a dead button. */
   send?: () => void;
   /** Wire the QR-scan button. Hidden when absent. */
   scan?: () => void;

@@ -154,16 +154,41 @@
         <h2>Seams</h2>
         <fieldset>
           <label><input type="checkbox" id="opt-receive" checked> Receive (address + QR)</label>
-          <label><input type="checkbox" id="opt-send" checked> Send button</label>
           <label><input type="checkbox" id="opt-scan"> QR-scan button</label>
           <label><input type="checkbox" id="opt-cashlink"> Create a Cashlink row</label>
           <label><input type="checkbox" id="opt-onboard" checked> New-to-Nimiq line</label>
           <label><input type="checkbox" id="opt-openinpay"> Open in Nimiq Pay</label>
-          <label><input type="checkbox" id="opt-reportbug" checked> Report a bug row</label>
           <label><input type="checkbox" id="opt-identicon" checked> Real identicons</label>
           <label><input type="checkbox" id="opt-qr" checked> QR renderer</label>
           <label><input type="checkbox" id="opt-testnet"> Testnet (shows network row)</label>
           <p class="hint">An unwired seam renders no row, which is the corner's no-dead-buttons rule. Toggle one off and watch it vanish.</p>
+        </fieldset>
+        <fieldset>
+          <legend>Send</legend>
+          <label><input type="radio" name="send" value="builtin" checked> Built-in send view</label>
+          <label><input type="radio" name="send" value="override"> Override with an app flow</label>
+          <p class="hint">Send is NOT an ordinary seam. The button is always there, and with no <code>send</code> option it opens the mini wallet's own recipient + amount view, which calls <code>wallet.pay()</code>. Passing <code>send</code> replaces that with your own flow.</p>
+          <legend style="margin-top:10px">Mock pay outcome</legend>
+          <label><input type="radio" name="pay" value="ok" checked> Succeeds</label>
+          <label><input type="radio" name="pay" value="cancel"> User cancels in wallet</label>
+          <label><input type="radio" name="pay" value="fail"> Fails</label>
+          <p class="hint">Only applies to the Mock backend. A cancel must stay silent (closing a wallet dialog is a normal outcome, not an error); a failure must say so.</p>
+        </fieldset>
+        <fieldset>
+          <legend>Report a bug</legend>
+          <label><input type="radio" name="bug" value="off"> No row</label>
+          <label><input type="radio" name="bug" value="stub" checked> Row, stubbed (logs only)</label>
+          <label><input type="radio" name="bug" value="real"> Row, REAL (files a GitHub issue)</label>
+          <label style="margin-top:6px">File into
+            <select id="bug-repo" style="font:inherit;font-size:12px;padding:3px 6px;border:1px solid var(--line);border-radius:6px">
+              <option value="hashmark">hashmark</option>
+              <option value="nimiq.kids">nimiq.kids</option>
+              <option value="nimiq.cool">nimiq.cool</option>
+              <option value="nimiq.sale">nimiq.sale</option>
+              <option value="nimiq-app-shell">nimiq-app-shell (not registered)</option>
+            </select>
+          </label>
+          <p class="hint"><b>Real</b> posts to bot.nimiq.tech, which drafts the issue with an LLM and files it, labelled <code>playground</code>. It creates an actual issue, so close it afterwards. <code>nimiq-app-shell</code> is in the list on purpose: the service answers <code>unknown_repo</code> for it, which is how you see the reporter's error path.</p>
         </fieldset>
       </div>
     </div>
@@ -251,7 +276,24 @@ function createMockWallet({ mode, connected }) {
     },
     async pay(args) {
       log('info', 'wallet.pay()', args);
-      return { txHash: 'mock-tx-' + Math.random().toString(16).slice(2, 10) };
+      /* The wallet dialog is a real pause and three real outcomes. The send
+         view treats them very differently, so all three have to be reachable
+         without a Hub: success paints the sent state, a cancel must stay
+         SILENT (closing a wallet dialog is a normal thing to do, not an
+         error), and only a genuine failure gets an error line. */
+      await new Promise((r) => setTimeout(r, 900));
+      const outcome = radio('pay');
+      if (outcome === 'cancel') {
+        log('warn', '  -> user cancelled in wallet');
+        throw new Error('User cancelled the request');
+      }
+      if (outcome === 'fail') {
+        log('error', '  -> pay failed');
+        throw new Error('network unreachable');
+      }
+      const txHash = 'mock-tx-' + Math.random().toString(16).slice(2, 10);
+      log('info', '  -> broadcast', txHash);
+      return { txHash };
     },
     async signMessage(message) {
       log('info', 'wallet.signMessage()', message);
@@ -309,6 +351,10 @@ function qrEl(text, sizePx) {
   }
   return el;
 }
+
+/* Shown in the Report a bug context so a filed issue says which build produced
+   it. Kept in step with package.json by hand; it is a label, not a dependency. */
+const SHELL_VERSION = '0.11.0';
 
 /* ------------------------------------------------------------ mock assets */
 const $ = (id) => document.getElementById(id);
@@ -379,15 +425,26 @@ function buildOptions() {
       onChange: (t) => { log('info', 'fiat.onChange()', t); renderState(); },
     };
   }
-  if (opt('opt-send'))      o.send = () => log('info', 'send(), host opens its own flow');
+  /* Send is deliberately NOT passed by default. The button is always present,
+     and leaving the option off is what gives you the built-in recipient +
+     amount view. Passing a logger here replaces a working send with a dead
+     button, which is exactly the trap this radio exists to show. */
+  if (radio('send') === 'override') {
+    o.send = () => log('info', 'send() override, host opens its own flow');
+  }
   if (opt('opt-scan'))      o.scan = () => log('info', 'scan(), host opens its camera');
   if (opt('opt-cashlink'))  o.createCashlink = () => log('info', 'createCashlink()');
   if (opt('opt-onboard'))   o.onboard = () => log('info', 'onboard(), HubApi.onboard');
   if (opt('opt-openinpay')) o.openInPay = () => { log('info', 'openInPay() read at click time'); return 'https://pay.nimiq.com/'; };
-  if (opt('opt-reportbug')) {
-    /* Function form on purpose: the object form would file a REAL issue into a
-       real repo from a playground click. */
-    o.reportBug = () => log('warn', 'reportBug(): object form would POST to bot.nimiq.tech, stubbed here');
+
+  const bug = radio('bug');
+  if (bug === 'stub') {
+    o.reportBug = () => log('warn', 'reportBug() stubbed. Switch to REAL to file an actual issue.');
+  } else if (bug === 'real') {
+    o.reportBug = {
+      bot: { repo: $('bug-repo').value, labels: ['playground'] },
+      context: { surface: 'playground', version: SHELL_VERSION },
+    };
   }
   o.onRename = (label) => log('info', 'onRename()', label);
   return o;
@@ -449,7 +506,9 @@ function renderState() {
   ].join('<br>');
 }
 
-for (const el of document.querySelectorAll('input')) el.addEventListener('change', remount);
+/* select too, not just input: the bug-repo picker has to remount the corner or
+   the row keeps filing into whatever repo was chosen at load. */
+for (const el of document.querySelectorAll('input, select')) el.addEventListener('change', remount);
 
 window.addEventListener('error', (e) => log('error', 'window error', e.message));
 window.addEventListener('unhandledrejection', (e) => log('error', 'unhandled rejection', String(e.reason)));
