@@ -260,7 +260,10 @@ describe('switching account drops the previous account money', () => {
   const A = 'NQ34 248H 8MB8 8QK2 5RVK EM8Q QJ8N 2Q5R 3XRK';
   const B = 'NQ21 8LNC MJD3 D7T4 8FSX N5M8 5V2M A9GY 4KUJ';
 
-  function mount(read: () => Promise<bigint> = async () => 4_218_37500n) {
+  function mount(
+    read: () => Promise<bigint> = async () => 4_218_37500n,
+    extra: Partial<CornerControlOptions> = {},
+  ) {
     const w = new Window();
     for (const key of ['document', 'HTMLElement', 'navigator', 'localStorage', 'getComputedStyle', 'window']) {
       (globalThis as unknown as Record<string, unknown>)[key] =
@@ -285,6 +288,7 @@ describe('switching account drops the previous account money', () => {
       i18n,
       assets: [{ ticker: 'NIM', name: 'Nimiq', network: 'Nimiq', decimals: 5,
         address: A, balance: read }],
+      ...extra,
     });
     return { host, wallet };
   }
@@ -330,6 +334,17 @@ describe('switching account drops the previous account money', () => {
     await wallet.connect();
     await settle();
     expect(host.querySelector('.nq-cc')?.className).not.toContain('nq-cc-show-receive');
+  });
+
+  // Hashmark's wallet is an adapter over a betting key, where connect() means
+  // "set up betting" and can route to onboarding. Offering that as "Switch
+  // account" describes an action the app does not have.
+  test('switchAccount:false removes the row without touching Disconnect', async () => {
+    const { host } = mount(undefined, { switchAccount: false });
+    await settle();
+    const labels = [...host.querySelectorAll('.nq-cc-row')].map((r) => r.textContent);
+    expect(labels.some((l) => l?.includes('Switch account'))).toBe(false);
+    expect(host.querySelector('.nq-cc-disconnect')?.textContent).toBe('Disconnect');
   });
 
   test('the switch row exists and is not the disconnect', async () => {
