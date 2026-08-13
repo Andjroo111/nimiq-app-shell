@@ -19,6 +19,7 @@ export default {
   'shell.openInPay': 'In Nimiq Pay öffnen',
   'shell.network': 'Netzwerk',
   'shell.tapToCopy': 'Adresse antippen zum Kopieren',
+  'shell.networkOnly': 'Sende {ticker} nur über {network}. Über ein anderes Netzwerk gesendete Coins sind verloren.',
   'shell.createCashlink': 'Cashlink erstellen',
   'shell.newToNimiq': 'Neu bei Nimiq? Wallet erstellen',
   'shell.recipient': 'Empfänger',

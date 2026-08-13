@@ -384,6 +384,24 @@ button.nq-cc-name:focus-visible { outline:2px solid var(--nq-cc-accent, #0582ca)
 .nq-cc-copy-wrap.nq-cc-copied .nq-cc-address, .nq-cc-copy-wrap.nq-cc-copied-hold .nq-cc-address {
   background:rgba(5,130,202,.08); color:#0582ca; }
 .nq-cc-address:focus-visible { outline:2px solid #0582ca; outline-offset:2px; }
+/* Non-NIM addresses are not 9 four-char blocks, so they drop the 3x3 grid and
+   wrap as one string. break-all, not break-word: an address has no word breaks
+   and must not push the 272px card wider. */
+.nq-cc-address-flat { display:block; text-align:center; line-height:1.55;
+  word-break:break-all; letter-spacing:.01em; }
+/* The wrong-chain guard. Orange because it is a WARNING: red would read as an
+   error that already happened, and grey would read as fine print, which is
+   exactly what this must not be.
+   Colours are the nq registry status-alert warning triplet verbatim
+   (colors-orange on colors-orange-400 with a colors-orange-500 ring), not an
+   approximation of it. NOTE: this block is a JS template literal, so it must
+   never contain a backtick. */
+.nq-cc-net-warn { margin:8px 0 0; padding:8px 10px; border-radius:6px;
+  background:oklch(0.951 0.0221 74.1);
+  outline:1.5px solid oklch(0.9396 0.0436 71.7); outline-offset:-1.5px;
+  color:oklch(0.7387 0.179 56.67);
+  font-size:11.5px; font-weight:700; line-height:1.4; text-align:center; }
+.nq-cc-net-warn[hidden] { display:none; }
 .nq-cc-copy-tooltip { position:absolute; left:50%; bottom:calc(100% + 10px);
   transform:translateX(-50%) translateY(4px); padding:8px 12px; border-radius:4px;
   background-image:radial-gradient(100% 100% at 100% 100%, #265dd7, #0582ca); color:#fff; font-size:13px;
@@ -636,8 +654,14 @@ export function mountMiniWallet(
     i18nNodes.push([node, key]);
     node.textContent = i18n.t(key);
   }
+  /** Re-stated after every language change. The receive view's back label and
+   *  chain warning are interpolated per asset, so the plain key-to-text pass
+   *  above would overwrite them with the un-suffixed string and blank the
+   *  warning. Assigned once the receive view exists. */
+  let repaintReceive: () => void = () => {};
   function applyLang(): void {
     for (const [node, key] of i18nNodes) node.textContent = i18n.t(key);
+    repaintReceive();
   }
 
   // ---- signed-out section (hub only) ---------------------------------------
@@ -692,10 +716,13 @@ export function mountMiniWallet(
         ? (asset) => options.fiat!.rate(fiatTicker, asset)
         : undefined,
       // The corner reads on menu-open (refreshBalance below), so it opts out of
-      // the list's own mount read. Leaving it on would hit a Polygon RPC and a
-      // BTC explorer on every page load of every app, for a panel most visitors
-      // never open.
+      // the list's own mount read. Leaving it on would hit a Polygon RPC on
+      // every page load of every app, for a panel most visitors never open.
       autoRefresh: false,
+      // Tapping a row receives THAT asset. Only offered when the receive flow
+      // is on at all, so `receive: false` does not leave rows that look
+      // pressable and do nothing.
+      onSelect: showReceive ? (asset) => openReceive(asset) : undefined,
     });
   }
 
@@ -961,10 +988,21 @@ export function mountMiniWallet(
   tNode(copyTip, 'shell.copied');
   const hint = el('p', 'nq-cc-receive-hint', receiveBody);
   tNode(hint, 'shell.tapToCopy');
+  // The wrong-chain guard. Below the address rather than above it, because it
+  // is the last thing read before the address is copied, and it is only ever
+  // filled for a specific asset (the account's own NIM address needs no
+  // warning, and a warning on every screen is a warning nobody reads).
+  const netWarn = el('p', 'nq-cc-net-warn', receiveBody);
+  netWarn.hidden = true;
+
+  /** Whichever address the receive view is currently showing. Defaults to the
+   *  account, and is repointed per asset by openReceive. Copy must read THIS,
+   *  not the account, or tapping a USDT address copies the NIM one. */
+  let receiveAddress: string | null = null;
 
   let copyTimer: ReturnType<typeof setTimeout> | undefined;
   addressBtn.addEventListener('click', () => {
-    const addr = wallet?.account?.address;
+    const addr = receiveAddress ?? wallet?.account?.address;
     if (!addr) return;
     try { void navigator.clipboard.writeText(addr); } catch { /* clipboard unavailable */ }
     copyWrap.classList.add('nq-cc-copied', 'nq-cc-copied-hold');
@@ -1079,22 +1117,70 @@ export function mountMiniWallet(
   });
 
   let qrFor = '';
-  function openReceive(): void {
+  /** A NIM address: NQ + 2 check digits + 32 base32 chars, spaces optional. Only
+   *  this shape gets the 3×3 grid; see openReceive. */
+  const NIM_ADDRESS_SHAPE = /^NQ[0-9]{2}[0-9A-HJ-NP-VXY]{32}$/;
+
+  /** The asset the receive view is showing, or null for the account's own NIM
+   *  address. Held so a language switch can restate the label and warning. */
+  let receiveAsset: ShellAsset | null = null;
+  repaintReceive = (): void => {
+    backLabel.textContent = receiveAsset
+      ? `${i18n.t('shell.receive')} ${receiveAsset.ticker}`
+      : i18n.t('shell.receive');
+    netWarn.hidden = !receiveAsset;
+    netWarn.textContent = receiveAsset
+      ? i18n.t('shell.networkOnly', {
+          ticker: receiveAsset.ticker,
+          network: receiveAsset.network,
+        })
+      : '';
+  };
+
+  /** Show the receive view. With an asset, it shows THAT asset's address, chain
+   *  and QR payload; without one, the account's own NIM address as before.
+   *
+   *  An asset with no address of its own falls back to the account address
+   *  rather than rendering an empty screen. That is right for a token on the
+   *  account's own chain and would be wrong for a foreign one, which is why the
+   *  chain is named on screen either way. */
+  function openReceive(asset?: ShellAsset): void {
     const account = wallet?.account ?? null;
     if (!account) return;
+    const address = asset?.address ?? account.address;
+    if (!address) return;
     root.classList.add('nq-cc-show-receive');
-    const compact = account.address.replace(/\s+/g, '');
-    // 9 four-char blocks, 3×3, uppercase Fira Mono (the canonical address grid)
-    const blocks = compact.match(/.{1,4}/g) ?? [];
+
+    const compact = address.replace(/\s+/g, '');
+    receiveAddress = compact;
+
+    // The 3×3 grid is a NIM address format, not a universal one: it assumes 36
+    // characters in 9 four-char blocks. A 42-character Polygon address forced
+    // through it renders as ragged nonsense, so anything that is not a NIM
+    // address is shown as one wrapped monospace string instead.
     addressBtn.textContent = '';
-    for (const block of blocks) {
-      const span = el('span', undefined, addressBtn);
-      span.textContent = block;
+    const isNim = NIM_ADDRESS_SHAPE.test(compact.toUpperCase());
+    addressBtn.classList.toggle('nq-cc-address-flat', !isNim);
+    if (isNim) {
+      for (const block of compact.match(/.{1,4}/g) ?? []) {
+        const span = el('span', undefined, addressBtn);
+        span.textContent = block;
+      }
+    } else {
+      addressBtn.textContent = compact;
     }
-    if (options.qr && qrFor !== compact) {
+
+    receiveAsset = asset ?? null;
+    repaintReceive();
+
+    // `nimiq:` is correct for NIM and wrong for every other chain, so it is only
+    // applied to the account address. An asset says what it wants via `uri`, and
+    // the default is the bare address, which every scanner understands.
+    const payload = asset ? (asset.uri?.(compact) ?? compact) : `nimiq:${compact}`;
+    if (options.qr && qrFor !== payload) {
       qrSlot.textContent = '';
-      qrSlot.appendChild(options.qr(`nimiq:${compact}`, 164));
-      qrFor = compact;
+      qrSlot.appendChild(options.qr(payload, 164));
+      qrFor = payload;
     }
   }
 

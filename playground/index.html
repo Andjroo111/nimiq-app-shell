@@ -153,13 +153,13 @@
           <label><input type="radio" name="bal" value="none"> No balance</label>
           <label><input type="radio" name="bal" value="nim" checked> NIM only (<code>getBalanceLuna</code>)</label>
           <label><input type="radio" name="bal" value="multi"> Multi-asset (<code>assets</code>)</label>
-          <p class="hint">Multi-asset shows NIM plus USDT plus BTC, each with its own decimals (5 / 6 / 8) and its own latency.</p>
+          <p class="hint">Multi-asset shows NIM plus USDC and USDT on Polygon. Tap a row to receive THAT asset: its own address, its own chain warning. BTC is deliberately absent, see issue #124.</p>
         </fieldset>
         <fieldset>
           <legend>Reader behaviour</legend>
-          <label><input type="checkbox" id="opt-slow"> Slow BTC read (3s)</label>
+          <label><input type="checkbox" id="opt-slow"> Slow USDC read (3s)</label>
           <label><input type="checkbox" id="opt-throw"> USDT reader throws</label>
-          <label><input type="checkbox" id="opt-nofiat-btc"> BTC has no price</label>
+          <label><input type="checkbox" id="opt-nofiat-btc"> USDC has no price</label>
           <p class="hint">A throwing reader must keep the last value on screen. An unpriced asset must be left OUT of the total, not counted as zero.</p>
         </fieldset>
         <fieldset>
@@ -270,7 +270,9 @@ document.getElementById('clear').onclick = () => { logEl.textContent = ''; };
    That same seam is what makes a playground possible with no network at all. */
 const MOCK_ADDRESS  = 'NQ34 248H 8MB8 8QK2 5RVK EM8Q QJ8N 2Q5R 3XRK';
 const MOCK_POLYGON  = '0x71C7656EC7ab88b098defB751B7401B5f6d8976F';
-const MOCK_BTC      = 'bc1qar0srrr7xfkvy5l643lydnw9re59gtzzwf5mdq';
+/* No BTC row on purpose. Through the Hub, chooseAddress hands back a fresh
+   unused BTC address on every call, so a balance read against it is not the
+   user's balance and a receive screen for it is a lie. See issue #124. */
 
 function createMockWallet({ mode, connected }) {
   let account = connected ? { address: MOCK_ADDRESS, label: 'Playground' } : null;
@@ -380,33 +382,36 @@ const radio = (name) => document.querySelector(`input[name="${name}"]:checked`).
 
 const nimLuna    = 4_218_37500;         // 42 183.75 NIM
 const usdtUnits  = 1_250_450_000n;      // 1 250.45 USDT (6dp)
-const btcUnits   = 12_345_678n;         // 0.12345678 BTC (8dp)
+const usdcUnits  = 402_110_000n;        // 402.11 USDC (6dp)
 
 async function readNim()  { return nimLuna; }
 async function readUsdt() {
   if (opt('opt-throw')) { log('error', 'USDT reader threw (on purpose)'); throw new Error('polygon rpc 503'); }
   return usdtUnits;
 }
-async function readBtc() {
-  if (opt('opt-slow')) { log('warn', 'BTC read: sleeping 3s'); await new Promise((r) => setTimeout(r, 3000)); }
-  return btcUnits;
+async function readUsdc() {
+  if (opt('opt-slow')) { log('warn', 'USDC read: sleeping 3s'); await new Promise((r) => setTimeout(r, 3000)); }
+  return usdcUnits;
 }
 
 function buildAssets() {
   return [
-    { ticker: 'NIM',  name: 'Nimiq',      decimals: 5, balance: readNim,  address: MOCK_ADDRESS },
-    { ticker: 'USDT', name: 'Tether USD', decimals: 6, balance: readUsdt, address: MOCK_POLYGON },
-    { ticker: 'BTC',  name: 'Bitcoin',    decimals: 8, balance: readBtc,  address: MOCK_BTC },
+    { ticker: 'NIM',  name: 'Nimiq',      network: 'Nimiq',   decimals: 5,
+      balance: readNim,  address: MOCK_ADDRESS },
+    { ticker: 'USDC', name: 'USD Coin',   network: 'Polygon', decimals: 6,
+      balance: readUsdc, address: MOCK_POLYGON },
+    { ticker: 'USDT', name: 'Tether USD', network: 'Polygon', decimals: 6,
+      balance: readUsdt, address: MOCK_POLYGON },
   ];
 }
 
 /* One whole unit priced in `ticker`. Deliberately returns null for BTC when
    the switch is on, so you can watch it drop OUT of the total rather than
    being counted as zero. */
-const USD_PER = { NIM: 0.0021, USDT: 1.0, BTC: 96_400 };
+const USD_PER = { NIM: 0.0021, USDT: 1.0, USDC: 1.0 };
 const FX = { USD: 1, EUR: 0.92, GBP: 0.79, BRL: 5.4 };
 async function rate(ticker, asset = 'NIM') {
-  if (asset === 'BTC' && opt('opt-nofiat-btc')) return null;
+  if (asset === 'USDC' && opt('opt-nofiat-btc')) return null;
   const usd = USD_PER[asset];
   if (usd === undefined) return null;
   return usd * (FX[ticker] ?? 1);
@@ -517,7 +522,7 @@ function renderState() {
   $('fmt').innerHTML = [
     `fmtNim(${nimLuna})            <b>${fmtNim(nimLuna)}</b>`,
     `fmtUnits(${usdtUnits}n, 6)    <b>${fmtUnits(usdtUnits, 6)}</b>`,
-    `fmtUnits(${btcUnits}n, 8)     <b>${fmtUnits(btcUnits, 8)}</b>`,
+    `fmtUnits(12345678n, 8)        <b>${fmtUnits(12345678n, 8)}</b> <span style="color:#5b5f85">8dp trims, never 0.00120000</span>`,
     `fmtUnits(9007199254740993n,8) <b>${fmtUnits(9007199254740993n, 8)}</b> <span style="color:#6c7095">exact past 2^53</span>`,
     `fmtFiat(12.5,'USD','en-US')   <b>${fmtFiat(12.5, 'USD', 'en-US')}</b>`,
   ].join('<br>');

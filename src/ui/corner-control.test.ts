@@ -1,9 +1,15 @@
-// Data pins for the corner control (the DOM behavior is verified by consumer
-// apps' browser passes — this repo has no DOM harness, by convention).
+// Data pins for the corner control, plus a DOM block for the receive view.
+//
+// Most of this file pins data rather than rendering. The receive block is the
+// exception and earns it: showing one asset's address under another asset's
+// name is the one failure in this component that costs somebody money.
 import { describe, expect, test } from 'bun:test';
-import { FIAT_FLAGS, NATIVE_NAMES, type CornerControlOptions } from './corner-control';
+import { Window } from 'happy-dom';
+import { FIAT_FLAGS, NATIVE_NAMES, mountMiniWallet, type CornerControlOptions } from './corner-control';
 import { FLAG_SVG } from '../flags/data';
-import { SHELL_LANGUAGES, FEATURED_LANGUAGES, shellLocales } from '../locales';
+import { SHELL_LANGUAGES, FEATURED_LANGUAGES, shellLocales, mergeLocales } from '../locales';
+import { createI18n } from '../i18n';
+import type { Wallet } from '../wallet';
 
 describe('corner-control data', () => {
   test('every fiat flag code has bundled artwork', () => {
@@ -140,5 +146,104 @@ describe('corner-control data', () => {
     const offered = ['USD', 'EUR', 'GBP', 'MXN', 'BRL', 'CNY', 'INR',
       'JPY', 'CHF', 'CAD', 'AUD', 'KRW', 'TRY', 'VND'];
     for (const ticker of offered) expect(FIAT_FLAGS[ticker], ticker).toBeDefined();
+  });
+});
+
+describe('receive view names the chain it is showing', () => {
+  const NIM_ADDRESS = 'NQ34 248H 8MB8 8QK2 5RVK EM8Q QJ8N 2Q5R 3XRK';
+  const POLYGON_ADDRESS = '0x71C7656EC7ab88b098defB751B7401B5f6d8976F';
+
+  function mount() {
+    const w = new Window();
+    for (const key of ['document', 'HTMLElement', 'navigator', 'localStorage', 'getComputedStyle']) {
+      (globalThis as unknown as Record<string, unknown>)[key] =
+        (w as unknown as Record<string, unknown>)[key];
+    }
+    const i18n = createI18n({ locales: mergeLocales(shellLocales), fallback: 'en' });
+    const wallet = {
+      mode: 'hub',
+      account: { address: NIM_ADDRESS, label: 'Test' },
+      connect: async () => null,
+      signAndSend: async () => ({ txHash: '' }),
+      pay: async () => ({ txHash: '' }),
+      signMessage: async () => ({ address: '', message: '', publicKeyHex: '', signatureHex: '' }),
+      onAccountChange: () => () => {},
+      disconnect: () => {},
+    } as unknown as Wallet;
+    const host = w.document.createElement('div') as unknown as HTMLElement;
+    mountMiniWallet(host, {
+      wallet,
+      i18n,
+      assets: [
+        { ticker: 'NIM', name: 'Nimiq', network: 'Nimiq', decimals: 5,
+          address: NIM_ADDRESS, balance: async () => 1n },
+        { ticker: 'USDT', name: 'Tether USD', network: 'Polygon', decimals: 6,
+          address: POLYGON_ADDRESS, balance: async () => 1n },
+      ],
+    });
+    return { host, i18n };
+  }
+  const settle = () => new Promise((r) => setTimeout(r, 40));
+
+  // The whole point of #120: before this, tapping any row showed the NIM
+  // address, because the receive view only ever read wallet.account.
+  test('selecting an asset shows THAT asset address, not the account one', async () => {
+    const { host } = mount();
+    await settle();
+    const rows = host.querySelectorAll('.nq-al-row');
+    (rows[1] as HTMLElement).click();
+    await settle();
+    const shown = host.querySelector('.nq-cc-address')?.textContent ?? '';
+    expect(shown).toContain('0x71C7656EC7ab88b098defB751B7401B5f6d8976F');
+    expect(shown).not.toContain('NQ34');
+  });
+
+  test('the chain is stated on the receive screen, not only in the row', async () => {
+    const { host } = mount();
+    await settle();
+    (host.querySelectorAll('.nq-al-row')[1] as HTMLElement).click();
+    await settle();
+    const warn = host.querySelector('.nq-cc-net-warn');
+    expect(warn?.hasAttribute('hidden')).toBe(false);
+    expect(warn?.textContent).toContain('Polygon');
+    expect(warn?.textContent).toContain('USDT');
+  });
+
+  // The 3x3 grid assumes 36 characters in nine four-char blocks. A 42-character
+  // Polygon address forced through it renders as ragged nonsense.
+  test('a non-NIM address drops the 3x3 grid', async () => {
+    const { host } = mount();
+    await settle();
+    (host.querySelectorAll('.nq-al-row')[1] as HTMLElement).click();
+    await settle();
+    expect(host.querySelector('.nq-cc-address')?.className).toContain('nq-cc-address-flat');
+    (host.querySelectorAll('.nq-al-row')[0] as HTMLElement).click();
+    await settle();
+    expect(host.querySelector('.nq-cc-address')?.className).not.toContain('nq-cc-address-flat');
+  });
+
+  // The account's own NIM address is not a wrong-chain hazard, and a warning on
+  // every screen is a warning nobody reads.
+  test('the NIM row warns too, but the bare account view does not', async () => {
+    const { host } = mount();
+    await settle();
+    (host.querySelectorAll('.nq-al-row')[0] as HTMLElement).click();
+    await settle();
+    expect(host.querySelector('.nq-cc-net-warn')?.textContent).toContain('Nimiq');
+  });
+
+  // applyLang() rewrites every i18n node from its key, which would blank an
+  // interpolated warning and drop the asset ticker from the back label.
+  test('a language switch keeps the warning and the per-asset label', async () => {
+    const { host, i18n } = mount();
+    await settle();
+    (host.querySelectorAll('.nq-al-row')[1] as HTMLElement).click();
+    await settle();
+    i18n.setLanguage('de');
+    await settle();
+    const warn = host.querySelector('.nq-cc-net-warn')?.textContent ?? '';
+    expect(warn).toContain('Polygon');
+    expect(warn).toContain('USDT');
+    expect(host.querySelector('.nq-cc-back')?.textContent).toContain('USDT');
   });
 });

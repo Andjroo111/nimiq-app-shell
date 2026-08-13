@@ -19,6 +19,7 @@ export default {
   'shell.openInPay': 'Ouvrir dans Nimiq Pay',
   'shell.network': 'Réseau',
   'shell.tapToCopy': "Touchez l'adresse pour la copier",
+  'shell.networkOnly': 'Envoyez des {ticker} uniquement via {network}. Les fonds envoyés via un autre réseau sont perdus.',
   'shell.createCashlink': 'Créer un Cashlink',
   'shell.newToNimiq': 'Nouveau sur Nimiq ? Créez un portefeuille',
   'shell.recipient': 'Destinataire',

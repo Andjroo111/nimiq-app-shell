@@ -15,6 +15,7 @@ import { mountAssetList } from './asset-list';
 
 const NIM: ShellAsset = {
   ticker: 'NIM',
+  network: 'Nimiq',
   decimals: 5,
   balance: async () => 120_000_000n,
 };
@@ -62,7 +63,7 @@ describe('asset-list contract', () => {
   // A reader that throws must not blank a real balance: on screen that reads as
   // "your money is gone", not "the RPC is flaky".
   test('a reader may resolve null to mean "no answer this time"', async () => {
-    const flaky: ShellAsset = { ticker: 'BTC', decimals: 8, balance: async () => null };
+    const flaky: ShellAsset = { ticker: 'BTC', network: 'Bitcoin', decimals: 8, balance: async () => null };
     await expect(flaky.balance()).resolves.toBeNull();
   });
 
@@ -105,12 +106,36 @@ describe('asset-list mounts with real balances', () => {
     expect(handle.units('NIM')).toBe(120_000_000n);
   });
 
+  // The row's second line has to name the chain, because a bare ticker is not
+  // enough to receive safely. USDT exists on five chains and only one of them
+  // is the one this wallet can accept.
+  test('the row names the chain next to the asset name', async () => {
+    const host = withDom();
+    mountAssetList(host, {
+      assets: [{ ticker: 'USDT', name: 'Tether USD', network: 'Polygon', decimals: 6,
+        balance: async () => 1_000_000n }],
+    });
+    await settle();
+    expect(host.textContent).toContain('Tether USD · Polygon');
+  });
+
+  // NIM is name 'Nimiq' on network 'Nimiq'. Printing both spends the row's one
+  // subtitle line saying the same word twice.
+  test('a name matching its network is not printed twice', async () => {
+    const host = withDom();
+    mountAssetList(host, { assets: [NIM] });
+    await settle();
+    expect(host.textContent).toContain('Nimiq');
+    expect(host.textContent).not.toContain('Nimiq · Nimiq');
+  });
+
   // A throwing reader must keep the row rather than blank it, because a balance
   // that vanishes reads as "your money is gone", not "the RPC is flaky".
   test('a throwing reader still renders its row', async () => {
     const host = withDom();
     mountAssetList(host, {
-      assets: [{ ticker: 'USDT', decimals: 6, balance: async () => { throw new Error('rpc 503'); } }],
+      assets: [{ ticker: 'USDT', network: 'Polygon', decimals: 6,
+        balance: async () => { throw new Error('rpc 503'); } }],
     });
     await settle();
     expect(host.textContent).toContain('USDT');

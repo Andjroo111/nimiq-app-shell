@@ -20,6 +20,7 @@ export default {
   'shell.openInPay': 'Open in Nimiq Pay',
   'shell.network': 'Network',
   'shell.tapToCopy': 'Tap the address to copy',
+  'shell.networkOnly': 'Send {ticker} on {network} only. Coins sent on another network are lost.',
   'shell.createCashlink': 'Create a Cashlink',
   'shell.newToNimiq': 'New to Nimiq? Create a wallet',
   'shell.recipient': 'Recipient',

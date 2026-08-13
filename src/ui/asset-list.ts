@@ -40,8 +40,28 @@ export interface ShellAsset {
    *  the last known value on screen rather than blanking a real balance over a
    *  flaky RPC — a balance that vanishes reads as "your money is gone". */
   balance: () => Promise<bigint | number | null>;
-  /** Full name under the ticker ('Nimiq', 'Tether USD'). Omitted → ticker alone. */
+  /** The chain this asset lives on, as a person would say it: 'Nimiq',
+   *  'Polygon', 'Bitcoin'.
+   *
+   *  REQUIRED, and required on purpose. A ticker is not enough information to
+   *  receive safely: USDT exists on Ethereum, Tron, Polygon, Solana and BSC,
+   *  and this wallet can only ever accept the one the connected account holds.
+   *  Someone reading a bare `USDT` row and withdrawing from an exchange on Tron
+   *  loses the money. An optional field is a field that gets forgotten, and the
+   *  cost of forgetting this one is somebody's balance, so the compiler asks
+   *  for it instead. */
+  network: string;
+  /** Full name under the ticker ('Nimiq', 'Tether USD'). Omitted → ticker alone.
+   *  Rendered next to `network`, and deduplicated when the two are the same
+   *  word, so NIM reads 'Nimiq' rather than 'Nimiq · Nimiq'. */
   name?: string;
+  /** Build the QR payload for this asset's address. Default: the bare address.
+   *
+   *  Bare is the safe default because it is what every wallet's scanner
+   *  understands. `nimiq:` is correct for NIM and wrong for everything else, so
+   *  hosts wanting a scheme (EIP-681 `ethereum:0x…@137`, `bitcoin:`) say so
+   *  here rather than having one guessed from the ticker. */
+  uri?: (address: string) => string;
   /** Row artwork, self-sized to `sizePx`. Omitted → the row runs text-only. */
   icon?: (sizePx: number) => HTMLElement;
   /** Receiving address for THIS asset (per chain). Only used by hosts that wire
@@ -97,6 +117,22 @@ export interface AssetListHandle {
    *  `getBalanceLuna` onto `assets` does not silently lose the cap. */
   units(ticker: string): bigint | null;
   destroy(): void;
+}
+
+/** The row's second line: the full name and the chain, deduplicated.
+ *
+ *  NIM carries name 'Nimiq' on network 'Nimiq', and printing both would spend
+ *  the one line the row has on saying the same word twice. Everything where the
+ *  two differ is exactly the case worth spelling out ('Tether USD · Polygon').
+ *
+ *  Exported because the receive view states the same pairing and the two must
+ *  not drift into wording the other does not use. */
+export function assetSubtitle(asset: ShellAsset): string {
+  const name = asset.name?.trim();
+  const network = asset.network.trim();
+  if (!name) return network;
+  if (name.toLowerCase() === network.toLowerCase()) return name;
+  return `${name} · ${network}`;
 }
 
 const STYLE_ID = 'nimiq-shell-asset-list-style';
@@ -195,7 +231,7 @@ export function mountAssetList(
       const tick = el('span', 'nq-al-tick', id);
       tick.textContent = asset.ticker;
       const name = el('span', 'nq-al-name', id);
-      name.textContent = asset.name ?? '';
+      name.textContent = assetSubtitle(asset);
       const amt = el('span', 'nq-al-amt', row);
       const unitsEl = el('span', 'nq-al-units nq-al-pending', amt);
       unitsEl.textContent = '—';
