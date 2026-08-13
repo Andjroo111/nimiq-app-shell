@@ -74,6 +74,16 @@ export { FLAG_SVG, flagDataUrl } from './flags/data';
 export { FLAG_FIT, type FlagFit } from './flags/fit';
 export { buildFlagHex, type FlagHexOptions } from './ui/flag-hex';
 
+// ---- chart geometry (SVG path maths; no data, no colours, no markup) ----
+export {
+  areaPaths,
+  type AreaPaths,
+  type AreaPathsOptions,
+  donutArcs,
+  type DonutArc,
+  donutPoint,
+} from './ui/chart-geometry';
+
 // ---- vanilla UI ----
 export {
   mountProfileWidget,
