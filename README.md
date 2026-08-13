@@ -288,27 +288,48 @@ is one address, one chain, luna's 5 decimals. Apps holding more than NIM pass
 `assets` instead, and the account row's figure becomes the fiat **total**:
 
 ```ts
+const account = await hub.chooseAddress({ appName, returnUsdcAddress: true });
+
 mountMiniWallet(el, {
   wallet, i18n,
   assets: () => [
-    { ticker: 'NIM',  name: 'Nimiq',  decimals: 5, balance: () => nimBalance() },
-    { ticker: 'USDT', name: 'Tether', decimals: 6, balance: () => usdtBalance(),
-      address: polygonAddress },
-    { ticker: 'BTC',  name: 'Bitcoin', decimals: 8, balance: () => btcBalance(),
-      address: btcAddress },
+    { ticker: 'NIM',  name: 'Nimiq',     decimals: 5, balance: () => nimBalance() },
+    { ticker: 'USDC', name: 'USD Coin',  decimals: 6, balance: () => usdcBalance(),
+      address: account.usdcAddress },
+    { ticker: 'USDT', name: 'Tether USD', decimals: 6, balance: () => usdtBalance(),
+      address: account.usdcAddress },  // same Polygon address, two tokens
   ],
   fiat: { currencies: ['USD', 'EUR'], rate: (fiat, asset) => price(asset, fiat) },
 });
 ```
 
+> ### Bitcoin does not belong in this list
+>
+> Earlier versions of this example showed a `BTC` row. Through the Hub that row
+> cannot be right, and the reason defeats reading as well as sending.
+>
+> `chooseAddress({ returnBtcAddress: true })` returns **a single unused BTC
+> address, a different one on every call**, and change from any spend lands on
+> yet another address. So a balance fetched for it is not the user's BTC
+> balance; it is a fresh address holding approximately nothing. Sending is shut
+> too: `SIGN_BTC_TRANSACTION` is deliberately absent from the Hub's
+> third-party whitelist (`nimiq/hub` `src/lib/RpcApi.ts`).
+>
+> A BTC row is only correct for an app that holds its own BTC key and can
+> therefore offer a stable address it derived itself. See issue #124 for the
+> three identity models and which one an app is in.
+
+USDC and USDT deliberately share one `address`: Polygon is account-model, so
+both tokens live at the same address, and the ticker is what separates them.
+
 Three things the shape is deliberate about:
 
 - **One address and one reader per asset.** The shell cannot derive a Polygon
   address from a NIM one, and has no business knowing what an RPC is. The Hub
-  hands all three addresses back from a single `chooseAddress` with **no**
+  hands the Polygon address back from the same `chooseAddress` with **no**
   balances attached, so reading them is always the host's job.
-- **Rows resolve independently, not as one batched read.** Nimiq consensus, a
-  Polygon RPC and a BTC explorer answer at very different speeds; a single
+- **Rows resolve independently, not as one batched read.** Nimiq consensus and
+  a Polygon RPC answer at very different speeds; a single
   `read(): Promise<Balance[]>` would pin the list to the slowest chain.
 - **Smallest units as bigint, with the asset's own decimals**, formatted through
   `fmtUnits`. A 6- or 8-decimal token through a float is exactly the drift
@@ -321,8 +342,8 @@ view's cap; pass `assets` alone and the cap comes from its `NIM` row.
 The same stack mounts standalone via `mountAssetList` for a wallet or funding
 screen of your own. A standalone list reads its balances **at mount**. The mini
 wallet passes `autoRefresh: false` because it reads on menu-open instead: firing
-a Polygon RPC and a BTC explorer on every page load, for a panel most visitors
-never open, is the cost that lazy read exists to avoid.
+a Polygon RPC on every page load, for a panel most visitors never open, is the
+cost that lazy read exists to avoid.
 
 Before v0.11.0 there was no mount read at all, so a standalone list sat at a
 dash in every row until the host happened to call `refresh()`.
@@ -420,6 +441,37 @@ it at the tagged ref). Bundled apps should keep importing the TS source instead.
   codec.
 - **HTLC / contract-creation signing**, the Hub backend signs basic transfers
   only; apps needing HTLC drop to `@nimiq/hub-api` directly (see Hashmark).
+
+### What the Hub will not let a fleet app do at all
+
+Several things missing here are missing because the Hub refuses them to any
+origin that is not Nimiq's own, not because nobody got to them. Dropping to
+`@nimiq/hub-api` directly does not help. Read from `nimiq/hub@master`
+`src/lib/RpcApi.ts`, where `_3rdPartyRequestWhitelist` is the enforcement:
+
+**Allowed:** `CHECKOUT`, `SIGN_TRANSACTION`, `SIGN_STAKING`, `SIGN_MESSAGE`,
+`CHOOSE_ADDRESS`, `CREATE_CASHLINK`, `MANAGE_CASHLINK`, `CONNECT_ACCOUNT`,
+`SIGN_POLYGON_TRANSACTION`. Everything else answers
+`<origin> is unauthorized to call <requestType>`.
+
+| Wanted | Why it cannot be done |
+| --- | --- |
+| Rename in the wallet | `RenameRequest` needs `accountId`; `chooseAddress` never returns one, and `RENAME` is not whitelisted |
+| Backup / export recovery words | same `accountId` blocker, and `EXPORT` is not whitelisted |
+| Add an address, log out, change password | same, all `SimpleRequest` |
+| List the user's accounts | `LIST` is not whitelisted |
+| Send BTC | `SIGN_BTC_TRANSACTION` is deliberately excluded (see the Bitcoin note above) |
+| `HubApi.onboard` | excluded on purpose: "exposes internal accountIds" |
+
+Two consequences worth stating plainly, because both look like bugs otherwise:
+
+- **The mini wallet's rename is local (localStorage, per address) and always
+  will be.** It is not a placeholder for a Hub rename that someone will wire
+  later. `onRename` exists so a host that has an `accountId` by some other route
+  can sync it further.
+- **The "New to Nimiq? Create a wallet" row must be wired to `connect()`**, not
+  to `HubApi.onboard`. The choose-address flow offers wallet creation to a
+  visitor who has none, which reaches the same funnel by an allowed route.
 
 ---
 
