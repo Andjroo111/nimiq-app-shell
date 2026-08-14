@@ -349,21 +349,28 @@ const SHEET_STYLE_ID = 'nimiq-shell-report-bug-style';
  *  clipPath and no minted ids: the ladybug needed both to cut its spots at the
  *  rim, and neither survives a shape that has no spots.
  *
- *  THE LEGS CROSS 0.2 INTO the shell, so each one reads as continuing under it
- *  rather than stopping at it (Andrew). That number is the whole range: the
- *  stroke is 0.76, so the round cap has a radius of 0.38 and sits flush with
- *  the shell's inner edge at 0, which reads as a butt join. Past about 0.3 the
- *  cap clears that edge and every leg wears a visible blob, which is what 0.35
- *  did on the first attempt. 0.2 crosses without one. Drawn at 0, 0.2, 0.35 and
- *  0.5 at 150px before choosing, because none of it is visible at 24.
+ *  THE LEGS STOP AT THE EDGE and the ANTENNAE RUN DEEP, which is Andrew's
+ *  call and reads as the anatomy: a leg is jointed onto the shell, a feeler
+ *  comes out from under it.
  *
- *  Before any of that they did not reach the shell at all: they
+ *  A leg ends exactly on the ellipse. The stroke is what makes that land: at
+ *  0.76 the round cap has a radius of 0.38, precisely the shell stroke's
+ *  half-width, so the cap sits flush inside the outline and disappears. Push a
+ *  leg in past about 0.3 and the cap clears that inner edge and wears a visible
+ *  blob, which is what an earlier 0.35 did.
+ *
+ *  The antennae go in 1.5, far enough to read as emerging from under the shell
+ *  rather than resting on it. Drawn at 0, 0.9, 1.5 and 2.1 at 150px: past about
+ *  2 they close on the top of the centre seam and the three marks converge into
+ *  one. None of this is visible at 24px, which is why all of it was judged
+ *  zoomed.
+ *
+ *  Before any of that neither reached the shell: the legs
  *  ran outward from (6.5,18.5) while the body's lower arc is a radius-6 circle
  *  about (12,14), so the inner end sat 1.1 units off the shell it was supposed
- *  to grow from. The antennae land on the shell for the same reason; they used
- *  to start inside the head and leave two stubs floating in it. Every one of
- *  those is invisible at 24px and obvious the moment anyone zooms, which is how
- *  Andrew found all three.
+ *  to grow from, and the antennae started INSIDE the head, leaving two stubs
+ *  floating in it. Andrew found both by zooming, which is the only way either
+ *  is visible.
  *
  *  There is no bug in the official Nimiq asset library (searched: bug, beetle,
  *  ladybug, insect, feedback, report), which is why this glyph is hand-drawn.
@@ -379,9 +386,9 @@ export const BUG_ICON =
   'stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">' +
   '<path d="M12 8.2a6 5.8 0 1 1-.01 0Z"/>' +
   '<path d="M12 10.404V19.65"/>' +
-  '<path d="M6.425 12.456 4.118 11.795M6.2 14H3.8M6.977 16.8 4.899 18' +
-  'M17.575 12.456 19.882 11.795M17.8 14h2.4M17.023 16.8 19.101 18"/>' +
-  '<path d="M10.232 8.767 9 6.3M13.768 8.767 15 6.3"/></svg>';
+  '<path d="M6.232 12.401 4.118 11.795M6 14H3.8M6.804 16.9 4.899 18' +
+  'M17.768 12.401 19.882 11.795M18 14h2.2M17.196 16.9 19.101 18"/>' +
+  '<path d="M10.902 10.109 9 6.3M13.098 10.109 15 6.3"/></svg>';
 
 function ensureSheetStyles(doc: Document): void {
   if (doc.getElementById(SHEET_STYLE_ID)) return;
