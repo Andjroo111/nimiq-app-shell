@@ -392,7 +392,7 @@ across five address formats.
 
 ### Languages and currencies (v0.15.0)
 
-The mini wallet offers the **11 `FEATURED_LANGUAGES`** by default, the same 11
+The mini wallet offers the **13 `FEATURED_LANGUAGES`** by default, the same 11
 `mountLanguagePill` offered, because defaulting to the 5 the shell ships UI
 strings for would silently cut every app on the old chrome from eleven languages
 to five. nimiq.tech ships full translations for exactly these 11, so the pick is
@@ -401,7 +401,7 @@ real even where the shell's own strings fall back to English.
 | Set | Count | |
 | --- | --- | --- |
 | Shell UI strings | 5 | en es de fr pt |
-| `FEATURED_LANGUAGES` (the default) | 11 | + hi zh tr ha ko vi |
+| `FEATURED_LANGUAGES` (the default) | 13 | + hi zh tr ha ko vi tl id |
 | Nimiq wallet, for comparison | 9 | has nl ru uk, lacks hi ha ko tr vi |
 
 Pass `languages` to narrow or widen it.
