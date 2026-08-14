@@ -19,6 +19,8 @@ import tr from './tr';
 import ko from './ko';
 import vi from './vi';
 import ha from './ha';
+import tl from './tl';
+import id from './id';
 import type { Locales } from '../i18n';
 
 /** UI strings for every language the mini wallet OFFERS, not just the five it
@@ -34,7 +36,7 @@ import type { Locales } from '../i18n';
  *  but an unreviewed translation beats a language that visibly does nothing.
  *  `shell.networkOnly` is the one to review first: it is the wrong-chain warning,
  *  and it is the only string here where a bad translation costs money. */
-export const shellLocales: Locales = { en, de, es, fr, pt, hi, zh, tr, ko, vi, ha };
+export const shellLocales: Locales = { en, de, es, fr, pt, hi, zh, tr, ko, vi, ha, tl, id };
 
 export { en, de, es, fr, pt };
 
@@ -73,6 +75,14 @@ export const FEATURED_LANGUAGES: ShellLanguage[] = [
   { id: 'ko', name: 'Korean', flag: 'kr' },
   { id: 'pt', name: 'Portuguese', flag: 'br' },
   { id: 'vi', name: 'Vietnamese', flag: 'vn' },
+  // Added 2026-08-14 from Andrew's own crypto-ownership data (nimiq.blog):
+  // the Philippines (16.8m owners) and Indonesia (13.1m) are top-ten crypto
+  // markets that the picker did not speak to. Takes coverage of the top ten
+  // from six languages to eight. Pakistan and Iran are the remaining two and
+  // need Urdu and Persian, which are right-to-left and therefore layout work
+  // rather than translation work.
+  { id: 'tl', name: 'Filipino', flag: 'ph' },
+  { id: 'id', name: 'Indonesian', flag: 'id' },
 ];
 
 /** Deep-merge locale maps: later sources win per-key, per-locale. Locales only
