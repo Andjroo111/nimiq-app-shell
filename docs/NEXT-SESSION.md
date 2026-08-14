@@ -6,8 +6,8 @@ The **mini wallet**: the fleet's one header control. `mountMiniWallet` is the
 canonical export; `mountCornerControl` is kept as an alias because ~25 apps
 import that name.
 
-**Current: v0.20.0**, tagged and on jsDelivr:
-`https://cdn.jsdelivr.net/gh/Andjroo111/nimiq-app-shell@v0.20.0/dist/app-shell.js`
+**Current: v0.20.1**, tagged and on jsDelivr:
+`https://cdn.jsdelivr.net/gh/Andjroo111/nimiq-app-shell@v0.20.1/dist/app-shell.js`
 
 ## Playground, the way to see any of this
 
@@ -32,6 +32,7 @@ page for a while.
 | v0.19.1 (#144) | the playground can deep-link a state, which is what made the menu lintable at all |
 | v0.19.2 (#145) | a saved recipient was a 23px tap target |
 | v0.20.0 (#146) | the send and receive screens are the wallet's own: the 3x3 recipient grid, a recipient identicon, a built-in QR |
+| v0.20.1 (#148) | the report-bug glyph: legs and antennae that reach the shell, and the right size beside the hexagon |
 
 ### What the review rounds on v0.20.0 changed
 
@@ -51,6 +52,18 @@ Andrew drove the running playground and called these, in order:
 - **Switch account is the hexagon itself**, Andrew's drawing: the shipped
   outline path cut at its left and right points into two halves, each ending in
   an arrowhead, each stopping 0.9 short so the break reads at 24px.
+- **The bug glyph took five rounds, all of them found by ZOOMING.** Legs that
+  floated 1.1 units off the shell; then an inset that fixed the float and gave
+  every leg a cap nub; then a crop that was rendering it smaller than the
+  hexagon; then a ladybug that was rejected for a plain bug out of six drawn
+  together; then legs and antennae swapped, because a leg joints ONTO the shell
+  and a feeler comes out from UNDER it. None of it is visible at 24px. If a
+  glyph changes again, draw it at 150 and look, and draw the alternatives beside
+  it rather than one at a time.
+- **There is no bug in the official asset library** (searched bug, beetle,
+  ladybug, insect, feedback, report), so this glyph is hand-drawn and will stay
+  a judgement call. Andrew's read on the six: "none of them are great". The
+  honest fix is a commissioned registry icon, not another redraw here.
 - ⚠ **THE PLAYGROUND WAS RESTYLING THE COMPONENT IT EXISTS TO SHOW.** A bare
   `label { display: flex }` for its own control rows leaked into the mounted
   mini wallet, so a correctly centred label rendered left HERE and would have
