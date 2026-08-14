@@ -490,18 +490,29 @@ button.nq-cc-name:focus-visible { outline:2px solid var(--nq-cc-accent, #0582ca)
 .nq-cc.nq-cc-show-send .nq-cc-view-main { display:none; }
 .nq-cc.nq-cc-show-send .nq-cc-view-send { display:block; }
 .nq-cc-send-body { display:flex; flex-direction:column; gap:8px; padding:10px 8px 8px; }
-.nq-cc-field-label { font-size:12px; font-weight:600; color:var(--nq-cc-menu-muted, rgba(31,35,72,.5)); }
-/* The recipient identicon leads the row, the label follows it, which is the
-   order of an avatar beside a name everywhere else. The slot keeps its width
-   whether or not a face is in it, so the label never jumps sideways at the
-   moment the address becomes valid, and the pair stays centred.
+/* display is DECLARED, not inherited from the host. A page with a global
+   label{display:flex} (the playground had exactly that, for its own control
+   rows) turns this into a flex container, and then text-align does nothing
+   because flex packs its children to the start instead. The component cannot
+   assume anything about a bare element selector on the page it is dropped
+   into. */
+.nq-cc-field-label { display:block; font-size:12px; font-weight:600;
+  color:var(--nq-cc-menu-muted, rgba(31,35,72,.5)); }
+/* The identicon sits LEFT and the label centres on the card, independently.
+   Same three-column grid as the view header above it, and for the same reason:
+   the label lines up with the title and the block grid, all three centred on
+   the menu, while the face keeps the left edge an avatar belongs on. Centring
+   the PAIR instead put the label off-centre by half an identicon, which is the
+   version Andrew rejected.
 
-   CENTRED, because everything it belongs to is: the view title above it and
-   the block grid below it both centre on the card, and a left-aligned pair
-   between them read as a third alignment in a column of two. Amount stays left
-   over its full-width input, which has nothing to centre against. */
-.nq-cc-field-head { display:flex; align-items:center; justify-content:center;
-  gap:9px; min-height:36px; }
+   The third column is the identicon's width again, so the label's centre is
+   the card's centre rather than whatever is left beside the face. The slot
+   holds its width whether or not a face is in it, so nothing shifts at the
+   moment the address becomes valid. Amount stays left over its full-width
+   input, which has nothing to centre against. */
+.nq-cc-field-head { display:grid; grid-template-columns:36px 1fr 36px;
+  align-items:center; min-height:36px; }
+.nq-cc-field-head .nq-cc-field-label { grid-column:2; text-align:center; }
 .nq-cc-recipient-icon { display:block; width:36px; height:36px; flex:none; }
 .nq-cc-recipient-icon > * { display:block; width:100%; height:100%; }
 
