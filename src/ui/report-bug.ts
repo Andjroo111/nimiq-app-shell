@@ -349,11 +349,15 @@ const SHEET_STYLE_ID = 'nimiq-shell-report-bug-style';
  *  clipPath and no minted ids: the ladybug needed both to cut its spots at the
  *  rim, and neither survives a shape that has no spots.
  *
- *  THE LEGS END EXACTLY ON the ellipse, and the number that makes that work is
- *  the stroke: at 0.76 the round cap has a radius of 0.38, precisely the shell
- *  stroke's half-width, so the cap lands flush inside it and disappears.
- *  Insetting them instead pushes the cap past that inner edge and leaves a
- *  visible nub on every leg. Before either fix they did not reach at all: they
+ *  THE LEGS CROSS 0.2 INTO the shell, so each one reads as continuing under it
+ *  rather than stopping at it (Andrew). That number is the whole range: the
+ *  stroke is 0.76, so the round cap has a radius of 0.38 and sits flush with
+ *  the shell's inner edge at 0, which reads as a butt join. Past about 0.3 the
+ *  cap clears that edge and every leg wears a visible blob, which is what 0.35
+ *  did on the first attempt. 0.2 crosses without one. Drawn at 0, 0.2, 0.35 and
+ *  0.5 at 150px before choosing, because none of it is visible at 24.
+ *
+ *  Before any of that they did not reach the shell at all: they
  *  ran outward from (6.5,18.5) while the body's lower arc is a radius-6 circle
  *  about (12,14), so the inner end sat 1.1 units off the shell it was supposed
  *  to grow from. The antennae land on the shell for the same reason; they used
@@ -375,8 +379,8 @@ export const BUG_ICON =
   'stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">' +
   '<path d="M12 8.2a6 5.8 0 1 1-.01 0Z"/>' +
   '<path d="M12 10.404V19.65"/>' +
-  '<path d="M6.232 12.401 4.118 11.795M6 14H3.8M6.804 16.9 4.899 18' +
-  'M17.768 12.401 19.882 11.795M18 14h2.2M17.196 16.9 19.101 18"/>' +
+  '<path d="M6.425 12.456 4.118 11.795M6.2 14H3.8M6.977 16.8 4.899 18' +
+  'M17.575 12.456 19.882 11.795M17.8 14h2.4M17.023 16.8 19.101 18"/>' +
   '<path d="M10.232 8.767 9 6.3M13.768 8.767 15 6.3"/></svg>';
 
 function ensureSheetStyles(doc: Document): void {
