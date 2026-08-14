@@ -27,7 +27,7 @@ import type { Wallet } from '../wallet';
 import { FEATURED_LANGUAGES, type ShellLanguage } from '../locales';
 import { buildFlagHex } from './flag-hex';
 import { fmtNim, fmtFiat, lunaToNim, nimToLuna } from '../format/nim';
-import { bugIcon, openReportBugSheet, type ReportBugOptions } from './report-bug';
+import { BUG_ICON, openReportBugSheet, type ReportBugOptions } from './report-bug';
 import { installReportCapture } from './report-capture';
 import { mountAssetList, type AssetListHandle, type ShellAsset } from './asset-list';
 import { applyTheme, type ShellTheme } from './theme';
@@ -1322,7 +1322,7 @@ export function mountMiniWallet(
     const row = el('button', 'nq-cc-row nq-cc-report', viewMain);
     row.type = 'button';
     const glyph = el('span', 'nq-cc-cashlink-slot', row);
-    glyph.insertAdjacentHTML('beforeend', bugIcon());
+    glyph.insertAdjacentHTML('beforeend', BUG_ICON);
     const label = el('span', 'nq-cc-strong', row);
     tNode(label, 'shell.reportBug');
     row.addEventListener('click', () => {
