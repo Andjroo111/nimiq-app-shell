@@ -3,9 +3,9 @@ import { shellLocales, SHELL_LANGUAGES, FEATURED_LANGUAGES, mergeLocales } from 
 import en from './en';
 
 describe('shell locales', () => {
-  test('ships a locale for all 11 offered languages', () => {
+  test('ships a locale for all 13 offered languages', () => {
     expect(Object.keys(shellLocales).sort())
-      .toEqual(['de', 'en', 'es', 'fr', 'ha', 'hi', 'ko', 'pt', 'tr', 'vi', 'zh']);
+      .toEqual(['de', 'en', 'es', 'fr', 'ha', 'hi', 'id', 'ko', 'pt', 'tl', 'tr', 'vi', 'zh']);
   });
 
   test('every locale mirrors the authoritative en key set', () => {

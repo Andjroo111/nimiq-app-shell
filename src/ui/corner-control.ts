@@ -268,6 +268,7 @@ function setStoredLabel(address: string, label: string): void {
 export const NATIVE_NAMES: Record<string, string> = {
   en: 'English', es: 'Español', de: 'Deutsch', fr: 'Français', pt: 'Português',
   hi: 'हिन्दी', zh: '中文', tr: 'Türkçe', ko: '한국어', vi: 'Tiếng Việt', ha: 'Hausa',
+  tl: 'Filipino', id: 'Bahasa Indonesia',
 };
 
 /** Fiat ticker → bundled flag artwork (the wallet pairs currencies with country

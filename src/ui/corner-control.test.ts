@@ -533,8 +533,8 @@ describe('an asset without its own address cannot open receive', () => {
 describe('language coverage', () => {
   // The v0.2.x mountLanguagePill offered 11. The corner replacing it must not
   // quietly offer 5, or the fleet sweep downgrades every app it touches.
-  test('the corner offers the 11 featured languages by default', () => {
-    expect(FEATURED_LANGUAGES).toHaveLength(11);
+  test('the corner offers the 13 featured languages by default', () => {
+    expect(FEATURED_LANGUAGES).toHaveLength(13);
     const opts: CornerControlOptions = { i18n: {} as never };
     expect(opts.languages).toBeUndefined(); // so the default is what ships
   });
