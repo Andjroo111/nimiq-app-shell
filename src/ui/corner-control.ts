@@ -829,17 +829,24 @@ const SCAN_QR =
 // logo; carried into a row of UI icons it drew at 2px and read a full weight
 // darker than its neighbours, which is what Andrew spotted.
 //
-// The arrowhead barbs straddle the travel axis at 32 degrees, 2.1 long. They
-// are stated as coordinates rather than computed because this is a static
+// EACH HALF STOPS 0.9 SHORT OF ITS POINT. Ending exactly at the tips left the
+// two arrowheads nearly touching, and at 24px on a phone they read as one
+// continuous outline rather than as two arrows going opposite ways (Andrew,
+// 2026-08-14). Pulling both ends back along their own edge opens the break
+// without shortening the shape enough to stop being the hexagon: 1.4 and 2.0
+// were also drawn, and past about 1 the halves start reading as two chevrons.
+//
+// The arrowhead barbs straddle the travel axis at 32 degrees, 2.1 long. Every
+// coordinate here is stated rather than computed, because this is a static
 // asset: an icon that does trigonometry at runtime is a drawing pretending to
 // be code.
 const SWITCH_ICON =
   '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 18 17" aria-hidden="true">' +
   '<g fill="none" stroke="currentColor" stroke-width="0.72" stroke-linecap="round" ' +
   'stroke-linejoin="round">' +
-  '<path d="M17.045 7.563l-3.429-6.09a1.37 1.37 0 00-1.189-.702H5.57c-.489 0-.941.267-1.186.703L.954 7.563"/>' +
-  '<path d="M.954 8.968l3.43 6.088a1.36 1.36 0 001.186.703h6.858a1.36 1.36 0 001.186-.703l3.43-6.088"/>' +
-  '<path d="M2.798 6.557L.954 7.563L.858 5.465M15.2 9.973L17.044 8.968L17.139 11.066"/></g></svg>';
+  '<path d="M16.603 6.779l-2.987-5.306a1.37 1.37 0 00-1.189-.702H5.57c-.489 0-.941.267-1.186.703L1.396 6.779"/>' +
+  '<path d="M1.396 9.752l2.988 5.304a1.36 1.36 0 001.186.703h6.858a1.36 1.36 0 001.186-.703l2.988-5.304"/>' +
+  '<path d="M3.24 5.773L1.396 6.779L1.3 4.681M14.758 10.757L16.602 9.752L16.697 11.85"/></g></svg>';
 
 // wallet-verbatim cashlink glyph (upstream nimiq-style cashlink.svg)
 const CASHLINK_ICON =
