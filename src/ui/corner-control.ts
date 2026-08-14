@@ -560,11 +560,27 @@ button.nq-cc-name:focus-visible { outline:2px solid var(--nq-cc-accent, #0582ca)
    looks like a list of 12. A fade on the bottom edge says "there is more"
    without adding chrome; it is removed once you reach the end, so a fully
    visible grid never wears one. */
-.nq-cc-grid-wrap::after { content:''; position:absolute; left:0; right:0; bottom:0; height:28px;
+.nq-cc-grid-wrap::after { content:''; position:absolute; left:0; right:0; bottom:0; height:34px;
   pointer-events:none; opacity:1; transition:opacity .15s var(--nimiq-ease, cubic-bezier(.25,0,0,1));
   background:linear-gradient(to bottom, rgba(255,255,255,0), var(--nq-cc-menu-bg, #fff));
   border-radius:0 0 6px 6px; }
-.nq-cc-grid-wrap[data-at-end]::after, .nq-cc-grid-wrap[data-no-scroll]::after { opacity:0; }
+/* A chevron sitting IN the fade. The fade alone was not read as an affordance
+   (Andrew, twice), and on iOS there is nothing else to read: WebKit ignores
+   ::-webkit-scrollbar there, so an overlay scrollbar never appears until a
+   finger is already moving. A downward chevron is the one mark people already
+   associate with "more below". It rides the same on/off state as the fade. */
+.nq-cc-grid-more { position:absolute; left:50%; bottom:5px; transform:translateX(-50%);
+  display:flex; align-items:center; justify-content:center; width:22px; height:22px;
+  border-radius:50%; background:var(--nq-cc-menu-bg, #fff); pointer-events:none;
+  box-shadow:0 1px 4px rgba(31,35,72,.18); opacity:1;
+  transition:opacity .15s var(--nimiq-ease, cubic-bezier(.25,0,0,1)); }
+.nq-cc-grid-more svg { width:11px; height:11px; color:var(--nq-cc-menu-fg, #1f2348); opacity:.75; }
+.nq-cc-grid-wrap[data-at-end]::after, .nq-cc-grid-wrap[data-no-scroll]::after,
+.nq-cc-grid-wrap[data-at-end] .nq-cc-grid-more,
+.nq-cc-grid-wrap[data-no-scroll] .nq-cc-grid-more { opacity:0; }
+/* A real track on pointer devices. iOS ignores this entirely, which is why the
+   chevron above is the primary signal rather than the fallback. */
+.nq-cc-grid { scrollbar-width:thin; scrollbar-color:rgba(31,35,72,.28) transparent; }
 .nq-cc-grid { display:grid; gap:4px; padding:4px; padding-right:8px; max-height:196px; overflow-y:auto;
   background:rgba(31,35,72,.04); border-radius:6px; }
 .nq-cc-grid.nq-cc-cols-2 { grid-template-columns:1fr 1fr; }
@@ -681,6 +697,14 @@ function el<K extends keyof HTMLElementTagNameMap>(
  *  whenever the grid's contents change, since the language and currency lists
  *  are built after the wrapper exists. */
 function wireScrollFade(wrap: HTMLElement, grid: HTMLElement): void {
+  const more = document.createElement('div');
+  more.className = 'nq-cc-grid-more';
+  more.setAttribute('aria-hidden', 'true');
+  more.innerHTML =
+    '<svg viewBox="0 0 12 8" fill="none" aria-hidden="true">' +
+    '<path d="M1 1.5 6 6.5l5-5" stroke="currentColor" stroke-width="2" ' +
+    'stroke-linecap="round" stroke-linejoin="round"/></svg>';
+  wrap.appendChild(more);
   const sync = (): void => {
     const overflows = grid.scrollHeight - grid.clientHeight > 2;
     wrap.toggleAttribute('data-no-scroll', !overflows);
