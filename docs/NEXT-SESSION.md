@@ -6,8 +6,8 @@ The **mini wallet**: the fleet's one header control. `mountMiniWallet` is the
 canonical export; `mountCornerControl` is kept as an alias because ~25 apps
 import that name.
 
-**Current: v0.19.0**, tagged and on jsDelivr:
-`https://cdn.jsdelivr.net/gh/Andjroo111/nimiq-app-shell@v0.19.0/dist/app-shell.js`
+**Current: v0.20.0**, tagged and on jsDelivr:
+`https://cdn.jsdelivr.net/gh/Andjroo111/nimiq-app-shell@v0.20.0/dist/app-shell.js`
 
 ## Playground, the way to see any of this
 
@@ -26,7 +26,37 @@ page for a while.
 
 ## Shipped 2026-08-14
 
-**v0.19.0 (#143)** — host branding, written up below.
+| Release | What |
+| --- | --- |
+| v0.19.0 (#143) | host branding: the `--nq-cc-*` layer finished, plus a `theme` option. Written up below. |
+| v0.19.1 (#144) | the playground can deep-link a state, which is what made the menu lintable at all |
+| v0.19.2 (#145) | a saved recipient was a 23px tap target |
+| v0.20.0 (#146) | the send and receive screens are the wallet's own: the 3x3 recipient grid, a recipient identicon, a built-in QR |
+
+### What the review rounds on v0.20.0 changed
+
+Andrew drove the running playground and called these, in order:
+
+- **A title is not a back button.** The sub-views used their own name as the way
+  out ("< Send"). Now a bare chevron left, the name centred, on a three-column
+  grid so the title centres on the CARD. New `shell.back` in all 13 locales.
+- **The two icon rows were different weights, and it was the icons, not the
+  type.** Both labels measured 600/14px in the same colour. Report a bug drew at
+  1.6px while the cashlink and switch glyphs drew at 0.94, because it is stroke
+  1.6 on a 24 viewBox and they are 2.5 on a 64.
+- **The bug glyph was also SMALLER.** getBBox put its artwork at 18x16 inside
+  the 24x24 box it declared, rendering 18x16 beside a hexagon rendering
+  20.5x20. Cropping the viewBox to the artwork's bounds fixed it, and its
+  stroke had to come DOWN to hold the same weight at the bigger crop.
+- **Switch account is the hexagon itself**, Andrew's drawing: the shipped
+  outline path cut at its left and right points into two halves, each ending in
+  an arrowhead, each stopping 0.9 short so the break reads at 24px.
+- ⚠ **THE PLAYGROUND WAS RESTYLING THE COMPONENT IT EXISTS TO SHOW.** A bare
+  `label { display: flex }` for its own control rows leaked into the mounted
+  mini wallet, so a correctly centred label rendered left HERE and would have
+  been right in every real app. Both ends fixed: the playground scopes its rule,
+  and the component declares `display` on its own labels. Assume nothing about
+  bare element selectors on a host page.
 
 ## Shipped 2026-08-13
 
