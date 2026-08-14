@@ -273,8 +273,15 @@ export const NATIVE_NAMES: Record<string, string> = {
 /** Fiat ticker → bundled flag artwork (the wallet pairs currencies with country
  *  flags; we clip them into the brand hexagon). Unknown tickers render text-only. */
 export const FIAT_FLAGS: Record<string, string> = {
-  USD: 'us', EUR: 'eu', GBP: 'gb', MXN: 'mx', BRL: 'br', CNY: 'cn', INR: 'in',
-  JPY: 'jp', CHF: 'ch', CAD: 'ca', AUD: 'au', KRW: 'kr', TRY: 'tr', VND: 'vn',
+  AED: 'ae', ARS: 'ar', AUD: 'au', BRL: 'br', CAD: 'ca', CHF: 'ch', CLP: 'cl',
+  CNY: 'cn', CRC: 'cr', CZK: 'cz', DKK: 'dk', EUR: 'eu', GBP: 'gb', GMD: 'gm',
+  GTQ: 'gt', HKD: 'hk', HUF: 'hu', IDR: 'id', ILS: 'il', INR: 'in', JPY: 'jp',
+  KRW: 'kr', MXN: 'mx', MYR: 'my', NGN: 'ng', NOK: 'no', NZD: 'nz', PHP: 'ph',
+  PKR: 'pk', PLN: 'pl', RUB: 'ru', SEK: 'se', SGD: 'sg', THB: 'th', TRY: 'tr',
+  TWD: 'tw', UAH: 'ua', USD: 'us', VND: 'vn', ZAR: 'za',
+  // XOF, the West African CFA franc, is deliberately absent. It is legal tender
+  // in eight countries, so any single flag would name the wrong one; it renders
+  // text-only, which is the honest answer rather than a guess.
 };
 
 function ensureStyles(): void {

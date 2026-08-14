@@ -142,6 +142,21 @@ describe('corner-control data', () => {
   });
 
   test('every ticker a host may offer has flag artwork', () => {
+    // The Nimiq wallet's full FIAT_CURRENCIES_OFFERED, minus XOF which is
+    // deliberately text-only (eight countries share it, so any one flag names
+    // the wrong country). Andrew's own crypto-ownership data is why this list
+    // matters: PHP, NGN, PKR and IDR are top-ten crypto markets that used to
+    // render as bare text.
+    const walletOffered = ['AED', 'ARS', 'AUD', 'BRL', 'CAD', 'CHF', 'CLP', 'CNY', 'CRC',
+      'CZK', 'DKK', 'EUR', 'GBP', 'GMD', 'GTQ', 'HKD', 'HUF', 'IDR', 'ILS', 'INR', 'JPY',
+      'KRW', 'MXN', 'MYR', 'NGN', 'NOK', 'NZD', 'PHP', 'PKR', 'PLN', 'RUB', 'SEK', 'SGD',
+      'THB', 'TRY', 'TWD', 'UAH', 'USD', 'VND', 'ZAR'];
+    for (const ticker of walletOffered) {
+      expect(FIAT_FLAGS[ticker], `${ticker} needs a flag`).toBeDefined();
+      expect(FLAG_SVG[FIAT_FLAGS[ticker]!], `art for ${ticker}`).toBeDefined();
+    }
+    expect(FIAT_FLAGS.XOF, 'XOF stays text-only on purpose').toBeUndefined();
+
     // nimiq.kids offers all 14 its rate feed returns; each needs a hexagon.
     const offered = ['USD', 'EUR', 'GBP', 'MXN', 'BRL', 'CNY', 'INR',
       'JPY', 'CHF', 'CAD', 'AUD', 'KRW', 'TRY', 'VND'];
