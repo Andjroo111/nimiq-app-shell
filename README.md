@@ -699,6 +699,24 @@ It loads the real `dist/app-shell.js`, so it tests the artifact jsDelivr serves
 rather than a separately-compiled copy that could drift. After editing `src/`,
 run `bun run build:dist` and reload.
 
+### Deep-link a state (v0.19.1)
+
+```
+?state=menu|receive|send   ?brand=swellet|hashmark|cool   ?connected=1   ?corner=light
+```
+
+The menu, the receive view and the send view sit behind `[hidden]` and
+`display:none` until two clicks, and **`nq lint` probes the page as loaded**.
+Every one of its rules is gated on `visible()`, so those three states were
+therefore never linted at all: the same markup reports `1 error FAIL` when shown
+and `0 errors clean pass` inside a `display:none` block. A URL that lands on a
+state makes it reachable to the linter, reproducible as a screenshot, and
+sendable as a bug report.
+
+It drives ONE corner (navy by default). A click inside either menu dismisses
+every other open one, which is what closes a menu you clicked away from, so
+driving both left the first shut the moment the second was clicked.
+
 ## Develop
 
 ```bash

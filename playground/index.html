@@ -388,7 +388,7 @@ function qrEl(text, sizePx) {
 
 /* Shown in the Report a bug context so a filed issue says which build produced
    it. Kept in step with package.json by hand; it is a label, not a dependency. */
-const SHELL_VERSION = '0.19.0';
+const SHELL_VERSION = '0.19.1';
 
 /* ------------------------------------------------------------ mock assets */
 const $ = (id) => document.getElementById(id);
@@ -625,7 +625,76 @@ for (const el of document.querySelectorAll('input, select')) el.addEventListener
 window.addEventListener('error', (e) => log('error', 'window error', e.message));
 window.addEventListener('unhandledrejection', (e) => log('error', 'unhandled rejection', String(e.reason)));
 
+/* ---------------------------------------------------- deep-link a state
+   The menu, the receive view and the send view live behind [hidden] and
+   display:none until two clicks. `nq lint` probes the page as LOADED, and
+   every one of its rules sits behind a visible() gate, so those three states
+   were never linted at all: an identical violation reports 1 error FAIL when
+   shown and 0 errors clean pass inside a display:none block.
+
+   A URL that LANDS on a state is what fixes that, and it pays three ways: the
+   linter can reach it, a screenshot can be reproduced from a link rather than
+   a click script, and a bug can be handed over as a URL.
+
+     ?state=menu|receive|send   ?brand=swellet   ?connected=1   ?corner=light
+
+   Read once at boot, deliberately not written back. A URL that rewrites itself
+   as you click stops being the thing you pasted to someone. */
+function applyDeepLink() {
+  const q = new URLSearchParams(location.search);
+  const brand = q.get('brand');
+  if (brand && BRANDS[brand] !== undefined) {
+    const el = document.querySelector(`input[name="brand"][value="${brand}"]`);
+    if (el) el.checked = true;
+  }
+  const state = q.get('state');
+  // receive and send are BEHIND a connected wallet, so asking for either asks
+  // for the wallet too rather than silently landing on the signed-out menu.
+  const wantsWallet = state === 'receive' || state === 'send';
+  if (q.get('connected') === '1' || wantsWallet) $('opt-connected').checked = true;
+  return { state, corner: q.get('corner') };
+}
+
+/* Two things have to be true before Receive or Send will do anything, and both
+   bite in the same place.
+
+   The wallet resolves its account ASYNCHRONOUSLY, even the mock, and openReceive
+   refuses outright while there is none, so an early click is a silent no-op.
+   And the buttons live INSIDE the menu, which is [hidden] until open(), so
+   waiting on their geometry first deadlocks: nothing in there has a height
+   until the thing you were going to open afterwards is open. Open, then wait on
+   the connected flag, then click. */
+async function openState(state, which) {
+  if (!state || state === 'closed') return;
+  // ONE corner, not both. A click inside either menu closes every other open
+  // one (the document handler is what dismisses a menu you clicked away from),
+  // so driving both left the first corner shut the moment the second was
+  // clicked. Two open menus is not a state the component has anyway.
+  const c = corners[which === 'light' ? 1 : 0];
+  if (!c) return;
+  c.open();
+  const sel = state === 'receive' ? '.nq-cc-receive' : state === 'send' ? '.nq-cc-send' : null;
+  if (!sel) return;
+  const ready = await waitFor(() => c.el.dataset.connected !== undefined);
+  if (!ready) return log('warn', `deep-link ?state=${state} timed out waiting for the wallet`);
+  c.el.querySelector(sel)?.click();
+}
+
+function waitFor(read, timeoutMs = 2000) {
+  return new Promise((resolve) => {
+    const started = performance.now();
+    const tick = () => {
+      const got = read();
+      if (got || performance.now() - started > timeoutMs) return resolve(got || false);
+      requestAnimationFrame(tick);
+    };
+    tick();
+  });
+}
+
+const boot = applyDeepLink();
 remount();
+openState(boot.state, boot.corner);
 log('info', 'playground ready, open the corner in either header');
 </script>
 </body>
