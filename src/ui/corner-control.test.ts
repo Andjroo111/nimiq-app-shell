@@ -5,7 +5,7 @@
 // name is the one failure in this component that costs somebody money.
 import { describe, expect, test } from 'bun:test';
 import { Window } from 'happy-dom';
-import { FIAT_FLAGS, NATIVE_NAMES, addressGrid, mountMiniWallet, type CornerControlOptions, type ShellContact } from './corner-control';
+import { FIAT_FLAGS, NATIVE_NAMES, addressGrid, menuShift, mountMiniWallet, type CornerControlOptions, type ShellContact } from './corner-control';
 import { FLAG_SVG } from '../flags/data';
 import { SHELL_LANGUAGES, FEATURED_LANGUAGES, shellLocales, mergeLocales } from '../locales';
 import { createI18n } from '../i18n';
@@ -625,5 +625,43 @@ describe('address grid', () => {
 
   test('an empty address yields no cells', () => {
     expect(addressGrid('').cells).toEqual([]);
+  });
+});
+
+// The menu hangs off the corner at `right:0`, which lands on-screen only when
+// the mount slot sits at least a card-width from the left edge. nimiq.ninja puts
+// a CTA to the right of the pill, and the card ran off the left edge on every
+// phone width until this clamp existed.
+describe('menuShift', () => {
+  const CARD = 272;
+
+  test('a card already clear of the left edge is left alone', () => {
+    expect(menuShift(120, 120 + CARD, 430)).toBe(0);
+  });
+
+  test("ninja's real 430px overhang comes back to the gutter", () => {
+    // trigger right edge 258 → card left -14
+    expect(menuShift(-14, 258, 430)).toBe(-22);
+  });
+
+  test("ninja's real 360px overhang comes back to the gutter", () => {
+    expect(menuShift(-36, 236, 360)).toBe(-44);
+  });
+
+  test('the shift stops at the right-hand gutter rather than overshooting', () => {
+    // A card as wide as the viewport can only move as far as the right edge
+    // allows, so pulling it off one edge never pushes it off the other.
+    const shift = menuShift(-20, 350, 360);
+    expect(shift).toBe(-2);
+    expect(-20 - shift).toBeLessThanOrEqual(8); // new left, still short of the gutter
+    expect(350 - shift).toBeLessThanOrEqual(352); // new right, inside 360 - 8
+  });
+
+  test('a card with no room on the right does not move', () => {
+    expect(menuShift(-20, 352, 360)).toBe(0);
+  });
+
+  test('an exactly-gutter-aligned card does not twitch', () => {
+    expect(menuShift(8, 8 + CARD, 430)).toBe(0);
   });
 });

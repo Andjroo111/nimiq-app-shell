@@ -117,6 +117,7 @@ export {
   type CornerControlHandle as MiniWalletHandle,
   type ShellContact,
   addressGrid,
+  menuShift,
 } from './ui/corner-control';
 // The corner mounts this itself from `assets`; exported for hosts that want the
 // balance stack on a page of their own (a wallet screen, a funding view).
