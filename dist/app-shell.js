@@ -829,10 +829,17 @@ button.nq-cc-name:focus-visible { outline:2px solid var(--nq-cc-accent, #0582ca)
 
 /* Saved recipients: a wrapping row of quiet pills under the address field.
    Pills because every actionable thing in this menu is a pill, and quiet
-   because they are a shortcut, not the primary way to fill the field. */
+   because they are a shortcut, not the primary way to fill the field.
+
+   QUIET IS NOT SMALL. These shipped 47x23, and a 23px-tall control that fills
+   in who gets paid is the one mis-tap in this menu that costs money. The pill
+   now clears 36px on its shortest side, which is the floor nq lint enforces and
+   the size the Connect button already was. The text stays 11.5px and the fill
+   stays a wash: what grew is the target, not the voice. */
 .nq-cc-contacts { display:flex; flex-wrap:wrap; gap:5px; margin:6px 0 2px; }
 .nq-cc-contacts[hidden] { display:none; }
-.nq-cc-contact { max-width:100%; padding:4px 10px; border:none; border-radius:999px;
+.nq-cc-contact { max-width:100%; min-height:36px; display:inline-flex; align-items:center;
+  padding:4px 12px; border:none; border-radius:999px;
   background:color-mix(in srgb, var(--nq-cc-menu-fg, #1f2348) 6%, transparent);
   color:var(--nq-cc-menu-fg, #1f2348);
   font-family:inherit; font-size:11.5px; font-weight:700; line-height:1.3; cursor:pointer;
