@@ -491,12 +491,12 @@ button.nq-cc-name:focus-visible { outline:2px solid var(--nq-cc-accent, #0582ca)
 .nq-cc.nq-cc-show-send .nq-cc-view-send { display:block; }
 .nq-cc-send-body { display:flex; flex-direction:column; gap:8px; padding:10px 8px 8px; }
 .nq-cc-field-label { font-size:12px; font-weight:600; color:var(--nq-cc-menu-muted, rgba(31,35,72,.5)); }
-/* label row + the recipient identicon, which appears only once the address is
-   real. The row keeps its height either way so the field below does not jump. */
-.nq-cc-field-head { display:flex; align-items:center; justify-content:space-between;
-  gap:8px; min-height:26px; }
-.nq-cc-recipient-icon { display:block; width:26px; height:26px; flex:none; }
-.nq-cc-recipient-icon[hidden] { display:none; }
+/* The recipient identicon leads the row, the label follows it, which is the
+   order of an avatar beside a name everywhere else. The slot keeps its width
+   whether or not a face is in it, so the label never jumps sideways at the
+   moment the address becomes valid. */
+.nq-cc-field-head { display:flex; align-items:center; gap:9px; min-height:36px; }
+.nq-cc-recipient-icon { display:block; width:36px; height:36px; flex:none; }
 .nq-cc-recipient-icon > * { display:block; width:100%; height:100%; }
 
 /* Recipient: nine four-char blocks in a 3x3 grid, the wallet's send-modal field
@@ -580,12 +580,21 @@ button.nq-cc-name:focus-visible { outline:2px solid var(--nq-cc-accent, #0582ca)
   padding:16px 0 10px; color:var(--nq-cc-success, #13b59d); font-size:14px; font-weight:700; }
 .nq-cc-view-send.nq-cc-sent .nq-cc-send-body { display:none; }
 .nq-cc-view-send.nq-cc-sent .nq-cc-send-done { display:flex; }
-.nq-cc-back { display:flex; align-items:center; gap:6px; width:100%; padding:7px 10px; border:none;
-  border-radius:6px; background:none; font-family:inherit; font-size:15px;
-  color:var(--nq-cc-menu-muted, rgba(31,35,72,.6)); text-align:left; cursor:pointer;
+/* Sub-view header: back chevron left, the view's name CENTRED in the card.
+   Three columns and not a flex row, so the title is centred on the menu rather
+   than on whatever is left over beside the button. The third column is the
+   chevron's width again, holding the symmetry. */
+.nq-cc-view-head { display:grid; grid-template-columns:34px 1fr 34px; align-items:center;
+  padding:2px 2px 0; }
+.nq-cc-view-title { grid-column:2; text-align:center; font-size:15px; font-weight:600;
+  color:var(--nq-cc-menu-fg, #1f2348); }
+.nq-cc-back { grid-column:1; display:inline-flex; align-items:center; justify-content:center;
+  width:34px; height:34px; padding:0; border:none; border-radius:50%; background:none;
+  font-family:inherit; color:var(--nq-cc-menu-muted, rgba(31,35,72,.6)); cursor:pointer;
   transition:background .15s var(--nimiq-ease, cubic-bezier(.25,0,0,1)); }
 .nq-cc-back:hover { background:var(--nq-cc-menu-hover, rgba(31,35,72,.06)); }
 .nq-cc-back:focus-visible { outline:2px solid var(--nq-cc-accent, #0582ca); outline-offset:-2px; }
+.nq-cc-chevron { display:block; width:8px; height:13px; }
 .nq-cc-receive-body { display:flex; flex-direction:column; align-items:center; padding:10px 8px 8px; }
 .nq-cc-qr { display:block; padding:10px; border-radius:8px;
   background:var(--nq-cc-qr-plate, #fff); }
@@ -768,6 +777,13 @@ button.nq-cc-name:focus-visible { outline:2px solid var(--nq-cc-accent, #0582ca)
   document.head.appendChild(style);
 }
 
+/** Back chevron. Same stroke weight and linecaps as the caret it sits beside,
+ *  so the two read as one family rather than two icon sets. */
+const CHEVRON_LEFT =
+  '<svg class="nq-cc-chevron" viewBox="0 0 6 10" aria-hidden="true">' +
+  '<path d="M5 1L1 5l4 4" fill="none" stroke="currentColor" stroke-width="1.15" ' +
+  'stroke-linecap="round" stroke-linejoin="round"/></svg>';
+
 const CARET =
   '<svg class="nq-cc-caret" viewBox="0 0 10 6" aria-hidden="true">' +
   '<path d="M1 1l4 4 4-4" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>';
@@ -793,14 +809,37 @@ const ARROW =
 const SCAN_QR =
   '<svg class="nq-cc-scan-glyph" viewBox="0 0 40 40" xmlns="http://www.w3.org/2000/svg" aria-hidden="true"><g fill="currentColor"><path d="M1.21 7.06c.67 0 1.21-.54 1.21-1.21l-.04-3.12a.3.3 0 0 1 .3-.3H5.7a1.21 1.21 0 1 0 0-2.43H2.37A2.4 2.4 0 0 0 0 2.42v3.43c0 .67.54 1.21 1.21 1.21zM5.69 37.58H2.73a.3.3 0 0 1-.3-.3v-3.13a1.21 1.21 0 1 0-2.43 0v3.43A2.4 2.4 0 0 0 2.37 40H5.7a1.21 1.21 0 0 0 0-2.42zM38.79 32.94c-.67 0-1.21.54-1.21 1.21l.04 3.12a.3.3 0 0 1-.3.3H34.3a1.21 1.21 0 1 0 0 2.43h3.32A2.4 2.4 0 0 0 40 37.58v-3.43c0-.67-.54-1.21-1.21-1.21zM37.63 0H34.3a1.21 1.21 0 1 0 0 2.42h2.96c.17 0 .3.14.3.3v3.13a1.21 1.21 0 0 0 2.43 0V2.42A2.4 2.4 0 0 0 37.63 0z"/><path fill-rule="evenodd" clip-rule="evenodd" d="M13.94 15.15H6.67c-.67 0-1.22-.54-1.22-1.21V6.67c0-.67.55-1.21 1.22-1.21h7.27c.67 0 1.21.54 1.21 1.2v7.28c0 .67-.54 1.21-1.21 1.21zM8.18 7.88a.3.3 0 0 0-.3.3v4.24c0 .17.13.3.3.3h4.24a.3.3 0 0 0 .3-.3V8.18a.3.3 0 0 0-.3-.3H8.18zM6.67 24.85h7.27c.67 0 1.21.54 1.21 1.21v7.27c0 .67-.54 1.22-1.21 1.22H6.67c-.67 0-1.22-.55-1.22-1.22v-7.27c0-.67.55-1.21 1.22-1.21zm5.75 7.27a.3.3 0 0 0 .3-.3v-4.24a.3.3 0 0 0-.3-.3H8.18a.3.3 0 0 0-.3.3v4.24c0 .17.13.3.3.3h4.24zM26.06 5.45h7.27c.67 0 1.21.55 1.21 1.22v7.27c0 .67-.54 1.21-1.2 1.21h-7.28c-.67 0-1.21-.54-1.21-1.21V6.67c0-.67.54-1.22 1.21-1.22zm5.76 7.28a.3.3 0 0 0 .3-.3V8.17a.3.3 0 0 0-.3-.3h-4.24a.3.3 0 0 0-.3.3v4.24c0 .17.13.3.3.3h4.24z"/><path d="M17.58 10.6h1.2a.9.9 0 1 0 0-1.81.3.3 0 0 1-.3-.3V6.66a.9.9 0 1 0-1.81 0V9.7c0 .5.4.9.9.9zM21.21 7.58c.17 0 .3.13.3.3v6.66a.9.9 0 1 0 1.82 0V6.67c0-.5-.4-.91-.9-.91H21.2a.9.9 0 1 0 0 1.82zM12.42 18.18c0 .5.41.91.91.91h4.25c.5 0 .9-.4.9-.9v-4.86a.9.9 0 1 0-1.81 0v3.64a.3.3 0 0 1-.3.3h-3.04c-.5 0-.9.4-.9.91z"/><path d="M9.09 17.27c-.5 0-.9.4-.9.91v3.03a.3.3 0 0 1-.31.3H6.67a.9.9 0 1 0 0 1.82h15.75c.5 0 .91-.4.91-.9v-3.64a.9.9 0 0 0-1.82 0v2.42a.3.3 0 0 1-.3.3h-10.9a.3.3 0 0 1-.31-.3v-3.03c0-.5-.4-.9-.91-.9zM22.12 26.06c0-.5-.4-.9-.9-.9h-3.64c-.5 0-.91.4-.91.9v4.85a.9.9 0 1 0 1.81 0v-3.64c0-.16.14-.3.3-.3h2.43c.5 0 .91-.4.91-.9zM33.33 32.42h-10.3a.3.3 0 0 1-.3-.3V29.7a.9.9 0 1 0-1.82 0v3.63c0 .5.4.91.9.91h11.52a.9.9 0 0 0 0-1.82z"/><path fill-rule="evenodd" clip-rule="evenodd" d="M29.1 30h-3.65a.9.9 0 0 1-.9-.91v-3.64c0-.5.4-.9.9-.9h3.64c.5 0 .91.4.91.9v3.64c0 .5-.4.91-.9.91zm-2.43-3.64a.3.3 0 0 0-.3.3v1.22c0 .17.13.3.3.3h1.2a.3.3 0 0 0 .31-.3v-1.21a.3.3 0 0 0-.3-.3h-1.21z"/><path d="M32.73 20.9c-.5 0-.91.42-.91.92v7.88a.9.9 0 0 0 1.82 0v-7.88c0-.5-.41-.91-.91-.91zM33.64 17.58c0-.5-.41-.91-.91-.91h-6.67c-.5 0-.9.4-.9.9v3.64a.9.9 0 0 0 1.8 0V18.8c0-.17.15-.3.31-.3h5.46c.5 0 .9-.41.9-.91z"/></g></svg>';
 
-// Switch-account glyph: two arrows swapping. Same 64 viewBox, stroke width and
-// linecaps as CASHLINK_ICON so it lands at the same optical weight in the shared
-// glyph slot rather than looking heavier or lighter than its neighbours.
+// Switch-account glyph: the Nimiq hexagon IS the two arrows.
+//
+// Andrew drew this one, 2026-08-14, after the first pass put arrows inside a
+// hexagon frame: the outline itself is cut at the left and right points into
+// two halves, and each half ends in an arrowhead pointing the way it was
+// travelling. Rotational, the way a refresh mark is, but in the brand's shape.
+//
+// Both halves are slices of the shipped `logos-nimiq-hexagon-outline-mono`
+// path, VERBATIM (rule 2: never reconstruct an SVG path). The four rounded
+// corners come along with them, which is what makes it read as the hexagon
+// rather than as a generic six-sided ring; the only pieces removed are the two
+// pointed tips, and those are exactly where the gaps go.
+//
+// currentColor, never gold. Gold belongs to the logo, and this is a UI icon.
+//
+// Stroke 0.72 on the 18 viewBox is 0.95px at 24, matching the cashlink and bug
+// glyphs beside it. The asset ships at 1.5, which is its weight as a standalone
+// logo; carried into a row of UI icons it drew at 2px and read a full weight
+// darker than its neighbours, which is what Andrew spotted.
+//
+// The arrowhead barbs straddle the travel axis at 32 degrees, 2.1 long. They
+// are stated as coordinates rather than computed because this is a static
+// asset: an icon that does trigonometry at runtime is a drawing pretending to
+// be code.
 const SWITCH_ICON =
-  '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" aria-hidden="true">' +
-  '<g fill="none" stroke="currentColor" stroke-linecap="round" stroke-width="2.5px" ' +
-  'stroke-linejoin="round"><path d="M14 24.5h36"/><path d="M40.5 15l9.5 9.5-9.5 9.5"/>' +
-  '<path d="M50 39.5H14"/><path d="M23.5 30L14 39.5l9.5 9.5"/></g></svg>';
+  '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 18 17" aria-hidden="true">' +
+  '<g fill="none" stroke="currentColor" stroke-width="0.72" stroke-linecap="round" ' +
+  'stroke-linejoin="round">' +
+  '<path d="M17.045 7.563l-3.429-6.09a1.37 1.37 0 00-1.189-.702H5.57c-.489 0-.941.267-1.186.703L.954 7.563"/>' +
+  '<path d="M.954 8.968l3.43 6.088a1.36 1.36 0 001.186.703h6.858a1.36 1.36 0 001.186-.703l3.43-6.088"/>' +
+  '<path d="M2.798 6.557L.954 7.563L.858 5.465M15.2 9.973L17.044 8.968L17.139 11.066"/></g></svg>';
 
 // wallet-verbatim cashlink glyph (upstream nimiq-style cashlink.svg)
 const CASHLINK_ICON =
@@ -1323,13 +1362,37 @@ export function mountMiniWallet(
   const badge = el('span', 'nq-cc-badge', netGroup);
   badge.textContent = 'Testnet';
 
+  /** A sub-view header: a back CHEVRON on the left, the view's name centred.
+   *
+   *  The name used to BE the back button ("< Send"), which asked the one
+   *  control on the screen to mean two things at once, and the one it looked
+   *  like was "send". A title is not an action. The chevron is the action, the
+   *  centred name says where you are, and the two stop competing.
+   *
+   *  Three columns rather than a flex row: the title is centred in the CARD, so
+   *  it does not shift by the width of the chevron beside it. */
+  function viewHeader(parent: HTMLElement, titleKey: string, onBack: () => void): HTMLElement {
+    const head = el('div', 'nq-cc-view-head', parent);
+    const btn = el('button', 'nq-cc-back', head);
+    btn.type = 'button';
+    btn.setAttribute('aria-label', i18n.t('shell.back'));
+    btn.insertAdjacentHTML('beforeend', CHEVRON_LEFT);
+    const title = el('span', 'nq-cc-view-title', head);
+    tNode(title, titleKey);
+    btn.addEventListener('click', onBack);
+    // The i18n subscription retranslates tNode content, but an aria-label is an
+    // attribute and is not one of those nodes.
+    backLabels.push(btn);
+    return title;
+  }
+  const backLabels: HTMLElement[] = [];
+
   // ---- receive view content -------------------------------------------------
-  const backBtn = el('button', 'nq-cc-back', viewReceive);
-  backBtn.type = 'button';
-  backBtn.appendChild(document.createTextNode('‹ '));
-  const backLabel = el('span', 'nq-cc-strong', backBtn);
-  tNode(backLabel, 'shell.receive');
-  backBtn.addEventListener('click', () => root.classList.remove('nq-cc-show-receive'));
+  // The title carries the asset when one is being received, so repaintReceive
+  // holds it: "Receive USDC" rather than a bare "Receive" over a Polygon address.
+  const receiveTitle = viewHeader(
+    viewReceive, 'shell.receive', () => root.classList.remove('nq-cc-show-receive'),
+  );
   el('div', 'nq-cc-divider', viewReceive);
   const receiveBody = el('div', 'nq-cc-receive-body', viewReceive);
   const qrSlot = el('div', 'nq-cc-qr', receiveBody);
@@ -1366,12 +1429,7 @@ export function mountMiniWallet(
   addressBtn.addEventListener('blur', () => copyWrap.classList.remove('nq-cc-copied-hold'));
 
   // ---- send view content ----------------------------------------------------
-  const sendBackBtn = el('button', 'nq-cc-back', viewSend);
-  sendBackBtn.type = 'button';
-  sendBackBtn.appendChild(document.createTextNode('‹ '));
-  const sendBackLabel = el('span', 'nq-cc-strong', sendBackBtn);
-  tNode(sendBackLabel, 'shell.send');
-  sendBackBtn.addEventListener('click', () => closeSend());
+  viewHeader(viewSend, 'shell.send', () => closeSend());
   el('div', 'nq-cc-divider', viewSend);
   const sendBody = el('div', 'nq-cc-send-body', viewSend);
   // The label row carries the recipient identicon, because the identicon is the
@@ -1381,10 +1439,9 @@ export function mountMiniWallet(
    // address is a real one and goes again if you edit it back into nonsense, so
    // its presence IS the validity signal.
   const recipientHead = el('div', 'nq-cc-field-head', sendBody);
+  const recipientIcon = el('span', 'nq-cc-recipient-icon', recipientHead);
   const recipientLabel = el('label', 'nq-cc-field-label', recipientHead);
   tNode(recipientLabel, 'shell.recipient');
-  const recipientIcon = el('span', 'nq-cc-recipient-icon', recipientHead);
-  recipientIcon.hidden = true;
 
   // Nine four-char blocks in a 3x3 grid, the wallet's own send-modal field.
   const recipientWrap = el('div', 'nq-cc-addr-field', sendBody);
@@ -1510,8 +1567,10 @@ export function mountMiniWallet(
     if (!options.identicon || recipientIconFor === (address ?? '')) return;
     recipientIconFor = address ?? '';
     recipientIcon.textContent = '';
-    recipientIcon.hidden = !address;
-    if (address) recipientIcon.appendChild(options.identicon(address, 26));
+    // visibility, not hidden: the slot holds its width either way, so the label
+    // beside it does not jump sideways the moment the address becomes valid.
+    recipientIcon.style.visibility = address ? '' : 'hidden';
+    if (address) recipientIcon.appendChild(options.identicon(address, 36));
   }
   const compactRecipient = (): string => significantChars(recipientInput.value);
   const amountNim = (): number => {
@@ -1592,7 +1651,7 @@ export function mountMiniWallet(
    *  address. Held so a language switch can restate the label and warning. */
   let receiveAsset: ShellAsset | null = null;
   repaintReceive = (): void => {
-    backLabel.textContent = receiveAsset
+    receiveTitle.textContent = receiveAsset
       ? `${i18n.t('shell.receive')} ${receiveAsset.ticker}`
       : i18n.t('shell.receive');
     netWarn.hidden = !receiveAsset;
@@ -1813,6 +1872,7 @@ export function mountMiniWallet(
     : () => { /* language-only: no wallet to subscribe to */ };
   const unsubLang = i18n.onChange(() => {
     applyLang();
+    for (const btn of backLabels) btn.setAttribute('aria-label', i18n.t('shell.back'));
     renderLangValue();
     renderFaceFlag();
     renderFace();

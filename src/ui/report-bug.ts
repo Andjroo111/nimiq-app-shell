@@ -336,8 +336,12 @@ const SHEET_STYLE_ID = 'nimiq-shell-report-bug-style';
 
 /** The bug glyph, in the corner's stroke-icon language (the same weight as the
  *  wallet/scan glyphs), sized by .nq-cc-cashlink-slot's 24px box. */
+/** Stroke 0.95 and not 1.6: this glyph sits in the corner menu's shared slot
+ *  next to the cashlink and switch-account marks, which are 2.5 on a 64 viewBox
+ *  = 0.94px at 24px. At 1.6 on a 24 viewBox this drew 1.6px, so Report a bug
+ *  read a full weight heavier and visibly darker than the row above it. */
 export const BUG_ICON =
-  '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" ' +
+  '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="0.95" ' +
   'stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">' +
   '<path d="M12 20a6 6 0 0 0 6-6v-3a6 6 0 0 0-12 0v3a6 6 0 0 0 6 6Z"/>' +
   '<path d="M10 6.5 8.5 4M14 6.5 15.5 4"/><path d="M12 8v12"/>' +

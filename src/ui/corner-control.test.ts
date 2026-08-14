@@ -268,7 +268,10 @@ describe('receive view names the chain it is showing', () => {
     const warn = host.querySelector('.nq-cc-net-warn')?.textContent ?? '';
     expect(warn).toContain('Polygon');
     expect(warn).toContain('USDT');
-    expect(host.querySelector('.nq-cc-back')?.textContent).toContain('USDT');
+    // The ticker rides the view TITLE now, not the back button: the back
+    // control is a bare chevron, because a label that is also the way out asks
+    // one control to mean two things.
+    expect(host.querySelector('.nq-cc-view-title')?.textContent).toContain('USDT');
   });
 });
 

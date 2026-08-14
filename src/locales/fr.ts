@@ -13,6 +13,7 @@ export default {
   'shell.balance': 'Solde',
   'shell.language': 'Langue',
   'shell.notConnected': 'Non connecté',
+  'shell.back': 'Retour',
   'shell.send': 'Envoyer',
   'shell.cancel': 'Annuler',
   'shell.retry': 'Réessayer',

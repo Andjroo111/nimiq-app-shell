@@ -15,6 +15,7 @@ export default {
   "shell.balance": "잔액",
   "shell.language": "언어",
   "shell.notConnected": "연결되지 않음",
+  "shell.back": "뒤로",
   "shell.send": "보내기",
   "shell.cancel": "취소",
   "shell.retry": "다시 시도",
