@@ -555,6 +555,16 @@ button.nq-cc-name:focus-visible { outline:2px solid var(--nq-cc-accent, #0582ca)
    TRAP: standard scrollbar-width/scrollbar-color make Chrome 121+ ignore
    ::-webkit-scrollbar, they live in the Firefox-only @supports block. */
 .nq-cc-grid-wrap { position:relative; margin-top:6px; }
+/* Scroll affordance. The grid has a styled scrollbar, but macOS and iOS hide
+   overlay scrollbars until you actually scroll, so a list of 40 currencies
+   looks like a list of 12. A fade on the bottom edge says "there is more"
+   without adding chrome; it is removed once you reach the end, so a fully
+   visible grid never wears one. */
+.nq-cc-grid-wrap::after { content:''; position:absolute; left:0; right:0; bottom:0; height:28px;
+  pointer-events:none; opacity:1; transition:opacity .15s var(--nimiq-ease, cubic-bezier(.25,0,0,1));
+  background:linear-gradient(to bottom, rgba(255,255,255,0), var(--nq-cc-menu-bg, #fff));
+  border-radius:0 0 6px 6px; }
+.nq-cc-grid-wrap[data-at-end]::after, .nq-cc-grid-wrap[data-no-scroll]::after { opacity:0; }
 .nq-cc-grid { display:grid; gap:4px; padding:4px; padding-right:8px; max-height:196px; overflow-y:auto;
   background:rgba(31,35,72,.04); border-radius:6px; }
 .nq-cc-grid.nq-cc-cols-2 { grid-template-columns:1fr 1fr; }
@@ -663,6 +673,25 @@ function el<K extends keyof HTMLElementTagNameMap>(
   if (className) node.className = className;
   if (parent) parent.appendChild(node);
   return node;
+}
+
+
+/** Keep a grid's bottom fade honest: on while there is more to scroll to, off at
+ *  the end, and off entirely when nothing overflows. Re-measured on scroll and
+ *  whenever the grid's contents change, since the language and currency lists
+ *  are built after the wrapper exists. */
+function wireScrollFade(wrap: HTMLElement, grid: HTMLElement): void {
+  const sync = (): void => {
+    const overflows = grid.scrollHeight - grid.clientHeight > 2;
+    wrap.toggleAttribute('data-no-scroll', !overflows);
+    wrap.toggleAttribute(
+      'data-at-end',
+      overflows && grid.scrollTop + grid.clientHeight >= grid.scrollHeight - 2,
+    );
+  };
+  grid.addEventListener('scroll', sync, { passive: true });
+  if (typeof ResizeObserver !== 'undefined') new ResizeObserver(sync).observe(grid);
+  sync();
 }
 
 /** Mount the mini wallet into `container`. Owns its state + listeners.
@@ -933,6 +962,7 @@ export function mountMiniWallet(
   const langBody = el('div', 'nq-cc-acc-body', langSection);
   const langGridWrap = el('div', 'nq-cc-grid-wrap', langBody);
   const langGrid = el('div', 'nq-cc-grid nq-cc-cols-2', langGridWrap);
+  wireScrollFade(langGridWrap, langGrid);
   langGrid.setAttribute('role', 'listbox');
   langGrid.setAttribute('aria-label', i18n.t('shell.language'));
 
@@ -986,6 +1016,7 @@ export function mountMiniWallet(
     const body = el('div', 'nq-cc-acc-body', section);
     const wrap = el('div', 'nq-cc-grid-wrap', body);
     const grid = el('div', 'nq-cc-grid nq-cc-cols-3', wrap);
+    wireScrollFade(wrap, grid);
     grid.setAttribute('role', 'listbox');
     grid.setAttribute('aria-label', i18n.t('shell.amountsIn'));
     for (const ticker of options.fiat!.currencies) {

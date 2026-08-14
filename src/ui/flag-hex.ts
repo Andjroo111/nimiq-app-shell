@@ -13,7 +13,7 @@
 // <image> whose data-URI artwork decodes after first paint, so the flag rendered as
 // a rounded rectangle in every fleet app's language switcher.
 
-import { flagDataUrl } from "../flags/data";
+import { FLAG_ASPECT, flagDataUrl } from "../flags/data";
 import { FLAG_FIT, type FlagFit } from "../flags/fit";
 
 // Verbatim Nimiq rounded-hexagon path, 20x18 viewBox.
@@ -23,8 +23,11 @@ const HEX =
 let uid = 0;
 
 /** Size the image box to COVER the hexagon (+overscan), honoring aspect + pan/zoom. */
-function flagBox(fit?: FlagFit): { x: number; y: number; w: number; h: number } {
-  const a = fit?.aspect ?? 1;
+function flagBox(fit?: FlagFit, code?: string): { x: number; y: number; w: number; h: number } {
+  // The art's own shape wins unless a fit overrides it. Assuming 1:1 for a 4:3
+  // flag letterboxes it inside the hexagon (white bands top and bottom), which
+  // is what happened when a second art source joined the set.
+  const a = fit?.aspect ?? (code ? FLAG_ASPECT[code.toLowerCase()] ?? 1 : 1);
   const s = fit?.scale ?? 1;
   const dx = fit?.dx ?? 0;
   const dy = fit?.dy ?? 0;
@@ -48,7 +51,7 @@ export interface FlagHexOptions {
 export function flagHexMarkup(code: string, options: FlagHexOptions = {}): string {
   const size = options.size ?? 24;
   const fit = options.fit ?? FLAG_FIT[code.toLowerCase()];
-  const { x, y, w, h } = flagBox(fit);
+  const { x, y, w, h } = flagBox(fit, code);
   // Aim for a ~1.1px edge at any size (thin at large sizes, still visible on a
   // small pill), never below 0.4 viewBox units.
   const stroke = Math.max(0.4, 22 / size);
