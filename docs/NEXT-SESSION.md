@@ -48,27 +48,37 @@ Registry: `nimiq-branding-cli` #30 (rename/onboard notes) and #31 (the
 
 ## The fleet sweep, issue #112
 
-**9 of 20 apps converted**, the six CDN and the three bundled. PRs are open and
-none are merged.
+**10 of 19 apps converted**: the six CDN, the three bundled, and party. PRs are
+open and none are merged.
+
+⚠ **splitlink is not a nineteenth app.** `Andjroo111/splitlink` was RENAMED to
+`Andjroo111/nimiq.party`; the GitHub API redirects, and `~/gdkc/projects/splitlink`
+is a stale local clone of that same repo whose `origin` still points at
+nimiq.party. Its five chrome files were byte-identical to party's, which is what
+gave it away. Converting it and pushing would have force-fought party's own
+branch. 20 becomes 19, and party #176 already covers it.
 
 | Model | Apps | Work per app |
 | --- | --- | --- |
 | CDN | cards ✅, gives ✅, ninja ✅, software ✅, stream ✅, swellet ✅ | one URL + one mount call |
 | Bundled | casino ✅, life ✅, work ✅ | dep bump + mount swap |
-| Vendored | cool, gift, money, name, party, talk, tax, tips, splitlink | bump **and rebuild `public/vendor/app-shell.js`**, or it is a no-op live |
+| Vendored | party ✅, cool, gift, money, name, talk, tax, tips | bump **and rebuild `public/vendor/app-shell.js`**, or it is a no-op live |
 | Own shape | sale, vote | needs a look each |
 
 Open PRs: `nimiq.gives` #58, `nimiq.ninja` #108, `nimiq.software` #65,
 `nimiq.stream` #48, `swellet` #99, `nimiq.casino` #31, `nimiq.life` #39,
-`nimiq.work` #129. CI is green on all seven repos that run it; swellet has a
-deploy-only workflow, so it was verified by its own `bun test` (1245 pass) and
-in a browser.
+`nimiq.work` #129, `nimiq.party` #176.
+
+CI is green on all seven CDN and bundled repos that run it. swellet has a
+deploy-only workflow, so it was verified by its own `bun test` (1245 pass) and in
+a browser. **party #176 is red on one CI line**, and only that line: see the
+vendored section below.
 
 **nimmesh is out of the sweep** (Andrew, 2026-08-14): it is a wallet, and a
 wallet does not wear the mini wallet. Same reason `nimiq.ninja/app` was always
-excluded while its landing converted. That takes the sweep from 21 to 20.
+excluded while its landing converted.
 
-13 of the 20 mount a language pill only, no wallet; those become the
+12 of the 19 mount a language pill only, no wallet; those become the
 language-only mini wallet. 7 have a wallet too, and swellet is the worked
 example: two controls collapse to one, and the three old theme var blocks
 (`--nq-langpill-*`, `--nq-walletpill-*`, `--nq-profile-*`) collapse to one
@@ -114,6 +124,36 @@ has not drifted.
   (`lifeLocales`) and its picker offered 11, now 13. Preserve whatever the app
   chose rather than narrowing it: ninja filters to 4 on purpose, swellet to 5,
   life defaults. Narrowing uninvited is a product change.
+
+### The vendored batch: party is the worked example
+
+`git remote -v` FIRST in every vendored repo. That is how splitlink turned out to
+be nimiq.party renamed, and a push would have fought party's own branch.
+
+- **The vendored apps are on an older chrome than the CDN ones were.** They mount
+  `mountLanguageSwitcher` + `mountProfileWidget`, not `mountLanguagePill` +
+  `mountWalletPill`. Both old names still export from v0.18.1, so a bump alone
+  compiles and changes nothing, which is the trap.
+- **Most of the work is deleting the app's own code.** party hand-rolled a
+  Connect button, its connecting/retry text, and a profile re-mount on every
+  account change, because the old chrome was two components and neither owned the
+  signed-out state. The mini wallet owns that swap. Keep only what the shell
+  cannot know: party mirrors the connected account into `state` as the app's
+  identity.
+- ⚠ **Do not "tidy" that mirror into clearing on disconnect.** `boot()` falls back
+  to a demo account and `split-entry.js` dereferences `state.account.address`, so
+  clearing throws instead of degrading. I wrote that bug and caught it reading the
+  call sites.
+- **A wider pill can wrap.** party's `.app-header` wraps, and the mini wallet is
+  wider than the old Connect button, so on a phone it takes its own line and
+  `margin-left:auto` has nothing to push against. `.shell-chrome` needed
+  `flex: 1 1 auto`. Only the browser catches this.
+- ⚠ **party and splitlink CI grep the built bundle for API symbols**, including
+  the two mount names that just went away, so the guard fires on exactly this
+  change. The marker list has to move with the API. **The Mac-mini `gh` token has
+  no `workflow` scope**, so that edit cannot be pushed: `gh auth refresh -s
+  workflow` first. party #176 is red for this reason alone and carries the exact
+  diff in a comment.
 
 ## What the Hub will not allow
 
