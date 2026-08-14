@@ -6,8 +6,8 @@ The **mini wallet**: the fleet's one header control. `mountMiniWallet` is the
 canonical export; `mountCornerControl` is kept as an alias because ~25 apps
 import that name.
 
-**Current: v0.18.2**, tagged and on jsDelivr:
-`https://cdn.jsdelivr.net/gh/Andjroo111/nimiq-app-shell@v0.18.2/dist/app-shell.js`
+**Current: v0.19.0**, tagged and on jsDelivr:
+`https://cdn.jsdelivr.net/gh/Andjroo111/nimiq-app-shell@v0.19.0/dist/app-shell.js`
 
 ## Playground, the way to see any of this
 
@@ -23,6 +23,10 @@ slow read, an unpriced asset, and the three send outcomes.
 **Use 127.0.0.1, not localhost**, when driving it with Playwright. The IPv6
 route makes `page.goto` time out while curl works fine, which reads as a broken
 page for a while.
+
+## Shipped 2026-08-14
+
+**v0.19.0 (#143)** — host branding, written up below.
 
 ## Shipped 2026-08-13
 
@@ -156,35 +160,55 @@ be nimiq.party renamed, and a push would have fought party's own branch.
   workflow` first. party #176 is red for this reason alone and carries the exact
   diff in a comment.
 
-## Next lane: an installing app must be able to wear its own brand
+## Host branding, SHIPPED in v0.19.0 (#143)
 
 Andrew, 2026-08-14: *"if the person installs it onto their app, they should be
-able to also make it match their branding"*, measured against nimiq.cool,
-hashmark and swellet.
+able to also make it match their branding"*. Two layers, and the split is the
+design.
 
-The seam exists but is half-built. **16 `--nq-cc-*` vars** cover the menu chrome
-(bg, fg, muted, hover, line, border, shadow, accent, card-bg, and the
-language-only face). **~20 hardcoded Nimiq colours have no escape hatch at all**,
-and they are the loud ones:
+**The vars are the mechanism.** Every painted value reads a `--nq-cc-*` whose
+default is the Nimiq value it replaced, so the ten apps on the untouched control
+are unchanged. Each var holds a WHOLE value rather than a component, so
+`--nq-cc-connect-image` can be a flat colour where Nimiq uses a radial.
 
-| What | Hardcoded | Why it shows |
-| --- | --- | --- |
-| Connect button | navy radial `#260133`→`#1f2348` | the primary CTA, on every signed-out page |
-| Send + Send-confirm | blue radial `#265dd7`→`#0582ca` | the primary CTA once signed in |
-| Inputs + focus rings | `#0582ca` | recipient, amount, rename |
-| Address chip, contacts | `rgba(5,130,202,…)` + `#0582ca` | the receive view |
-| Status colours | `#d94432` red, `#13b59d` green, `#fc8702` orange | errors and testnet |
-| Font | `'Mulish','Muli'` | inherits nothing from the host |
+**Most tints were never brand colours.** `rgba(31,35,72,.06)` IS `#1f2348` at
+6%, and that IS the default `--nq-cc-menu-fg`, so it is now a `color-mix` of
+that var: identical untouched, and it follows the foreground the moment a host
+themes one. The address well, currency grid, scrollbar, hairlines and hover wash
+came along without being named. Same for the light-blue washes at 8% and 12% of
+`--nq-cc-accent`. That is why the token layer is eleven wide rather than thirty.
 
-swellet is the proof: its `--nq-cc-*` block themes the card correctly in forest
-dark and white light, and the Connect button inside it is still Nimiq navy on a
-teal-brand page. That is the whole gap in one screenshot.
+**`theme` is the front door**: `font`, `primary`/`primaryText`,
+`accent`/`accentText`, `surface`, `text`, `face`/`faceText`, `danger`,
+`success`, `warning`. Stamped INLINE on the mounted element, so two mini wallets
+on a page can differ and `theme` beats a rule an app set earlier.
 
-Worth deciding before writing vars one at a time: whether this is **more vars**
-or **one `theme` option** on `CornerControlOptions` that stamps a scoped
-stylesheet. More vars is additive and safe; a theme object is a real interface
-and stops the list growing forever. hashmark (v0.17.1) and nimiq.cool both have
-their own palettes and are the other two test cases.
+Worth knowing before touching it again:
+
+- **`accentText` exists because hashmark forced it.** Its lime is bright enough
+  that white on it is unreadable, and nothing shipping in CSS picks a readable
+  label colour from an arbitrary one. `color-contrast()` is still not there.
+- **The report-bug sheet PORTALS to `document.body`**, so it cannot inherit vars
+  stamped on the control. `ReportBugOptions.theme` takes them and the corner
+  forwards its own. Any future portal has the same problem.
+- **The near stop of a themed radial is 92% of the brand, not 86%.** Nimiq's own
+  pair is close in lightness (`#265dd7` beside `#0582ca`); a bigger drop turned
+  hashmark's lime olive across most of the fill.
+- **`rgba(255,255,255,0)` in the grid fade was a bug on any non-white surface.**
+  It is a workaround for a browser bug that is gone; gradients interpolate in
+  premultiplied alpha, so plain `transparent` is both correct and theme-following.
+- **The guard is `theme.test.ts`**, which reads the stylesheet and fails on any
+  colour literal outside a var fallback or a `color-mix`. Its first shape COULD
+  NOT FAIL: a lazy `var(--x, … ))` regex spans from one rule to a closing pair
+  several rules later and swallowed an injected hardcode. It parses balanced
+  parens now, and a test asserts it catches one. Do not simplify it back.
+
+The playground has all three brands as a switch and repaints its strips with
+them. `bun run playground`, then Host brand.
+
+**The ten open sweep PRs stay pinned to v0.18.2 on purpose.** They are green and
+waiting on Andrew; 0.19.0 changes no default, so re-pinning would cost ten
+review states and buy nothing.
 
 ## What the Hub will not allow
 
