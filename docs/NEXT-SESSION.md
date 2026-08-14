@@ -6,8 +6,8 @@ The **mini wallet**: the fleet's one header control. `mountMiniWallet` is the
 canonical export; `mountCornerControl` is kept as an alias because ~25 apps
 import that name.
 
-**Current: v0.17.1**, tagged and on jsDelivr:
-`https://cdn.jsdelivr.net/gh/Andjroo111/nimiq-app-shell@v0.17.1/dist/app-shell.js`
+**Current: v0.18.1**, tagged and on jsDelivr:
+`https://cdn.jsdelivr.net/gh/Andjroo111/nimiq-app-shell@v0.18.1/dist/app-shell.js`
 
 ## Playground, the way to see any of this
 
@@ -48,21 +48,50 @@ Registry: `nimiq-branding-cli` #30 (rename/onboard notes) and #31 (the
 
 ## The fleet sweep, issue #112
 
-**1 of 21 apps converted.** This is the open work.
+**6 of 20 apps converted**, all six CDN. PRs are open and none are merged.
 
 | Model | Apps | Work per app |
 | --- | --- | --- |
-| CDN | cards ✅, gives, nimmesh, ninja, software, stream, swellet | one URL + one mount call |
+| CDN | cards ✅, gives ✅, ninja ✅, software ✅, stream ✅, swellet ✅ | one URL + one mount call |
 | Bundled | casino, life, work | dep bump + mount swap |
 | Vendored | cool, gift, money, name, party, talk, tax, tips, splitlink | bump **and rebuild `public/vendor/app-shell.js`**, or it is a no-op live |
 | Own shape | sale, vote | needs a look each |
 
-14 of the 21 mount a language pill only, no wallet; those become the
-language-only mini wallet. 7 have a wallet too.
+`nimiq.gives` #58, `nimiq.ninja` #108, `nimiq.software` #65, `nimiq.stream` #48,
+`swellet` #99. CI is green on the four repos that run it; swellet has a
+deploy-only workflow, so it was verified by its own `bun test` (1245 pass) and
+in a browser.
+
+**nimmesh is out of the sweep** (Andrew, 2026-08-14): it is a wallet, and a
+wallet does not wear the mini wallet. Same reason `nimiq.ninja/app` was always
+excluded while its landing converted. That takes the sweep from 21 to 20.
+
+13 of the 20 mount a language pill only, no wallet; those become the
+language-only mini wallet. 7 have a wallet too, and swellet is the worked
+example: two controls collapse to one, and the three old theme var blocks
+(`--nq-langpill-*`, `--nq-walletpill-*`, `--nq-profile-*`) collapse to one
+`--nq-cc-*` block.
 
 **Two clones need care.** `nimiq.cool` has a build loop running (contested
 clone, a parallel session builds there). `nimiq.sale` serves live from its clone
 via launchd. Do those last, and not under a running process.
+
+### What the CDN six actually cost
+
+Four were the advertised one-liner. Two were not, and both surprises are worth
+knowing before starting:
+
+- **stream carried the block on four pages**, not one. Grep the whole `public/`,
+  never just `index.html`.
+- **ninja found a real app-shell bug.** The menu is right-anchored at a fixed
+  272px. ninja is the first app to put anything (a CTA) to the pill's right, so
+  the card ran off the left edge at every phone width. Every app converted before
+  it happened to put the pill hard right. Fixed in #140 (v0.18.1). If the
+  next app puts the pill mid-header, it is already handled; if it puts it inside
+  a scroll container or a transformed ancestor, measure again.
+- **Version bumps are per-repo law.** gives, software, stream and swellet each
+  require a `package.json` bump plus a CHANGELOG entry per PR. ninja requires
+  neither. Read the repo's own CLAUDE.md first.
 
 ## What the Hub will not allow
 
@@ -99,6 +128,14 @@ unreadable as well as unsendable. Issue #124 has the three routes.
 - **A test asserting `ships 5 locales`** is what let six offered languages do
   nothing for eleven versions. It now asserts every language the picker OFFERS
   has strings.
+- **`right:0` is not a position, it is an assumption about the host.** The menu
+  looked correct for eighteen versions because every app that mounted it put the
+  pill hard right. `menuShift` is a pure function so the arithmetic can be tested
+  without a browser; `getBoundingClientRect` is the only part that needs one.
+- **An app's committed bundle can be older than its source.** swellet's
+  `public/dist/main.js` is gitignored, and the checked-out copy predated the
+  `window.__swelletLang` bridge, so the corner silently never mounted. That reads
+  exactly like a broken conversion. Build the app before blaming the change.
 
 ## Repo rules
 
