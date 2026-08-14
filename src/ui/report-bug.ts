@@ -336,23 +336,59 @@ const SHEET_STYLE_ID = 'nimiq-shell-report-bug-style';
 
 /** The bug glyph, in the corner's stroke-icon language (the same weight as the
  *  wallet/scan glyphs), sized by .nq-cc-cashlink-slot's 24px box. */
-/** The viewBox is the ARTWORK's bounds, not a round 24. Measured with getBBox,
- *  the drawing occupies 18x16 of the 24x24 box it used to declare, so in the
- *  corner's 24px slot it rendered 18x16 beside a hexagon rendering 20.5x20 and
- *  read visibly smaller and fainter (Andrew, 2026-08-14). Cropping to
- *  2.5 3.5 19 17 (the bounds plus half a stroke, so no cap clips) scales it to
- *  22.7x20.2, which matches.
+/** The bug, and its legs reach the shell.
  *
- *  Stroke 0.76 and not 1.6: at the new crop this renders 0.96px, the same as
- *  the cashlink and switch glyphs beside it (0.72 on an 18 viewBox). At the
- *  original 1.6 it drew 1.6px and read a full weight darker than its
- *  neighbours; a bigger crop needs a thinner number to hold the same weight. */
+ *  Andrew picked the plain one out of six drawn together (plain, ladybug,
+ *  beetle, ant, capsule, spider), each judged at 24, 48 and 96 and in the menu
+ *  row rather than on its own, because 24px is the only size that ships. A
+ *  ladybug with spots read as a picture of a ladybug; a menu row wants a glyph
+ *  you recognise without studying it, and the extra marks were noise at the one
+ *  size that matters.
+ *
+ *  Nothing here is decoration, which is why it is also the version with no
+ *  clipPath and no minted ids: the ladybug needed both to cut its spots at the
+ *  rim, and neither survives a shape that has no spots.
+ *
+ *  THE LEGS STOP AT THE EDGE and the ANTENNAE RUN DEEP, which is Andrew's
+ *  call and reads as the anatomy: a leg is jointed onto the shell, a feeler
+ *  comes out from under it.
+ *
+ *  A leg ends exactly on the ellipse. The stroke is what makes that land: at
+ *  0.76 the round cap has a radius of 0.38, precisely the shell stroke's
+ *  half-width, so the cap sits flush inside the outline and disappears. Push a
+ *  leg in past about 0.3 and the cap clears that inner edge and wears a visible
+ *  blob, which is what an earlier 0.35 did.
+ *
+ *  The antennae go in 1.2, far enough to read as emerging from under the shell
+ *  rather than resting on it. Drawn at 0, 0.9, 1.2, 1.5 and 2.1 at 150px: past
+ *  about 2 they close on the top of the centre seam and the three marks
+ *  converge into one. None of this is visible at 24px, which is why every round
+ *  of it was judged zoomed.
+ *
+ *  Before any of that neither reached the shell: the legs
+ *  ran outward from (6.5,18.5) while the body's lower arc is a radius-6 circle
+ *  about (12,14), so the inner end sat 1.1 units off the shell it was supposed
+ *  to grow from, and the antennae started INSIDE the head, leaving two stubs
+ *  floating in it. Andrew found both by zooming, which is the only way either
+ *  is visible.
+ *
+ *  There is no bug in the official Nimiq asset library (searched: bug, beetle,
+ *  ladybug, insect, feedback, report), which is why this glyph is hand-drawn.
+ *  It follows the house icon rules rather than a registry entry: one weight,
+ *  currentColor, no baked colour.
+ *
+ *  The viewBox is the ARTWORK's bounds plus half a stroke, not a round 24.
+ *  Declaring 24x24 around a 16x13 drawing rendered it visibly smaller than the
+ *  hexagon beside it in the corner's shared 24px slot. Stroke 0.76 holds 0.96px
+ *  at this crop, the same weight as the cashlink and switch glyphs. */
 export const BUG_ICON =
-  '<svg viewBox="2.5 3.5 19 17" fill="none" stroke="currentColor" stroke-width="0.76" ' +
+  '<svg viewBox="3.4 5.9 17.2 14.3" fill="none" stroke="currentColor" stroke-width="0.76" ' +
   'stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">' +
-  '<path d="M12 20a6 6 0 0 0 6-6v-3a6 6 0 0 0-12 0v3a6 6 0 0 0 6 6Z"/>' +
-  '<path d="M10 6.5 8.5 4M14 6.5 15.5 4"/><path d="M12 8v12"/>' +
-  '<path d="M6 11H3M6 15H3M6.5 18.5 4 20M18 11h3M18 15h3M17.5 18.5 20 20"/></svg>';
+  '<path d="M12 8.2a6 5.8 0 1 1-.01 0Z"/>' +
+  '<path d="M12 10.404V19.65"/>' +
+  '<path d="M6.232 12.401 4.118 11.795M6 14H3.8M6.804 16.9 4.899 18' +
+  'M17.768 12.401 19.882 11.795M18 14h2.2M17.196 16.9 19.101 18"/>' +
+  '<path d="M10.768 9.841 9 6.3M13.232 9.841 15 6.3"/></svg>';
 
 function ensureSheetStyles(doc: Document): void {
   if (doc.getElementById(SHEET_STYLE_ID)) return;
