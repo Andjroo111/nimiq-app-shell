@@ -30,6 +30,7 @@ import { fmtNim, fmtFiat, lunaToNim, nimToLuna } from '../format/nim';
 import { BUG_ICON, openReportBugSheet, type ReportBugOptions } from './report-bug';
 import { installReportCapture } from './report-capture';
 import { mountAssetList, type AssetListHandle, type ShellAsset } from './asset-list';
+import { applyTheme, type ShellTheme } from './theme';
 
 /** A NIM address: NQ + 2 check digits + 32 base32 chars. */
 const NIM_ADDRESS_SHAPE = /^NQ[0-9]{2}[0-9A-HJ-NP-VXY]{32}$/;
@@ -253,6 +254,17 @@ export interface CornerControlOptions {
    *  Present in EVERY presentation, including language-only and inside Nimiq
    *  Pay: a bug on a wallet-less page is still a bug someone needs to report. */
   reportBug?: ReportBugOptions | (() => void);
+  /** Make the control wear the HOST's brand: eleven semantic tokens (font, the
+   *  Connect colour, the act colour, their two label colours, surface, text,
+   *  the face pill and its text, and the three status hues), expanded into the
+   *  `--nq-cc-*` set and stamped on this instance. Omit it and it is Nimiq.
+   *
+   *  A token reaches everything derived from it, so a dark surface also darkens
+   *  the wells, hairlines, hover washes and scrollbar without naming any of
+   *  them. For the one thing the tokens do not cover, set the var directly in
+   *  your own CSS — they are the same mechanism, and `theme` is stamped inline
+   *  so it wins where both are set. */
+  theme?: ShellTheme;
   /** Inject the component's <style> once. Default true. */
   injectStyles?: boolean;
 }
@@ -304,11 +316,20 @@ function ensureStyles(): void {
   if (typeof document === 'undefined' || document.getElementById(STYLE_ID)) return;
   const style = document.createElement('style');
   style.id = STYLE_ID;
-  // Ported from the registry corner-control.css (locked 2026-07-23): brand
-  // values fixed (navy connect, light-blue send, Copyable blues); the menu
-  // surface is themeable the langpill/walletpill way (--nq-cc-* vars).
+  // Ported from the registry corner-control.css (locked 2026-07-23). EVERY
+  // painted value reads a --nq-cc-* var whose default is the Nimiq value it
+  // replaced, so an app that sets nothing is unchanged and an app that sets a
+  // brand is not fighting a hardcode. See theme.ts for the token layer above
+  // these; the derived tints below are why that layer stays eleven tokens wide.
+  //
+  // Derivation rule: a tint is never a literal. rgba(31,35,72,.06) IS
+  // #1f2348 at 6%, and #1f2348 IS the default --nq-cc-menu-fg, so it is written
+  // as a color-mix of that var: identical when untouched, and it follows the
+  // foreground the moment a host themes one. Same for the light-blue washes,
+  // which are --nq-cc-accent at 8% and 12%.
   style.textContent = `
-.nq-cc { position:relative; display:inline-block; font-family:'Mulish','Muli',system-ui,sans-serif; }
+.nq-cc { position:relative; display:inline-block;
+  font-family:var(--nq-cc-font, 'Mulish','Muli',system-ui,sans-serif); }
 .nq-cc-caret { width:10px; height:6px; flex:none; color:currentColor; opacity:.6;
   transition:transform .18s var(--nimiq-ease, cubic-bezier(.25,0,0,1)); }
 .nq-cc-face[aria-expanded="true"] .nq-cc-caret,
@@ -385,9 +406,12 @@ function ensureStyles(): void {
 /* signed out: navy Connect (bottom-right radial) + the quiet onboard line */
 .nq-cc-connect { position:relative; width:100%; height:36px; border:none; border-radius:500px;
   display:flex; align-items:center; justify-content:center; font-family:inherit; font-size:14px;
-  font-weight:700; color:#fff; cursor:pointer; background-color:#1f2348;
-  background-image:radial-gradient(100% 100% at 100% 100%, #260133, #1f2348); }
-.nq-cc-connect:hover { background-image:radial-gradient(100% 100% at 100% 100%, #180021, #151833); }
+  font-weight:700; color:var(--nq-cc-connect-fg, #fff); cursor:pointer;
+  background-color:var(--nq-cc-connect-bg, #1f2348);
+  background-image:var(--nq-cc-connect-image,
+    radial-gradient(100% 100% at 100% 100%, #260133, #1f2348)); }
+.nq-cc-connect:hover { background-image:var(--nq-cc-connect-image-hover,
+  radial-gradient(100% 100% at 100% 100%, #180021, #151833)); }
 .nq-cc-connect:focus-visible { outline:2px solid var(--nq-cc-accent, #0582ca); outline-offset:2px; }
 .nq-cc-connect:disabled { opacity:.7; cursor:default; }
 .nq-cc-onboard { width:100%; margin-top:2px; padding:10px 4px; border:none; background:none; cursor:pointer;
@@ -414,9 +438,12 @@ button.nq-cc-name { cursor:pointer; }
 button.nq-cc-name:hover { background:var(--nq-cc-menu-hover, rgba(31,35,72,.06)); }
 button.nq-cc-name:focus-visible { outline:2px solid var(--nq-cc-accent, #0582ca); outline-offset:-2px; }
 .nq-cc-name-input { width:100%; min-width:0; border:none; border-radius:6px; padding:2px 4px;
-  font-family:inherit; font-size:14px; font-weight:600; color:#1f2348; background:#fff;
-  box-shadow:inset 0 0 0 2px rgba(31,35,72,.1); }
-.nq-cc-name-input:focus { outline:none; box-shadow:inset 0 0 0 2px #0582ca; }
+  font-family:inherit; font-size:14px; font-weight:600;
+  color:var(--nq-cc-input-fg, var(--nq-cc-menu-fg, #1f2348));
+  background:var(--nq-cc-input-bg, var(--nq-cc-card-bg, #fff));
+  box-shadow:inset 0 0 0 2px color-mix(in srgb, var(--nq-cc-menu-fg, #1f2348) 10%, transparent); }
+.nq-cc-name-input:focus { outline:none;
+  box-shadow:inset 0 0 0 2px var(--nq-cc-accent, #0582ca); }
 .nq-cc-balance { margin-left:auto; display:flex; flex-direction:column; align-items:flex-end; gap:1px; flex:none; }
 .nq-cc-balance[hidden] { display:none; }
 .nq-cc-balance-nim { font-size:13px; font-weight:700; color:var(--nq-cc-menu-fg, #1f2348); }
@@ -429,12 +456,16 @@ button.nq-cc-name:focus-visible { outline:2px solid var(--nq-cc-accent, #0582ca)
   border:none; border-radius:500px; background:var(--nq-cc-menu-hover, rgba(31,35,72,.07)); font-family:inherit;
   font-size:13px; font-weight:700; color:var(--nq-cc-menu-fg, #1f2348); cursor:pointer;
   transition:background .2s var(--nimiq-ease, cubic-bezier(.25,0,0,1)); }
-.nq-cc-receive:hover, .nq-cc-receive:focus-visible { background:rgba(31,35,72,.12); }
+.nq-cc-receive:hover, .nq-cc-receive:focus-visible {
+  background:color-mix(in srgb, var(--nq-cc-menu-fg, #1f2348) 12%, transparent); }
 .nq-cc-receive:focus-visible { outline:2px solid var(--nq-cc-accent, #0582ca); outline-offset:2px; }
 .nq-cc-send { flex:1; display:inline-flex; align-items:center; justify-content:center; gap:7px; height:32px;
   border:none; border-radius:500px; cursor:pointer; font-family:inherit; font-size:13px; font-weight:700;
-  color:#fff; background-color:#0582ca; background-image:radial-gradient(100% 100% at 100% 100%, #265dd7, #0582ca); }
-.nq-cc-send:hover { background-image:radial-gradient(100% 100% at 100% 100%, #1f4fbc, #0473b3); }
+  color:var(--nq-cc-send-fg, #fff); background-color:var(--nq-cc-send-bg, #0582ca);
+  background-image:var(--nq-cc-send-image,
+    radial-gradient(100% 100% at 100% 100%, #265dd7, #0582ca)); }
+.nq-cc-send:hover { background-image:var(--nq-cc-send-image-hover,
+  radial-gradient(100% 100% at 100% 100%, #1f4fbc, #0473b3)); }
 .nq-cc-send:focus-visible { outline:2px solid var(--nq-cc-accent, #0582ca); outline-offset:3px; }
 .nq-cc-arrow-up { transform:rotate(-90deg); width:11px; height:8px; }
 .nq-cc-arrow-down { transform:rotate(90deg); width:11px; height:8px; }
@@ -458,28 +489,36 @@ button.nq-cc-name:focus-visible { outline:2px solid var(--nq-cc-accent, #0582ca)
 .nq-cc-field-label { font-size:12px; font-weight:600; color:var(--nq-cc-menu-muted, rgba(31,35,72,.5)); }
 /* inputs: inset box-shadow border, never border (rule 1) */
 .nq-cc-input { width:100%; border:none; border-radius:8px; padding:9px 10px; font-family:inherit;
-  font-size:14px; font-weight:600; color:#1f2348; background:#fff;
-  box-shadow:inset 0 0 0 2px rgba(31,35,72,.12); }
-.nq-cc-input:focus { outline:none; box-shadow:inset 0 0 0 2px #0582ca; }
-.nq-cc-input::placeholder { color:rgba(31,35,72,.3); font-weight:600; }
+  font-size:14px; font-weight:600;
+  color:var(--nq-cc-input-fg, var(--nq-cc-menu-fg, #1f2348));
+  background:var(--nq-cc-input-bg, var(--nq-cc-card-bg, #fff));
+  box-shadow:inset 0 0 0 2px color-mix(in srgb, var(--nq-cc-menu-fg, #1f2348) 12%, transparent); }
+.nq-cc-input:focus { outline:none; box-shadow:inset 0 0 0 2px var(--nq-cc-accent, #0582ca); }
+.nq-cc-input::placeholder { font-weight:600;
+  color:color-mix(in srgb, var(--nq-cc-menu-fg, #1f2348) 30%, transparent); }
 .nq-cc-input-addr { font-family:'Fira Mono',ui-monospace,monospace; font-size:12px;
   letter-spacing:.02em; text-transform:uppercase; }
 .nq-cc-amount-row { position:relative; }
 .nq-cc-amount-row .nq-cc-input { padding-right:44px; }
 .nq-cc-amount-suffix { position:absolute; right:11px; top:50%; transform:translateY(-50%);
-  font-size:13px; font-weight:700; color:rgba(31,35,72,.45); pointer-events:none; }
+  font-size:13px; font-weight:700; pointer-events:none;
+  color:color-mix(in srgb, var(--nq-cc-menu-fg, #1f2348) 45%, transparent); }
 .nq-cc-send-hint { font-size:12px; font-weight:600; color:var(--nq-cc-menu-muted, rgba(31,35,72,.5)); }
 .nq-cc-send-hint:empty { display:none; }
 .nq-cc-send-confirm { width:100%; height:36px; border:none; border-radius:500px; margin-top:2px;
-  font-family:inherit; font-size:14px; font-weight:700; color:#fff; cursor:pointer;
-  background-color:#0582ca; background-image:radial-gradient(100% 100% at 100% 100%, #265dd7, #0582ca); }
-.nq-cc-send-confirm:hover:not(:disabled) { background-image:radial-gradient(100% 100% at 100% 100%, #1f4fbc, #0473b3); }
+  font-family:inherit; font-size:14px; font-weight:700; cursor:pointer;
+  color:var(--nq-cc-send-fg, #fff); background-color:var(--nq-cc-send-bg, #0582ca);
+  background-image:var(--nq-cc-send-image,
+    radial-gradient(100% 100% at 100% 100%, #265dd7, #0582ca)); }
+.nq-cc-send-confirm:hover:not(:disabled) { background-image:var(--nq-cc-send-image-hover,
+  radial-gradient(100% 100% at 100% 100%, #1f4fbc, #0473b3)); }
 .nq-cc-send-confirm:focus-visible { outline:2px solid var(--nq-cc-accent, #0582ca); outline-offset:3px; }
 .nq-cc-send-confirm:disabled { opacity:.4; cursor:default; }
-.nq-cc-send-error { font-size:12px; font-weight:600; color:#d94432; text-align:center; }
+.nq-cc-send-error { font-size:12px; font-weight:600; text-align:center;
+  color:var(--nq-cc-danger, #d94432); }
 .nq-cc-send-error:empty { display:none; }
 .nq-cc-send-done { display:none; flex-direction:column; align-items:center; gap:6px;
-  padding:16px 0 10px; color:#13b59d; font-size:14px; font-weight:700; }
+  padding:16px 0 10px; color:var(--nq-cc-success, #13b59d); font-size:14px; font-weight:700; }
 .nq-cc-view-send.nq-cc-sent .nq-cc-send-body { display:none; }
 .nq-cc-view-send.nq-cc-sent .nq-cc-send-done { display:flex; }
 .nq-cc-back { display:flex; align-items:center; gap:6px; width:100%; padding:7px 10px; border:none;
@@ -498,13 +537,15 @@ button.nq-cc-name:focus-visible { outline:2px solid var(--nq-cc-accent, #0582ca)
    field, and the blue HOLDS after copy until focus leaves */
 .nq-cc-copy-wrap { position:relative; display:block; margin-top:10px; width:100%; }
 .nq-cc-address { display:grid; grid-template-columns:repeat(var(--nq-cc-addr-cols, 3), 1fr); gap:3px 0; justify-items:center;
-  width:100%; padding:8px 6px; border:none; border-radius:6px; background:rgba(31,35,72,.04); cursor:pointer;
+  width:100%; padding:8px 6px; border:none; border-radius:6px; cursor:pointer;
+  background:color-mix(in srgb, var(--nq-cc-menu-fg, #1f2348) 4%, transparent);
   font-family:'Fira Mono',ui-monospace,monospace; font-size:12px; color:var(--nq-cc-menu-muted, rgba(31,35,72,.7));
   transition:background .15s var(--nimiq-ease, cubic-bezier(.25,0,0,1)), color .15s var(--nimiq-ease, cubic-bezier(.25,0,0,1)); }
 .nq-cc-address:hover, .nq-cc-address:focus,
 .nq-cc-copy-wrap.nq-cc-copied .nq-cc-address, .nq-cc-copy-wrap.nq-cc-copied-hold .nq-cc-address {
-  background:rgba(5,130,202,.08); color:#0582ca; }
-.nq-cc-address:focus-visible { outline:2px solid #0582ca; outline-offset:2px; }
+  background:color-mix(in srgb, var(--nq-cc-accent, #0582ca) 8%, transparent);
+  color:var(--nq-cc-accent, #0582ca); }
+.nq-cc-address:focus-visible { outline:2px solid var(--nq-cc-accent, #0582ca); outline-offset:2px; }
 /* The wrong-chain guard. Orange because it is a WARNING: red would read as an
    error that already happened, and grey would read as fine print, which is
    exactly what this must not be.
@@ -513,9 +554,9 @@ button.nq-cc-name:focus-visible { outline:2px solid var(--nq-cc-accent, #0582ca)
    approximation of it. NOTE: this block is a JS template literal, so it must
    never contain a backtick. */
 .nq-cc-net-warn { margin:8px 0 0; padding:8px 10px; border-radius:6px;
-  background:oklch(0.951 0.0221 74.1);
-  outline:1.5px solid oklch(0.9396 0.0436 71.7); outline-offset:-1.5px;
-  color:oklch(0.7387 0.179 56.67);
+  background:var(--nq-cc-warn-bg, oklch(0.951 0.0221 74.1));
+  outline:1.5px solid var(--nq-cc-warn-line, oklch(0.9396 0.0436 71.7)); outline-offset:-1.5px;
+  color:var(--nq-cc-warning, oklch(0.7387 0.179 56.67));
   font-size:11.5px; font-weight:700; line-height:1.4; text-align:center; }
 .nq-cc-net-warn[hidden] { display:none; }
 
@@ -525,22 +566,27 @@ button.nq-cc-name:focus-visible { outline:2px solid var(--nq-cc-accent, #0582ca)
 .nq-cc-contacts { display:flex; flex-wrap:wrap; gap:5px; margin:6px 0 2px; }
 .nq-cc-contacts[hidden] { display:none; }
 .nq-cc-contact { max-width:100%; padding:4px 10px; border:none; border-radius:999px;
-  background:rgba(31,35,72,.06); color:var(--nq-cc-menu-fg, #1f2348);
+  background:color-mix(in srgb, var(--nq-cc-menu-fg, #1f2348) 6%, transparent);
+  color:var(--nq-cc-menu-fg, #1f2348);
   font-family:inherit; font-size:11.5px; font-weight:700; line-height:1.3; cursor:pointer;
   white-space:nowrap; overflow:hidden; text-overflow:ellipsis;
   transition:background .15s var(--nimiq-ease, cubic-bezier(.25,0,0,1)); }
-.nq-cc-contact:hover { background:rgba(5,130,202,.12); color:#0582ca; }
+.nq-cc-contact:hover { background:color-mix(in srgb, var(--nq-cc-accent, #0582ca) 12%, transparent);
+  color:var(--nq-cc-accent, #0582ca); }
 .nq-cc-contact:focus-visible { outline:2px solid var(--nq-cc-accent, #0582ca); outline-offset:2px; }
 .nq-cc-copy-tooltip { position:absolute; left:50%; bottom:calc(100% + 10px);
   transform:translateX(-50%) translateY(4px); padding:8px 12px; border-radius:4px;
-  background-image:radial-gradient(100% 100% at 100% 100%, #265dd7, #0582ca); color:#fff; font-size:13px;
+  background-image:var(--nq-cc-send-image,
+    radial-gradient(100% 100% at 100% 100%, #265dd7, #0582ca));
+  color:var(--nq-cc-send-fg, #fff); font-size:13px;
   font-weight:600; line-height:1.1; white-space:nowrap; pointer-events:none; opacity:0; z-index:30;
   box-shadow:0 2px 2.5px rgba(31,35,72,.02), 0 7px 8.5px rgba(31,35,72,.04), 0 18px 38px rgba(31,35,72,.07);
   transition:opacity .3s var(--nimiq-ease, cubic-bezier(.25,0,0,1)), transform .3s var(--nimiq-ease, cubic-bezier(.25,0,0,1));
   transition-delay:.2s; }
 .nq-cc-copy-tooltip::after { content:''; position:absolute; left:50%; top:calc(100% - 1px); width:14px; height:7px;
   margin-left:-7px; transform:scaleY(-1);
-  background-image:radial-gradient(100% 100% at 100% 100%, #265dd7, #0582ca);
+  background-image:var(--nq-cc-send-image,
+    radial-gradient(100% 100% at 100% 100%, #265dd7, #0582ca));
   -webkit-mask-image:url('data:image/svg+xml,<svg viewBox="0 0 18 16" xmlns="http://www.w3.org/2000/svg"><path d="M9 7.12c-.47 0-.93.2-1.23.64L3.2 14.29A4 4 0 0 1 0 16h18a4 4 0 0 1-3.2-1.7l-4.57-6.54c-.3-.43-.76-.64-1.23-.64z" fill="white"/></svg>');
   mask-image:url('data:image/svg+xml,<svg viewBox="0 0 18 16" xmlns="http://www.w3.org/2000/svg"><path d="M9 7.12c-.47 0-.93.2-1.23.64L3.2 14.29A4 4 0 0 1 0 16h18a4 4 0 0 1-3.2-1.7l-4.57-6.54c-.3-.43-.76-.64-1.23-.64z" fill="white"/></svg>');
   -webkit-mask-size:100% 100%; mask-size:100% 100%; }
@@ -578,7 +624,11 @@ button.nq-cc-name:focus-visible { outline:2px solid var(--nq-cc-accent, #0582ca)
    visible grid never wears one. */
 .nq-cc-grid-wrap::after { content:''; position:absolute; left:0; right:0; bottom:0; height:34px;
   pointer-events:none; opacity:1; transition:opacity .15s var(--nimiq-ease, cubic-bezier(.25,0,0,1));
-  background:linear-gradient(to bottom, rgba(255,255,255,0), var(--nq-cc-menu-bg, #fff));
+  /* plain transparent, not rgba(255,255,255,0): gradients interpolate in
+     PREMULTIPLIED alpha, so the old white-with-zero-alpha stop was a workaround
+     for a browser bug that is gone, and it made the fade travel through white
+     on any surface that is not. */
+  background:linear-gradient(to bottom, transparent, var(--nq-cc-menu-bg, #fff));
   border-radius:0 0 6px 6px; }
 /* A chevron sitting IN the fade. The fade alone was not read as an affordance
    (Andrew, twice), and on iOS there is nothing else to read: WebKit ignores
@@ -588,7 +638,7 @@ button.nq-cc-name:focus-visible { outline:2px solid var(--nq-cc-accent, #0582ca)
 .nq-cc-grid-more { position:absolute; left:50%; bottom:5px; transform:translateX(-50%);
   display:flex; align-items:center; justify-content:center; width:22px; height:22px;
   border-radius:50%; background:var(--nq-cc-menu-bg, #fff); pointer-events:none;
-  box-shadow:0 1px 4px rgba(31,35,72,.18); opacity:1;
+  box-shadow:0 1px 4px color-mix(in srgb, var(--nq-cc-menu-fg, #1f2348) 18%, transparent); opacity:1;
   transition:opacity .15s var(--nimiq-ease, cubic-bezier(.25,0,0,1)); }
 .nq-cc-grid-more svg { width:11px; height:11px; color:var(--nq-cc-menu-fg, #1f2348); opacity:.75; }
 .nq-cc-grid-wrap[data-at-end]::after, .nq-cc-grid-wrap[data-no-scroll]::after,
@@ -596,18 +646,22 @@ button.nq-cc-name:focus-visible { outline:2px solid var(--nq-cc-accent, #0582ca)
 .nq-cc-grid-wrap[data-no-scroll] .nq-cc-grid-more { opacity:0; }
 /* A real track on pointer devices. iOS ignores this entirely, which is why the
    chevron above is the primary signal rather than the fallback. */
-.nq-cc-grid { scrollbar-width:thin; scrollbar-color:rgba(31,35,72,.28) transparent; }
+.nq-cc-grid { scrollbar-width:thin;
+  scrollbar-color:color-mix(in srgb, var(--nq-cc-menu-fg, #1f2348) 28%, transparent) transparent; }
 .nq-cc-grid { display:grid; gap:4px; padding:4px; padding-right:8px; max-height:196px; overflow-y:auto;
-  background:rgba(31,35,72,.04); border-radius:6px; }
+  background:color-mix(in srgb, var(--nq-cc-menu-fg, #1f2348) 4%, transparent); border-radius:6px; }
 .nq-cc-grid.nq-cc-cols-2 { grid-template-columns:1fr 1fr; }
 .nq-cc-grid.nq-cc-cols-3 { grid-template-columns:repeat(3, 1fr); }
 .nq-cc-grid::-webkit-scrollbar { width:11px; }
 .nq-cc-grid::-webkit-scrollbar-track { background:transparent; margin:4px 0; }
-.nq-cc-grid::-webkit-scrollbar-thumb { background:rgba(31,35,72,.28); border-radius:500px;
+.nq-cc-grid::-webkit-scrollbar-thumb { border-radius:500px;
+  background:color-mix(in srgb, var(--nq-cc-menu-fg, #1f2348) 28%, transparent);
   border:3px solid transparent; background-clip:padding-box; }
-.nq-cc-grid::-webkit-scrollbar-thumb:hover { background-color:rgba(31,35,72,.45); }
+.nq-cc-grid::-webkit-scrollbar-thumb:hover {
+  background-color:color-mix(in srgb, var(--nq-cc-menu-fg, #1f2348) 45%, transparent); }
 @supports (-moz-appearance: none) {
-  .nq-cc-grid { scrollbar-width:thin; scrollbar-color:rgba(31,35,72,.28) transparent; }
+  .nq-cc-grid { scrollbar-width:thin;
+    scrollbar-color:color-mix(in srgb, var(--nq-cc-menu-fg, #1f2348) 28%, transparent) transparent; }
 }
 .nq-cc-card { display:flex; align-items:center; justify-content:flex-start; gap:7px; height:42px; padding:0 8px;
   border:none; border-radius:6px; background:none; cursor:pointer; font-family:inherit;
@@ -631,10 +685,12 @@ button.nq-cc-name:focus-visible { outline:2px solid var(--nq-cc-accent, #0582ca)
 .nq-cc-disconnect { padding:10px 8px; margin:-8px; border:none; background:none; cursor:pointer;
   font-family:inherit; font-size:12px; font-weight:600; color:var(--nq-cc-menu-muted, rgba(31,35,72,.45));
   transition:color .15s var(--nimiq-ease, cubic-bezier(.25,0,0,1)); }
-.nq-cc-disconnect:hover { color:#d94432; }
+.nq-cc-disconnect:hover { color:var(--nq-cc-danger, #d94432); }
 .nq-cc-disconnect:focus-visible { outline:2px solid var(--nq-cc-accent, #0582ca); outline-offset:2px; border-radius:3px; }
 .nq-cc-badge { font-size:12px; line-height:1; font-weight:700; letter-spacing:.09em; text-transform:uppercase;
-  color:#fc8702; background:rgba(31,35,72,.07); padding:5px 8px; border-radius:4px; }
+  color:var(--nq-cc-warning, #fc8702);
+  background:color-mix(in srgb, var(--nq-cc-menu-fg, #1f2348) 7%, transparent);
+  padding:5px 8px; border-radius:4px; }
 /* no footer at all when there is nothing to show */
 .nq-cc:not([data-testnet]):not([data-connected]) .nq-cc-footer,
 .nq-cc:not([data-testnet]):not([data-connected]) .nq-cc-footer-divider,
@@ -786,6 +842,9 @@ export function mountMiniWallet(
   // chrome, a wallet-less page keeps the outline pill (see the data-face rules).
   if (!wallet) root.dataset.face = 'lang';
   if (options.network === 'test') root.dataset.testnet = '';
+  // Before the first paint, and on the ROOT rather than the document, so two
+  // mini wallets on one page can wear different brands and neither leaks.
+  if (options.theme) applyTheme(root, options.theme);
   container.appendChild(root);
 
   const langOf = (id: string): ShellLanguage =>
@@ -1142,7 +1201,9 @@ export function mountMiniWallet(
       setOpen(false);
       const target = options.reportBug!;
       if (typeof target === 'function') target();
-      else openReportBugSheet(document, i18n, target);
+      // Forward the brand: the sheet portals to body, so it cannot inherit the
+      // vars stamped on this root and has to be handed them.
+      else openReportBugSheet(document, i18n, options.theme ? { ...target, theme: target.theme ?? options.theme } : target);
     });
   }
 

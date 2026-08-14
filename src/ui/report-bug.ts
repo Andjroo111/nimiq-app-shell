@@ -23,6 +23,7 @@
 
 import type { I18n } from '../i18n';
 import { pageContext } from './report-capture';
+import { applyTheme, type ShellTheme } from './theme';
 
 export type ReportBugType = 'bug' | 'idea' | 'question';
 
@@ -54,6 +55,13 @@ export interface ReportBugOptions {
   diagnostics?: boolean;
   /** Called after a successful submit (analytics, a host toast, …). */
   onSubmitted?: (result: SubmitFeedbackResult) => void;
+  /** The host brand, same tokens the mini wallet takes.
+   *
+   *  It has to be passed rather than inherited: the sheet is a PORTAL onto
+   *  document.body, so it sits outside the mounted control and never sees vars
+   *  stamped on it. The corner forwards its own `theme` here, so wiring one
+   *  themes both. */
+  theme?: ShellTheme;
 }
 
 const BOT_SERVICE = 'https://bot.nimiq.tech';
@@ -341,8 +349,9 @@ function ensureSheetStyles(doc: Document): void {
   style.id = SHEET_STYLE_ID;
   style.textContent = `
 .nq-fb-scrim { position:fixed; inset:0; z-index:10000; display:flex; align-items:center;
-  justify-content:center; padding:16px; background:rgba(31,35,72,.5);
-  font-family:'Mulish','Muli',system-ui,sans-serif; }
+  justify-content:center; padding:16px;
+  background:color-mix(in srgb, var(--nq-cc-scrim, #1f2348) 50%, transparent);
+  font-family:var(--nq-cc-font, 'Mulish','Muli',system-ui,sans-serif); }
 .nq-fb-card { width:100%; max-width:400px; max-height:calc(100dvh - 32px); overflow:auto; padding:20px;
   border-radius:10px; background:var(--nq-cc-menu-bg, #fff); color:var(--nq-cc-menu-fg, #1f2348);
   box-shadow:var(--nq-cc-menu-shadow, 0 4px 28px rgba(0,0,0,.16)); }
@@ -359,22 +368,25 @@ function ensureSheetStyles(doc: Document): void {
 textarea.nq-fb-input { min-height:104px; resize:vertical; font-weight:400; line-height:1.35; }
 .nq-fb-diag { display:flex; align-items:center; gap:8px; margin-bottom:12px; font-size:13px;
   font-weight:600; color:var(--nq-cc-menu-muted, rgba(31,35,72,.6)); cursor:pointer; }
-.nq-fb-error { display:none; margin:0 0 12px; font-size:13px; font-weight:600; color:#d94432; }
+.nq-fb-error { display:none; margin:0 0 12px; font-size:13px; font-weight:600;
+  color:var(--nq-cc-danger, #d94432); }
 .nq-fb-error a { color:inherit; }
 .nq-fb-actions { display:flex; align-items:center; justify-content:flex-end; gap:8px; }
 .nq-fb-cancel { padding:10px 12px; border:none; border-radius:6px; background:none; cursor:pointer;
   font-family:inherit; font-size:13px; font-weight:600; color:var(--nq-cc-menu-muted, rgba(31,35,72,.5));
   transition:background .15s var(--nimiq-ease, cubic-bezier(.25,0,0,1)); }
 .nq-fb-cancel:hover { background:var(--nq-cc-menu-hover, rgba(31,35,72,.06)); }
-.nq-fb-send { padding:10px 18px; border:none; border-radius:500px; background:#0582ca; color:#fff;
+.nq-fb-send { padding:10px 18px; border:none; border-radius:500px;
+  background:var(--nq-cc-send-bg, #0582ca); color:var(--nq-cc-send-fg, #fff);
   cursor:pointer; font-family:inherit; font-size:14px; font-weight:700;
   transition:background .15s var(--nimiq-ease, cubic-bezier(.25,0,0,1)); }
-.nq-fb-send:hover { background:#0d6dab; }
+.nq-fb-send:hover { background:color-mix(in srgb, var(--nq-cc-send-bg, #0582ca) 88%, black); }
 .nq-fb-send[disabled] { opacity:.6; cursor:default; }
 .nq-fb-cancel:focus-visible, .nq-fb-send:focus-visible { outline:2px solid var(--nq-cc-accent, #0582ca); outline-offset:2px; }
 .nq-fb-toast { position:fixed; left:50%; bottom:24px; transform:translateX(-50%); z-index:10001;
-  padding:11px 16px; border-radius:6px; background:#1f2348; color:#fff;
-  font-family:'Mulish','Muli',system-ui,sans-serif; font-size:14px; font-weight:600;
+  padding:11px 16px; border-radius:6px;
+  background:var(--nq-cc-connect-bg, #1f2348); color:var(--nq-cc-connect-fg, #fff);
+  font-family:var(--nq-cc-font, 'Mulish','Muli',system-ui,sans-serif); font-size:14px; font-weight:600;
   box-shadow:0 4px 14px rgba(31,35,72,.25); }
 `;
   doc.head.appendChild(style);
@@ -389,11 +401,12 @@ function escapeHtml(s: string): string {
     .replace(/'/g, '&#39;');
 }
 
-function toast(doc: Document, msg: string): void {
+function toast(doc: Document, msg: string, theme?: ShellTheme): void {
   const node = doc.createElement('div');
   node.className = 'nq-fb-toast';
   node.setAttribute('role', 'status');
   node.textContent = msg;
+  if (theme) applyTheme(node, theme);
   doc.body.appendChild(node);
   setTimeout(() => node.remove(), 3000);
 }
@@ -409,6 +422,7 @@ export function openReportBugSheet(doc: Document, i18n: I18n, options: ReportBug
   const scrim = doc.createElement('div');
   scrim.id = 'nq-fb-scrim';
   scrim.className = 'nq-fb-scrim';
+  if (options.theme) applyTheme(scrim, options.theme);
   scrim.innerHTML = `
     <div class="nq-fb-card" role="dialog" aria-modal="true" aria-labelledby="nq-fb-title">
       <div class="nq-fb-head">${BUG_ICON}<h2 class="nq-fb-title" id="nq-fb-title">${escapeHtml(t('shell.reportBug'))}</h2></div>
@@ -496,7 +510,7 @@ export function openReportBugSheet(doc: Document, i18n: I18n, options: ReportBug
 
     if (result.ok) {
       close();
-      toast(doc, t('shell.fbThanks'));
+      toast(doc, t('shell.fbThanks'), options.theme);
       options.onSubmitted?.(result);
       return;
     }

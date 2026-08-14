@@ -119,6 +119,10 @@ export {
   addressGrid,
   menuShift,
 } from './ui/corner-control';
+// Host branding. `theme` on the mini wallet is the front door; these are for a
+// host that wants the same tokens on a surface of its own, or wants to read the
+// expansion (a docs page, a theme picker) without mounting anything.
+export { applyTheme, themeVars, type ShellTheme } from './ui/theme';
 // The corner mounts this itself from `assets`; exported for hosts that want the
 // balance stack on a page of their own (a wallet screen, a funding view).
 export {
