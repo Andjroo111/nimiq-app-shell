@@ -1,0 +1,110 @@
+# nimiq-app-shell, next session
+
+## What this is
+
+The **mini wallet**: the fleet's one header control. `mountMiniWallet` is the
+canonical export; `mountCornerControl` is kept as an alias because ~25 apps
+import that name.
+
+**Current: v0.17.1**, tagged and on jsDelivr:
+`https://cdn.jsdelivr.net/gh/Andjroo111/nimiq-app-shell@v0.17.1/dist/app-shell.js`
+
+## Playground, the way to see any of this
+
+```bash
+bun run playground     # builds dist/, serves http://localhost:4321
+```
+
+Blank page, mini wallet in a navy header and a light one, every seam as a live
+switch. Mock wallet by default, so every state is reachable with no Hub, no
+chain and no network. The failure modes are switchable too: a throwing reader, a
+slow read, an unpriced asset, and the three send outcomes.
+
+**Use 127.0.0.1, not localhost**, when driving it with Playwright. The IPv6
+route makes `page.goto` time out while curl works fine, which reads as a broken
+page for a while.
+
+## Shipped 2026-08-13
+
+Eleven releases, v0.11.0 → v0.17.1.
+
+| PR | What |
+| --- | --- |
+| #117 | mini wallet naming, the playground, and the mount read `mountAssetList` never did |
+| #126 | corrected the BTC example, the rename spec and the onboard row |
+| #129 | per-asset receive, and the chain named where the decision is made |
+| #128 | switch account, saved recipients, balances that do not outlive an address |
+| #130 | an asset with no address of its own must not open receive |
+| #131 | `switchAccount: false`, for wallets whose `connect()` is not a picker |
+| #132 | 11 languages by default (was 5), and Mexico from 80 KB to 7 KB |
+| #133 | every currency the wallet offers now has a flag |
+| #134 | flag letterboxing, and a scroll fade |
+| #135 | a chevron, because the fade alone was not read |
+| #136 | the six offered languages that did nothing now translate |
+| #137 | the Switch account row had no glyph, so it hung left of its neighbours |
+
+Registry: `nimiq-branding-cli` #30 (rename/onboard notes) and #31 (the
+`address-display` ethereum format silently truncated any non-42 address).
+
+## The fleet sweep, issue #112
+
+**1 of 21 apps converted.** This is the open work.
+
+| Model | Apps | Work per app |
+| --- | --- | --- |
+| CDN | cards ✅, gives, nimmesh, ninja, software, stream, swellet | one URL + one mount call |
+| Bundled | casino, life, work | dep bump + mount swap |
+| Vendored | cool, gift, money, name, party, talk, tax, tips, splitlink | bump **and rebuild `public/vendor/app-shell.js`**, or it is a no-op live |
+| Own shape | sale, vote | needs a look each |
+
+14 of the 21 mount a language pill only, no wallet; those become the
+language-only mini wallet. 7 have a wallet too.
+
+**Two clones need care.** `nimiq.cool` has a build loop running (contested
+clone, a parallel session builds there). `nimiq.sale` serves live from its clone
+via launchd. Do those last, and not under a running process.
+
+## What the Hub will not allow
+
+Read from `nimiq/hub@master` `src/lib/RpcApi.ts`, not from doc comments.
+Third-party whitelist: CHECKOUT, SIGN_TRANSACTION, SIGN_STAKING, SIGN_MESSAGE,
+CHOOSE_ADDRESS, CREATE_CASHLINK, MANAGE_CASHLINK, CONNECT_ACCOUNT,
+SIGN_POLYGON_TRANSACTION.
+
+Everything else is refused, including RENAME, EXPORT, ADD_ADDRESS, LOGOUT, LIST
+and ONBOARD. They all extend `SimpleRequest`, which needs an `accountId`, and
+`chooseAddress` never returns one. That single fact is the root cause.
+
+**BTC is shut deliberately.** `SIGN_BTC_TRANSACTION` is commented out, and worse
+for us, `chooseAddress` returns a different unused BTC address every call, so a
+balance read against it is not the user's balance. BTC through the Hub is
+unreadable as well as unsendable. Issue #124 has the three routes.
+
+## Lessons that cost real time here
+
+- **The CSS lives in a JS template literal.** A backtick in a comment turns the
+  whole stylesheet into a tagged-template call. `tsc` and the tests both catch
+  it; skipping straight to the browser does not.
+- **A NUL byte in `src/flags/data.ts` since v0.10.0** made `grep` treat the file
+  as binary, so searching it silently returned nothing. Stripped in #130.
+- **Flag artwork was 45% of the bundle**, and one flag (Mexico) was 37% of it.
+  Coat-of-arms flags rasterise to ~5 KB with no visible loss at 26px.
+  `gen-flags.mjs` now throws on a rasterized flag rather than re-inlining it.
+- **Two art sources means two aspect ratios.** nimiq.tech is 1:1, flag-icons 4x3
+  is 1.333:1, and assuming 1:1 letterboxes the wide ones inside the hexagon.
+  `FLAG_ASPECT` is generated from each viewBox now, so it cannot drift again.
+- **iOS ignores `::-webkit-scrollbar` entirely.** A styled scrollbar is invisible
+  there until a finger is already moving, which is why the grids needed a
+  chevron rather than just a fade.
+- **A test asserting `ships 5 locales`** is what let six offered languages do
+  nothing for eleven versions. It now asserts every language the picker OFFERS
+  has strings.
+
+## Repo rules
+
+- Feature branch, PR, squash merge, delete branch. CI is `typecheck + tests`.
+- `bun run check && bun test` before pushing; `ai-slop <file>` on any prose.
+- `bun run build:dist` and commit `dist/` — jsDelivr serves it from the tag.
+- Tag every release and verify the CDN returns 200 for the new tag.
+- **Re-derive the version before bumping.** Parallel sessions merge here; a
+  `sed` on the version you remember silently no-ops.
