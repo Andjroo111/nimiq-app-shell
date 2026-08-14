@@ -34,6 +34,10 @@ page for a while.
 | v0.20.0 (#146) | the send and receive screens are the wallet's own: the 3x3 recipient grid, a recipient identicon, a built-in QR |
 | v0.20.1 (#148) | the report-bug glyph: legs and antennae that reach the shell, and the right size beside the hexagon |
 
+**#149 is OPEN and unmerged**: v0.20.2, the bug glyph goes SOLID (filled body, negative-space
+seam, a head whose underside arcs with the shell). Andrew asked for it from a reference and has
+not said merge. CI green. Nothing else depends on it.
+
 ### What the review rounds on v0.20.0 changed
 
 Andrew drove the running playground and called these, in order:
@@ -52,7 +56,12 @@ Andrew drove the running playground and called these, in order:
 - **Switch account is the hexagon itself**, Andrew's drawing: the shipped
   outline path cut at its left and right points into two halves, each ending in
   an arrowhead, each stopping 0.9 short so the break reads at 24px.
-- **The bug glyph took five rounds, all of them found by ZOOMING.** Legs that
+- **A FILLED glyph ended the leg-join problem outright.** An outline bug is a diagram, and
+  every join in it is a detail somebody has to get right; a silhouette has no joins. The seam
+  is negative space between two half ellipses, so it stays one crisp width at any size, and
+  the limbs start INSIDE the fill so their joins are hidden. If another hand-drawn glyph starts
+  costing rounds, that is the move.
+- **The bug glyph took five rounds before that, all of them found by ZOOMING.** Legs that
   floated 1.1 units off the shell; then an inset that fixed the float and gave
   every leg a cap nub; then a crop that was rendering it smaller than the
   hexagon; then a ladybug that was rejected for a plain bug out of six drawn
