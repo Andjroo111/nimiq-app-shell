@@ -65,14 +65,15 @@ branch. 20 becomes 19, and party #176 already covers it.
 | Vendored | party ✅, cool, gift, money, name, talk, tax, tips | bump **and rebuild `public/vendor/app-shell.js`**, or it is a no-op live |
 | Own shape | sale, vote | needs a look each |
 
-Open PRs: `nimiq.gives` #58, `nimiq.ninja` #108, `nimiq.software` #65,
+All ten PRs now pin **v0.18.2**. Open PRs: `nimiq.gives` #58, `nimiq.ninja` #108, `nimiq.software` #65,
 `nimiq.stream` #48, `swellet` #99, `nimiq.casino` #31, `nimiq.life` #39,
-`nimiq.work` #129, `nimiq.party` #176.
+`nimiq.work` #129, `nimiq.party` #176. Every one is GREEN.
 
 CI is green on all seven CDN and bundled repos that run it. swellet has a
 deploy-only workflow, so it was verified by its own `bun test` (1245 pass) and in
-a browser. **party #176 is red on one CI line**, and only that line: see the
-vendored section below.
+a browser. party #176 needed its CI marker list moved with the API; that landed
+over SSH, since the `workflow`-scope block is an OAuth App rule SSH is not
+subject to.
 
 **nimmesh is out of the sweep** (Andrew, 2026-08-14): it is a wallet, and a
 wallet does not wear the mini wallet. Same reason `nimiq.ninja/app` was always
