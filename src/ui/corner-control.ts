@@ -24,7 +24,7 @@
 
 import type { I18n } from '../i18n';
 import type { Wallet } from '../wallet';
-import { SHELL_LANGUAGES, type ShellLanguage } from '../locales';
+import { FEATURED_LANGUAGES, type ShellLanguage } from '../locales';
 import { buildFlagHex } from './flag-hex';
 import { fmtNim, fmtFiat, lunaToNim, nimToLuna } from '../format/nim';
 import { BUG_ICON, openReportBugSheet, type ReportBugOptions } from './report-bug';
@@ -100,7 +100,14 @@ export interface CornerControlOptions {
    *  offering a Connect button the page can't honour. */
   wallet?: Wallet;
   i18n: I18n;
-  /** Languages to offer. Default: the 5 the shell ships strings for. */
+  /** Languages to offer. Default: the 11 FEATURED_LANGUAGES.
+   *
+   *  Eleven and not the 5 the shell ships UI strings for, because
+   *  `mountLanguagePill` (the v0.2.x chrome this replaces) offered 11, and
+   *  defaulting lower would silently cut every app the fleet sweep touches from
+   *  eleven languages to five. nimiq.tech ships full translations for exactly
+   *  these 11, so the pick is real even where the shell's own strings fall back
+   *  to English. */
   languages?: ShellLanguage[];
   /** Identicon renderer for the face + wallet block (self-sized element). */
   identicon?: (address: string, sizePx: number) => HTMLElement;
@@ -662,7 +669,7 @@ export function mountMiniWallet(
   options: CornerControlOptions,
 ): CornerControlHandle {
   const { wallet, i18n } = options;
-  const languages = options.languages ?? SHELL_LANGUAGES;
+  const languages = options.languages ?? FEATURED_LANGUAGES;
   const showReceive = options.receive !== false;
   const hasAssets = !!options.assets;
   // The asset stack carries its own balances, so it satisfies the same "there

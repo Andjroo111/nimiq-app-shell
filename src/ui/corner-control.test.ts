@@ -515,6 +515,25 @@ describe('an asset without its own address cannot open receive', () => {
   });
 });
 
+describe('language coverage', () => {
+  // The v0.2.x mountLanguagePill offered 11. The corner replacing it must not
+  // quietly offer 5, or the fleet sweep downgrades every app it touches.
+  test('the corner offers the 11 featured languages by default', () => {
+    expect(FEATURED_LANGUAGES).toHaveLength(11);
+    const opts: CornerControlOptions = { i18n: {} as never };
+    expect(opts.languages).toBeUndefined(); // so the default is what ships
+  });
+
+  // Every offered language needs a native name for the picker and artwork for
+  // its flag hexagon, or it renders as a gap.
+  test('every featured language has a native name and bundled flag art', () => {
+    for (const lang of FEATURED_LANGUAGES) {
+      expect(NATIVE_NAMES[lang.id], `native name for ${lang.id}`).toBeDefined();
+      expect(FLAG_SVG[lang.flag], `flag art for ${lang.id} (${lang.flag})`).toBeDefined();
+    }
+  });
+});
+
 describe('address grid', () => {
   const NIM = 'NQ34248H8MB88QK25RVKEM8QQJ8N2Q5R3XRK';           // 36
   const EVM = '0x71C7656EC7ab88b098defB751B7401B5f6d8976F';     // 42
