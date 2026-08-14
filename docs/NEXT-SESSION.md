@@ -6,8 +6,8 @@ The **mini wallet**: the fleet's one header control. `mountMiniWallet` is the
 canonical export; `mountCornerControl` is kept as an alias because ~25 apps
 import that name.
 
-**Current: v0.17.1**, tagged and on jsDelivr:
-`https://cdn.jsdelivr.net/gh/Andjroo111/nimiq-app-shell@v0.17.1/dist/app-shell.js`
+**Current: v0.18.2**, tagged and on jsDelivr:
+`https://cdn.jsdelivr.net/gh/Andjroo111/nimiq-app-shell@v0.18.2/dist/app-shell.js`
 
 ## Playground, the way to see any of this
 
@@ -48,21 +48,142 @@ Registry: `nimiq-branding-cli` #30 (rename/onboard notes) and #31 (the
 
 ## The fleet sweep, issue #112
 
-**1 of 21 apps converted.** This is the open work.
+**10 of 19 apps converted**: the six CDN, the three bundled, and party. PRs are
+open and none are merged.
+
+**splitlink is not a nineteenth app.** `Andjroo111/splitlink` was RENAMED to
+`Andjroo111/nimiq.party`; the GitHub API redirects, and `~/gdkc/projects/splitlink`
+is a stale local clone of that same repo whose `origin` still points at
+nimiq.party. Its five chrome files were byte-identical to party's, which is what
+gave it away. Converting it and pushing would have force-fought party's own
+branch. 20 becomes 19, and party #176 already covers it.
 
 | Model | Apps | Work per app |
 | --- | --- | --- |
-| CDN | cards ✅, gives, nimmesh, ninja, software, stream, swellet | one URL + one mount call |
-| Bundled | casino, life, work | dep bump + mount swap |
-| Vendored | cool, gift, money, name, party, talk, tax, tips, splitlink | bump **and rebuild `public/vendor/app-shell.js`**, or it is a no-op live |
+| CDN | cards ✅, gives ✅, ninja ✅, software ✅, stream ✅, swellet ✅ | one URL + one mount call |
+| Bundled | casino ✅, life ✅, work ✅ | dep bump + mount swap |
+| Vendored | party ✅, cool, gift, money, name, talk, tax, tips | bump **and rebuild `public/vendor/app-shell.js`**, or it is a no-op live |
 | Own shape | sale, vote | needs a look each |
 
-14 of the 21 mount a language pill only, no wallet; those become the
-language-only mini wallet. 7 have a wallet too.
+Open PRs: `nimiq.gives` #58, `nimiq.ninja` #108, `nimiq.software` #65,
+`nimiq.stream` #48, `swellet` #99, `nimiq.casino` #31, `nimiq.life` #39,
+`nimiq.work` #129, `nimiq.party` #176.
+
+CI is green on all seven CDN and bundled repos that run it. swellet has a
+deploy-only workflow, so it was verified by its own `bun test` (1245 pass) and in
+a browser. **party #176 is red on one CI line**, and only that line: see the
+vendored section below.
+
+**nimmesh is out of the sweep** (Andrew, 2026-08-14): it is a wallet, and a
+wallet does not wear the mini wallet. Same reason `nimiq.ninja/app` was always
+excluded while its landing converted.
+
+12 of the 19 mount a language pill only, no wallet; those become the
+language-only mini wallet. 7 have a wallet too, and swellet is the worked
+example: two controls collapse to one, and the three old theme var blocks
+(`--nq-langpill-*`, `--nq-walletpill-*`, `--nq-profile-*`) collapse to one
+`--nq-cc-*` block.
 
 **Two clones need care.** `nimiq.cool` has a build loop running (contested
 clone, a parallel session builds there). `nimiq.sale` serves live from its clone
 via launchd. Do those last, and not under a running process.
+
+### What the CDN six actually cost
+
+Four were the advertised one-liner. Two were not, and both surprises are worth
+knowing before starting:
+
+- **stream carried the block on four pages**, not one. Grep the whole `public/`,
+  never just `index.html`.
+- **ninja found a real app-shell bug.** The menu is right-anchored at a fixed
+  272px. ninja is the first app to put anything (a CTA) to the pill's right, so
+  the card ran off the left edge at every phone width. Every app converted before
+  it happened to put the pill hard right. Fixed in #140 (v0.18.1). If the
+  next app puts the pill mid-header, it is already handled; if it puts it inside
+  a scroll container or a transformed ancestor, measure again.
+- **Version bumps are per-repo law.** gives, software, stream and swellet each
+  require a `package.json` bump plus a CHANGELOG entry per PR. ninja requires
+  neither. Read the repo's own CLAUDE.md first.
+
+### And what the bundled three cost
+
+All three were on the git dep `#v0.2.0`, a sixteen-release jump to `#v0.18.1`.
+`tsc --noEmit` was clean in all three across that jump, so the package's shape
+has not drifted.
+
+- **casino and life had TWO controls** (`#lang-pill` + `#wallet-slot`), so they
+  consolidate like swellet. Both parents are flex rows with a `gap`, so the
+  emptied `#lang-pill` div has to be **removed**, not left behind, or it leaves a
+  hole. work had one control and was a straight rename.
+- **The bigger bundle can break a file-size guard.** casino commits its minified
+  `public/dist/chrome.js`, and v0.18.1's inlined flag artwork took it from under
+  800 lines to 842. Excluded `public/dist/` from its guard, which is what
+  nimiq.life's own CI already did. Expect this in any repo that commits a
+  minified bundle and counts lines on it.
+- **An app can offer more languages than it translates.** nimiq.life renders 5
+  (`lifeLocales`) and its picker offered 11, now 13. Preserve whatever the app
+  chose rather than narrowing it: ninja filters to 4 on purpose, swellet to 5,
+  life defaults. Narrowing uninvited is a product change.
+
+### The vendored batch: party is the worked example
+
+`git remote -v` FIRST in every vendored repo. That is how splitlink turned out to
+be nimiq.party renamed, and a push would have fought party's own branch.
+
+- **The vendored apps are on an older chrome than the CDN ones were.** They mount
+  `mountLanguageSwitcher` + `mountProfileWidget`, not `mountLanguagePill` +
+  `mountWalletPill`. Both old names still export from v0.18.1, so a bump alone
+  compiles and changes nothing, which is the trap.
+- **Most of the work is deleting the app's own code.** party hand-rolled a
+  Connect button, its connecting/retry text, and a profile re-mount on every
+  account change, because the old chrome was two components and neither owned the
+  signed-out state. The mini wallet owns that swap. Keep only what the shell
+  cannot know: party mirrors the connected account into `state` as the app's
+  identity.
+- ⚠ **Do not "tidy" that mirror into clearing on disconnect.** `boot()` falls back
+  to a demo account and `split-entry.js` dereferences `state.account.address`, so
+  clearing throws instead of degrading. I wrote that bug and caught it reading the
+  call sites.
+- **A wider pill can wrap.** party's `.app-header` wraps, and the mini wallet is
+  wider than the old Connect button, so on a phone it takes its own line and
+  `margin-left:auto` has nothing to push against. `.shell-chrome` needed
+  `flex: 1 1 auto`. Only the browser catches this.
+- ⚠ **party and splitlink CI grep the built bundle for API symbols**, including
+  the two mount names that just went away, so the guard fires on exactly this
+  change. The marker list has to move with the API. **The Mac-mini `gh` token has
+  no `workflow` scope**, so that edit cannot be pushed: `gh auth refresh -s
+  workflow` first. party #176 is red for this reason alone and carries the exact
+  diff in a comment.
+
+## Next lane: an installing app must be able to wear its own brand
+
+Andrew, 2026-08-14: *"if the person installs it onto their app, they should be
+able to also make it match their branding"*, measured against nimiq.cool,
+hashmark and swellet.
+
+The seam exists but is half-built. **16 `--nq-cc-*` vars** cover the menu chrome
+(bg, fg, muted, hover, line, border, shadow, accent, card-bg, and the
+language-only face). **~20 hardcoded Nimiq colours have no escape hatch at all**,
+and they are the loud ones:
+
+| What | Hardcoded | Why it shows |
+| --- | --- | --- |
+| Connect button | navy radial `#260133`→`#1f2348` | the primary CTA, on every signed-out page |
+| Send + Send-confirm | blue radial `#265dd7`→`#0582ca` | the primary CTA once signed in |
+| Inputs + focus rings | `#0582ca` | recipient, amount, rename |
+| Address chip, contacts | `rgba(5,130,202,…)` + `#0582ca` | the receive view |
+| Status colours | `#d94432` red, `#13b59d` green, `#fc8702` orange | errors and testnet |
+| Font | `'Mulish','Muli'` | inherits nothing from the host |
+
+swellet is the proof: its `--nq-cc-*` block themes the card correctly in forest
+dark and white light, and the Connect button inside it is still Nimiq navy on a
+teal-brand page. That is the whole gap in one screenshot.
+
+Worth deciding before writing vars one at a time: whether this is **more vars**
+or **one `theme` option** on `CornerControlOptions` that stamps a scoped
+stylesheet. More vars is additive and safe; a theme object is a real interface
+and stops the list growing forever. hashmark (v0.17.1) and nimiq.cool both have
+their own palettes and are the other two test cases.
 
 ## What the Hub will not allow
 
@@ -99,6 +220,14 @@ unreadable as well as unsendable. Issue #124 has the three routes.
 - **A test asserting `ships 5 locales`** is what let six offered languages do
   nothing for eleven versions. It now asserts every language the picker OFFERS
   has strings.
+- **`right:0` is not a position, it is an assumption about the host.** The menu
+  looked correct for eighteen versions because every app that mounted it put the
+  pill hard right. `menuShift` is a pure function so the arithmetic can be tested
+  without a browser; `getBoundingClientRect` is the only part that needs one.
+- **An app's committed bundle can be older than its source.** swellet's
+  `public/dist/main.js` is gitignored, and the checked-out copy predated the
+  `window.__swelletLang` bridge, so the corner silently never mounted. That reads
+  exactly like a broken conversion. Build the app before blaming the change.
 
 ## Repo rules
 
