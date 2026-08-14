@@ -9,6 +9,7 @@ import { FIAT_FLAGS, NATIVE_NAMES, addressGrid, menuShift, mountMiniWallet, type
 import { FLAG_SVG } from '../flags/data';
 import { SHELL_LANGUAGES, FEATURED_LANGUAGES, shellLocales, mergeLocales } from '../locales';
 import { createI18n } from '../i18n';
+import { formatAddressBlocks, significantChars } from './address-input';
 import type { Wallet } from '../wallet';
 
 describe('corner-control data', () => {
@@ -267,7 +268,10 @@ describe('receive view names the chain it is showing', () => {
     const warn = host.querySelector('.nq-cc-net-warn')?.textContent ?? '';
     expect(warn).toContain('Polygon');
     expect(warn).toContain('USDT');
-    expect(host.querySelector('.nq-cc-back')?.textContent).toContain('USDT');
+    // The ticker rides the view TITLE now, not the back button: the back
+    // control is a bare chevron, because a label that is also the way out asks
+    // one control to mean two things.
+    expect(host.querySelector('.nq-cc-view-title')?.textContent).toContain('USDT');
   });
 });
 
@@ -427,8 +431,13 @@ describe('saved recipients', () => {
     await openSend(host);
     (host.querySelector('.nq-cc-contact') as HTMLElement).click();
     await settle();
-    expect((host.querySelector('.nq-cc-input-addr') as HTMLInputElement).value)
-      .toBe(CONTACTS[0]!.address);
+    // The field is the 3x3 block grid now, so the value carries the wallet's
+    // own formatting. What matters is that the SAME address landed in it.
+    const field = host.querySelector('.nq-cc-addr-input') as HTMLTextAreaElement;
+    expect(field.value).toBe(formatAddressBlocks(CONTACTS[0]!.address));
+    expect(significantChars(field.value)).toBe(
+      CONTACTS[0]!.address.replace(/\s+/g, '').toUpperCase(),
+    );
   });
 
   // A send view that refuses to open because the host address book threw is

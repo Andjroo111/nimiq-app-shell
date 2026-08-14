@@ -15,6 +15,7 @@ export default {
   "shell.balance": "Saldo",
   "shell.language": "Bahasa",
   "shell.notConnected": "Tidak terhubung",
+  "shell.back": "Kembali",
   "shell.send": "Kirim",
   "shell.cancel": "Batal",
   "shell.retry": "Coba lagi",

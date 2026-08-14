@@ -65,7 +65,11 @@
   fieldset { border: 0; padding: 0; margin: 0 0 16px; }
   fieldset:last-child { margin-bottom: 0; }
   legend { font-size: 12px; font-weight: 700; margin-bottom: 7px; padding: 0; }
-  label { display: flex; align-items: center; gap: 8px; font-size: 13px; padding: 3px 0; cursor: pointer; }
+  /* SCOPED to the control panel. As a bare element selector this leaked into
+     the mounted mini wallet and made its own labels flex containers, so the
+     playground was restyling the component it exists to show, and a centred
+     label rendered left here while being correct in every real app. */
+  .panel label { display: flex; align-items: center; gap: 8px; font-size: 13px; padding: 3px 0; cursor: pointer; }
   label input { accent-color: var(--blue); margin: 0; width: 18px; height: 18px; flex: none; }
   .hint { color: var(--muted); font-size: 12px; margin: 4px 0 0; line-height: 1.45; }
 
@@ -96,6 +100,16 @@
     box-shadow: inset 0 0 0 2px rgba(31, 35, 72, .1);
   }
   .nq-pg-select:focus-visible { outline: 2px solid var(--blue); outline-offset: 3px; }
+
+  /* Address book editor */
+  .ab-list { display: flex; flex-direction: column; gap: 4px; margin: 2px 0 8px; }
+  .ab-row { display: flex; align-items: center; gap: 8px; font-size: 12px; }
+  .ab-row b { font-weight: 700; }
+  .ab-row code { font-family: 'Fira Mono', ui-monospace, monospace; font-size: 11px;
+    color: var(--muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .ab-row .mini { margin-left: auto; flex: none; }
+  .ab-add { display: grid; grid-template-columns: 1fr 1.6fr auto; gap: 6px; }
+  .ab-empty { color: var(--muted); font-size: 12px; font-style: italic; }
 
   /* Standalone asset list: the same stack, mounted outside the corner. */
   #standalone { max-width: 340px; border: 1px solid var(--line); border-radius: 10px; overflow: hidden; }
@@ -184,10 +198,20 @@
           <label><input type="checkbox" id="opt-onboard" checked> New-to-Nimiq line</label>
           <label><input type="checkbox" id="opt-openinpay"> Open in Nimiq Pay</label>
           <label><input type="checkbox" id="opt-identicon" checked> Real identicons</label>
-          <label><input type="checkbox" id="opt-qr" checked> QR renderer</label>
+          <label><input type="checkbox" id="opt-qr"> Override the QR with a host renderer</label>
           <label><input type="checkbox" id="opt-testnet"> Testnet (shows network row)</label>
           <label><input type="checkbox" id="opt-contacts" checked> Saved recipients (address book)</label>
           <p class="hint">An unwired seam renders no row, which is the corner's no-dead-buttons rule. Toggle one off and watch it vanish.</p>
+        </fieldset>
+        <fieldset>
+          <legend>Address book</legend>
+          <div id="ab-list" class="ab-list"></div>
+          <div class="ab-add">
+            <input id="ab-label" class="nq-pg-select" placeholder="Name" autocomplete="off">
+            <input id="ab-addr" class="nq-pg-select" placeholder="NQ… or 0x…" autocomplete="off" spellcheck="false">
+            <button class="mini" id="ab-save">add</button>
+          </div>
+          <p class="hint">What the host's <code>contacts.list</code> hands over. Editing it here is the only way to see how a name of a given length wraps, or what a book of nine does to the chip row. Kept in <code>localStorage</code>, so a reload does not undo the set you built.</p>
         </fieldset>
         <fieldset>
           <legend>Send</legend>
@@ -370,8 +394,9 @@ function identiconEl(address, sizePx) {
 }
 
 /* -------------------------------------------------------------- QR (tiny)
-   Not a real encoder. It is a visible stand-in that proves the `qr` seam is
-   wired and sized right. Apps pass their own; the shell has no opinion. */
+   Not a real encoder, and deliberately ugly. Since v0.20.0 the shell draws the
+   wallet's own QR with no wiring, so this exists only to prove the `qr` seam
+   still OVERRIDES it. Leave the box unchecked to see the real one. */
 function qrEl(text, sizePx) {
   const el = document.createElement('div');
   el.style.cssText = `width:${sizePx}px;height:${sizePx}px;display:grid;
@@ -388,7 +413,7 @@ function qrEl(text, sizePx) {
 
 /* Shown in the Report a bug context so a filed issue says which build produced
    it. Kept in step with package.json by hand; it is a label, not a dependency. */
-const SHELL_VERSION = '0.19.2';
+const SHELL_VERSION = '0.20.0';
 
 /* ------------------------------------------------------------ mock assets */
 const $ = (id) => document.getElementById(id);
@@ -446,11 +471,54 @@ async function rate(ticker, asset = 'NIM') {
 
 /* The host owns the address book. This one is in memory and starts with a
    Polygon entry on purpose: it must NOT be offered when sending NIM. */
-const contacts = [
+/* The address book is EDITABLE and persisted, because the interesting states
+   are the ones a frozen three-entry fixture cannot reach: an empty book, a name
+   long enough to wrap the chip row, nine of them, the one whose address is a
+   Polygon address. The corner's own `contacts.add` writes here too, so the
+   save-after-send flow can be watched end to end. */
+const AB_KEY = 'nq-pg:contacts';
+const AB_SEED = [
   { label: 'Mum', address: 'NQ21 8LNC MJD3 D7T4 8FSX N5M8 5V2M A9GY 4KUJ' },
   { label: 'Savings', address: 'NQ73 6XLE 6VTP U4TX D3H0 UAKG 9YKR NRHR YVFB' },
   { label: 'Polygon till', address: '0x71C7656EC7ab88b098defB751B7401B5f6d8976F', asset: 'USDT' },
 ];
+let contacts = (() => {
+  try {
+    const raw = localStorage.getItem(AB_KEY);
+    if (raw) return JSON.parse(raw);
+  } catch { /* storage unavailable or holding something else */ }
+  return AB_SEED.slice();
+})();
+function saveContacts() {
+  try { localStorage.setItem(AB_KEY, JSON.stringify(contacts)); } catch { /* ignore */ }
+  renderAddressBook();
+}
+function renderAddressBook() {
+  const host = $('ab-list');
+  if (!host) return;
+  host.textContent = '';
+  if (!contacts.length) {
+    const p = document.createElement('p');
+    p.className = 'ab-empty';
+    p.textContent = 'Empty. The chip row hides itself rather than showing a heading over nothing.';
+    host.appendChild(p);
+    return;
+  }
+  contacts.forEach((c, i) => {
+    const row = document.createElement('div');
+    row.className = 'ab-row';
+    const name = document.createElement('b');
+    name.textContent = c.label;
+    const addr = document.createElement('code');
+    addr.textContent = c.address;
+    const del = document.createElement('button');
+    del.className = 'mini';
+    del.textContent = 'remove';
+    del.addEventListener('click', () => { contacts.splice(i, 1); saveContacts(); remount(); });
+    row.append(name, addr, del);
+    host.appendChild(row);
+  });
+}
 
 /* ------------------------------------------------------------------ mount */
 const i18n = createI18n({ locales: mergeLocales(shellLocales), fallback: 'en' });
@@ -469,6 +537,7 @@ function buildOptions() {
   };
   if (opt('opt-wallet')) o.wallet = wallet;
   if (opt('opt-identicon')) o.identicon = identiconEl;
+  // Unchecked is the DEFAULT now: the shell draws the wallet's own QR.
   if (opt('opt-qr')) o.qr = qrEl;
 
   if (bal === 'nim') o.getBalanceLuna = async () => nimLuna;
@@ -504,7 +573,7 @@ function buildOptions() {
   if (opt('opt-contacts')) {
     o.contacts = {
       list: () => { log('info', `contacts.list() -> ${contacts.length}`); return contacts; },
-      add: (entry) => { contacts.push(entry); log('info', 'contacts.add()', entry); },
+      add: (entry) => { contacts.push(entry); saveContacts(); log('info', 'contacts.add()', entry); },
     };
   }
 
@@ -691,6 +760,22 @@ function waitFor(read, timeoutMs = 2000) {
     tick();
   });
 }
+
+$('ab-save').addEventListener('click', () => {
+  const label = $('ab-label').value.trim();
+  const address = $('ab-addr').value.trim();
+  if (!label || !address) return log('warn', 'address book: a name and an address, both');
+  // asset rides along for a non-NIM address, which is what makes the corner
+  // offer that contact only on the matching asset's send.
+  const entry = { label, address };
+  if (/^0x/i.test(address)) entry.asset = 'USDT';
+  contacts.push(entry);
+  saveContacts();
+  $('ab-label').value = '';
+  $('ab-addr').value = '';
+  remount();
+});
+renderAddressBook();
 
 const boot = applyDeepLink();
 remount();

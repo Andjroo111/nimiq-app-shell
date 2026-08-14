@@ -15,6 +15,7 @@ export default {
   "shell.balance": "बैलेंस",
   "shell.language": "भाषा",
   "shell.notConnected": "कनेक्ट नहीं है",
+  "shell.back": "वापस",
   "shell.send": "भेजें",
   "shell.cancel": "रद्द करें",
   "shell.retry": "फिर कोशिश करें",

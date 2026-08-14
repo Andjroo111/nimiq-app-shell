@@ -14,6 +14,7 @@ export default {
   'shell.balance': 'Balance',
   'shell.language': 'Language',
   'shell.notConnected': 'Not connected',
+  'shell.back': 'Back',
   'shell.send': 'Send',
   'shell.cancel': 'Cancel',
   'shell.retry': 'Retry',
