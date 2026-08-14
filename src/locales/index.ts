@@ -13,9 +13,28 @@ import de from './de';
 import es from './es';
 import fr from './fr';
 import pt from './pt';
+import hi from './hi';
+import zh from './zh';
+import tr from './tr';
+import ko from './ko';
+import vi from './vi';
+import ha from './ha';
 import type { Locales } from '../i18n';
 
-export const shellLocales: Locales = { en, de, es, fr, pt };
+/** UI strings for every language the mini wallet OFFERS, not just the five it
+ *  started with.
+ *
+ *  Until v0.17.0 this shipped en/de/es/fr/pt while the picker offered eleven, so
+ *  choosing Mandarin, Korean, Vietnamese, Hindi, Turkish or Hausa changed the
+ *  flag and nothing else: the whole wallet stayed in English. Offering a
+ *  language that does nothing is worse than not offering it.
+ *
+ *  The six added here are MACHINE-ASSISTED and have not been reviewed by native
+ *  speakers. That is a real caveat and it is written down rather than implied,
+ *  but an unreviewed translation beats a language that visibly does nothing.
+ *  `shell.networkOnly` is the one to review first: it is the wrong-chain warning,
+ *  and it is the only string here where a bad translation costs money. */
+export const shellLocales: Locales = { en, de, es, fr, pt, hi, zh, tr, ko, vi, ha };
 
 export { en, de, es, fr, pt };
 
