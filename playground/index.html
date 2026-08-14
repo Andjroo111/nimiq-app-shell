@@ -184,7 +184,7 @@
           <label><input type="checkbox" id="opt-onboard" checked> New-to-Nimiq line</label>
           <label><input type="checkbox" id="opt-openinpay"> Open in Nimiq Pay</label>
           <label><input type="checkbox" id="opt-identicon" checked> Real identicons</label>
-          <label><input type="checkbox" id="opt-qr" checked> QR renderer</label>
+          <label><input type="checkbox" id="opt-qr"> Override the QR with a host renderer</label>
           <label><input type="checkbox" id="opt-testnet"> Testnet (shows network row)</label>
           <label><input type="checkbox" id="opt-contacts" checked> Saved recipients (address book)</label>
           <p class="hint">An unwired seam renders no row, which is the corner's no-dead-buttons rule. Toggle one off and watch it vanish.</p>
@@ -370,8 +370,9 @@ function identiconEl(address, sizePx) {
 }
 
 /* -------------------------------------------------------------- QR (tiny)
-   Not a real encoder. It is a visible stand-in that proves the `qr` seam is
-   wired and sized right. Apps pass their own; the shell has no opinion. */
+   Not a real encoder, and deliberately ugly. Since v0.20.0 the shell draws the
+   wallet's own QR with no wiring, so this exists only to prove the `qr` seam
+   still OVERRIDES it. Leave the box unchecked to see the real one. */
 function qrEl(text, sizePx) {
   const el = document.createElement('div');
   el.style.cssText = `width:${sizePx}px;height:${sizePx}px;display:grid;
@@ -388,7 +389,7 @@ function qrEl(text, sizePx) {
 
 /* Shown in the Report a bug context so a filed issue says which build produced
    it. Kept in step with package.json by hand; it is a label, not a dependency. */
-const SHELL_VERSION = '0.19.2';
+const SHELL_VERSION = '0.20.0';
 
 /* ------------------------------------------------------------ mock assets */
 const $ = (id) => document.getElementById(id);
@@ -469,6 +470,7 @@ function buildOptions() {
   };
   if (opt('opt-wallet')) o.wallet = wallet;
   if (opt('opt-identicon')) o.identicon = identiconEl;
+  // Unchecked is the DEFAULT now: the shell draws the wallet's own QR.
   if (opt('opt-qr')) o.qr = qrEl;
 
   if (bal === 'nim') o.getBalanceLuna = async () => nimLuna;

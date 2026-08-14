@@ -31,6 +31,8 @@ import { BUG_ICON, openReportBugSheet, type ReportBugOptions } from './report-bu
 import { installReportCapture } from './report-capture';
 import { mountAssetList, type AssetListHandle, type ShellAsset } from './asset-list';
 import { applyTheme, type ShellTheme } from './theme';
+import { nimiqQr } from './qr';
+import { formatAddressBlocks, reformatInPlace, significantChars } from './address-input';
 
 /** A NIM address: NQ + 2 check digits + 32 base32 chars. */
 const NIM_ADDRESS_SHAPE = /^NQ[0-9]{2}[0-9A-HJ-NP-VXY]{32}$/;
@@ -127,8 +129,10 @@ export interface CornerControlOptions {
   languages?: ShellLanguage[];
   /** Identicon renderer for the face + wallet block (self-sized element). */
   identicon?: (address: string, sizePx: number) => HTMLElement;
-  /** QR renderer for the receive view. Without it the receive view shows the
-   *  address grid only. */
+  /** OVERRIDE the receive QR. Without it the mini wallet draws the wallet's own
+   *  (registry `qr-code`: rounded modules, the light-blue radial), so this is a
+   *  seam rather than a requirement. It was host-only until v0.20.0, which had
+   *  nineteen apps about to hand-roll the one graphic here a camera must read. */
   qr?: (text: string, sizePx: number) => HTMLElement;
   /** Show the Receive flow (address + QR behind the Receive button). Default true. */
   receive?: boolean;
@@ -487,6 +491,63 @@ button.nq-cc-name:focus-visible { outline:2px solid var(--nq-cc-accent, #0582ca)
 .nq-cc.nq-cc-show-send .nq-cc-view-send { display:block; }
 .nq-cc-send-body { display:flex; flex-direction:column; gap:8px; padding:10px 8px 8px; }
 .nq-cc-field-label { font-size:12px; font-weight:600; color:var(--nq-cc-menu-muted, rgba(31,35,72,.5)); }
+/* label row + the recipient identicon, which appears only once the address is
+   real. The row keeps its height either way so the field below does not jump. */
+.nq-cc-field-head { display:flex; align-items:center; justify-content:space-between;
+  gap:8px; min-height:26px; }
+.nq-cc-recipient-icon { display:block; width:26px; height:26px; flex:none; }
+.nq-cc-recipient-icon[hidden] { display:none; }
+.nq-cc-recipient-icon > * { display:block; width:100%; height:100%; }
+
+/* Recipient: nine four-char blocks in a 3x3 grid, the wallet's send-modal field
+   scaled to this menu. One textarea holding a 14-character line per row
+   ("XXXX XXXX XXXX"), so the blocks sit at fixed FRACTIONS of the line in any
+   monospace font. Everything below is in ch for that reason: a px or rem
+   geometry drifts the moment Fira Mono is missing and the fallback's advance
+   differs, which is the documented cause of address grids looking wonky.
+
+   Inset box-shadow for the border, never border (rule 1). */
+.nq-cc-addr-field { position:relative; border-radius:8px; padding:7px 0;
+  background:var(--nq-cc-input-bg, var(--nq-cc-card-bg, #fff));
+  box-shadow:inset 0 0 0 2px color-mix(in srgb, var(--nq-cc-menu-fg, #1f2348) 12%, transparent);
+  transition:box-shadow .15s var(--nimiq-ease, cubic-bezier(.25,0,0,1)); }
+.nq-cc-addr-field:focus-within { box-shadow:inset 0 0 0 2px var(--nq-cc-accent, #0582ca); }
+/* A formatted line is 14 characters plus two block gaps. The gap is
+   WORD-SPACING rather than a bigger font or letter-spacing, because the
+   reference is tight four-character blocks separated by air: widening the
+   letters would space the characters inside a block too, and the four
+   characters of a block read as one unit. */
+.nq-cc-addr-input { display:block; margin:0 auto; padding:0; border:none;
+  --nq-cc-addr-gap:4.9ch;
+  width:calc(14ch + 2 * var(--nq-cc-addr-gap));
+  word-spacing:var(--nq-cc-addr-gap);
+  outline:none; resize:none; overflow:hidden; background:transparent;
+  font-family:'Fira Mono',ui-monospace,monospace; font-size:14px; line-height:26px;
+  text-transform:uppercase; text-align:center;
+  color:var(--nq-cc-input-fg, var(--nq-cc-menu-fg, #1f2348)); }
+.nq-cc-addr-input::placeholder { opacity:.32; }
+/* The separators, drawn on ONE element behind the text so the textarea keeps a
+   single caret and a single selection.
+
+   The column rules sit in the two gaps between blocks, at characters 4.5 and
+   9.5 of the 14-character line, which is 2.5ch either side of centre. This
+   element must carry the same font as the textarea, or its ch unit is Mulish's
+   and the rules land in the middle of the text.
+   NOTE: this block is a JS template literal, so it must never contain a
+   backtick. Writing ch in code quotes here is what broke the build once. */
+.nq-cc-addr-rules { position:absolute; inset:7px 0; pointer-events:none;
+  font-family:'Fira Mono',ui-monospace,monospace; font-size:14px;
+  --nq-cc-addr-rule:color-mix(in srgb, var(--nq-cc-menu-fg, #1f2348) 10%, transparent);
+  --nq-cc-addr-gap:4.9ch;
+  /* Block 1 ends at char 4 and block 2 starts at char 5 plus the gap, so the
+     gap centre is 2.5ch + half a gap either side of the line's centre. Derived
+     rather than eyeballed, so changing the gap moves the rules with it. */
+  --nq-cc-addr-rule-x:calc(2.5ch + var(--nq-cc-addr-gap) / 2);
+  background:
+    linear-gradient(var(--nq-cc-addr-rule), var(--nq-cc-addr-rule)) calc(50% - var(--nq-cc-addr-rule-x)) 50%/1px 100% no-repeat,
+    linear-gradient(var(--nq-cc-addr-rule), var(--nq-cc-addr-rule)) calc(50% + var(--nq-cc-addr-rule-x)) 50%/1px 100% no-repeat,
+    linear-gradient(var(--nq-cc-addr-rule), var(--nq-cc-addr-rule)) 50% 33.333%/calc(100% - 20px) 1px no-repeat,
+    linear-gradient(var(--nq-cc-addr-rule), var(--nq-cc-addr-rule)) 50% 66.667%/calc(100% - 20px) 1px no-repeat; }
 /* inputs: inset box-shadow border, never border (rule 1) */
 .nq-cc-input { width:100%; border:none; border-radius:8px; padding:9px 10px; font-family:inherit;
   font-size:14px; font-weight:600;
@@ -496,8 +557,6 @@ button.nq-cc-name:focus-visible { outline:2px solid var(--nq-cc-accent, #0582ca)
 .nq-cc-input:focus { outline:none; box-shadow:inset 0 0 0 2px var(--nq-cc-accent, #0582ca); }
 .nq-cc-input::placeholder { font-weight:600;
   color:color-mix(in srgb, var(--nq-cc-menu-fg, #1f2348) 30%, transparent); }
-.nq-cc-input-addr { font-family:'Fira Mono',ui-monospace,monospace; font-size:12px;
-  letter-spacing:.02em; text-transform:uppercase; }
 .nq-cc-amount-row { position:relative; }
 .nq-cc-amount-row .nq-cc-input { padding-right:44px; }
 .nq-cc-amount-suffix { position:absolute; right:11px; top:50%; transform:translateY(-50%);
@@ -528,9 +587,10 @@ button.nq-cc-name:focus-visible { outline:2px solid var(--nq-cc-accent, #0582ca)
 .nq-cc-back:hover { background:var(--nq-cc-menu-hover, rgba(31,35,72,.06)); }
 .nq-cc-back:focus-visible { outline:2px solid var(--nq-cc-accent, #0582ca); outline-offset:-2px; }
 .nq-cc-receive-body { display:flex; flex-direction:column; align-items:center; padding:10px 8px 8px; }
-.nq-cc-qr { display:block; width:164px; height:164px; }
-.nq-cc-qr:empty { display:none; }
-.nq-cc-qr > * { display:block; width:100%; height:100%; }
+.nq-cc-qr { display:block; padding:10px; border-radius:8px;
+  background:var(--nq-cc-qr-plate, #fff); }
+.nq-cc-qr:empty { display:none; padding:0; }
+.nq-cc-qr > * { display:block; width:164px; height:164px; }
 .nq-cc-receive-hint { font-size:12px; font-weight:600; color:var(--nq-cc-menu-muted, rgba(31,35,72,.45)); margin:8px 0 2px; }
 
 /* tap-to-copy address: upstream Copyable verbatim: light-blue tooltip, tinted
@@ -1314,12 +1374,33 @@ export function mountMiniWallet(
   sendBackBtn.addEventListener('click', () => closeSend());
   el('div', 'nq-cc-divider', viewSend);
   const sendBody = el('div', 'nq-cc-send-body', viewSend);
-  const recipientLabel = el('label', 'nq-cc-field-label', sendBody);
+  // The label row carries the recipient identicon, because the identicon is the
+   // only thing on this screen that tells you at a GLANCE that you are paying
+   // the person you meant to. Reading 36 characters back is not something people
+   // do; recognising a face they have seen before is. It appears the moment the
+   // address is a real one and goes again if you edit it back into nonsense, so
+   // its presence IS the validity signal.
+  const recipientHead = el('div', 'nq-cc-field-head', sendBody);
+  const recipientLabel = el('label', 'nq-cc-field-label', recipientHead);
   tNode(recipientLabel, 'shell.recipient');
-  const recipientInput = el('input', 'nq-cc-input nq-cc-input-addr', sendBody);
-  recipientInput.placeholder = 'NQ00 0000 0000 0000 0000 0000 0000 0000 0000';
+  const recipientIcon = el('span', 'nq-cc-recipient-icon', recipientHead);
+  recipientIcon.hidden = true;
+
+  // Nine four-char blocks in a 3x3 grid, the wallet's own send-modal field.
+  const recipientWrap = el('div', 'nq-cc-addr-field', sendBody);
+  el('span', 'nq-cc-addr-rules', recipientWrap);
+  const recipientInput = el('textarea', 'nq-cc-addr-input', recipientWrap);
+  recipientInput.rows = 3;
+  recipientInput.placeholder = formatAddressBlocks('NQ00000000000000000000000000000000000');
   recipientInput.autocomplete = 'off';
   recipientInput.spellcheck = false;
+  recipientInput.setAttribute('aria-label', i18n.t('shell.recipient'));
+  // Format as they type, and after a paste, which is how most addresses arrive.
+  recipientInput.addEventListener('input', () => reformatInPlace(recipientInput));
+  // Enter would add a fourth line to a three-line field.
+  recipientInput.addEventListener('keydown', (e) => {
+    if ((e as KeyboardEvent).key === 'Enter') e.preventDefault();
+  });
   // Saved recipients. Chips rather than a dropdown: there are only ever a
   // handful of people you pay repeatedly, and a select would hide them behind a
   // tap while a row of names is readable at a glance.
@@ -1377,16 +1458,14 @@ export function mountMiniWallet(
       chip.textContent = contact.label;
       chip.title = contact.address;
       chip.addEventListener('click', () => {
-        recipientInput.value = contact.address;
+        recipientInput.value = formatAddressBlocks(contact.address);
         validateSend();
         recipientInput.focus();
-        // Scroll back to the START. Filling an input leaves the caret at the
-        // end, so a 36-character address shows its last few blocks and hides
-        // the first, which is the half people actually recognise. The point of
-        // filling the field rather than bypassing it is that the address stays
-        // checkable, and it is not checkable if you cannot see where it begins.
+        // Caret to the START. The grid shows all nine blocks at once now, so
+        // this is no longer about scrolling the first ones back into view; it
+        // is so the field reads from its beginning, which is the half people
+        // actually recognise, rather than parking mid-address.
         recipientInput.setSelectionRange(0, 0);
-        recipientInput.scrollLeft = 0;
       });
     }
   }
@@ -1416,13 +1495,32 @@ export function mountMiniWallet(
 
   // 36 chars in Nimiq's base32 alphabet (no I, O, W, Z), NQ + check + 8 blocks
   const NIM_ADDRESS_RE = /^NQ\d{2}[0-9A-HJ-NP-VXY]{32}$/;
-  const compactRecipient = (): string => recipientInput.value.toUpperCase().replace(/[\s-]+/g, '');
+
+  /** Draw (or clear) the recipient identicon. Only ever called with an address
+   *  that already passed the shape check, so it never renders a face for
+   *  something half-typed: a face appearing early would be read as "this is
+   *  who you are paying" while the address is still wrong.
+   *
+   *  A host that wired no `identicon` renderer gets nothing rather than the
+   *  neutral hexagon the account face falls back to. The hexagon is a
+   *  PLACEHOLDER, and a placeholder here would say "identity confirmed" while
+   *  showing no identity at all. */
+  let recipientIconFor = '';
+  function renderRecipientIcon(address: string | null): void {
+    if (!options.identicon || recipientIconFor === (address ?? '')) return;
+    recipientIconFor = address ?? '';
+    recipientIcon.textContent = '';
+    recipientIcon.hidden = !address;
+    if (address) recipientIcon.appendChild(options.identicon(address, 26));
+  }
+  const compactRecipient = (): string => significantChars(recipientInput.value);
   const amountNim = (): number => {
     const n = Number(amountInput.value.replace(',', '.'));
     return Number.isFinite(n) ? n : 0;
   };
   function validateSend(): void {
     const okAddress = NIM_ADDRESS_RE.test(compactRecipient());
+    renderRecipientIcon(okAddress ? compactRecipient() : null);
     const nim = amountNim();
     const okAmount = nim > 0 && (balanceLuna === null || nim <= lunaToNim(balanceLuna));
     sendConfirm.disabled = !(okAddress && okAmount);
@@ -1542,9 +1640,11 @@ export function mountMiniWallet(
     // applied to the account address. An asset says what it wants via `uri`, and
     // the default is the bare address, which every scanner understands.
     const payload = asset ? (asset.uri?.(compact) ?? compact) : `nimiq:${compact}`;
-    if (options.qr && qrFor !== payload) {
+    if (qrFor !== payload) {
       qrSlot.textContent = '';
-      qrSlot.appendChild(options.qr(payload, 164));
+      // The host's renderer wins; without one this is the wallet's own QR
+      // rather than nothing, which is what it used to be.
+      qrSlot.appendChild(options.qr ? options.qr(payload, 164) : nimiqQr(payload, 164, qrSlot));
       qrFor = payload;
     }
   }
