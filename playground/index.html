@@ -140,6 +140,14 @@
           <p class="hint">In miniapp mode the wallet is ambient: the face collapses to a flag and the menu keeps language only.</p>
         </fieldset>
         <fieldset>
+          <legend>Host brand</legend>
+          <label><input type="radio" name="brand" value="nimiq" checked> Nimiq (no theme passed)</label>
+          <label><input type="radio" name="brand" value="swellet"> swellet, teal on forest dark</label>
+          <label><input type="radio" name="brand" value="hashmark"> hashmark, lime on charcoal</label>
+          <label><input type="radio" name="brand" value="cool"> nimiq.cool, green on white</label>
+          <p class="hint">The three real palettes this seam was measured against. The strips repaint too, because a Connect button only looks wrong next to the page it is wrong for.</p>
+        </fieldset>
+        <fieldset>
           <legend>Presence</legend>
           <label><input type="checkbox" id="opt-wallet" checked> Pass a wallet at all</label>
           <label><input type="checkbox" id="opt-connected"> Start connected</label>
@@ -380,7 +388,7 @@ function qrEl(text, sizePx) {
 
 /* Shown in the Report a bug context so a filed issue says which build produced
    it. Kept in step with package.json by hand; it is a label, not a dependency. */
-const SHELL_VERSION = '0.11.0';
+const SHELL_VERSION = '0.19.0';
 
 /* ------------------------------------------------------------ mock assets */
 const $ = (id) => document.getElementById(id);
@@ -513,6 +521,44 @@ function buildOptions() {
   return o;
 }
 
+// The three brands the theming seam was measured against, verbatim from each
+// app's own stylesheet. hashmark is the one that proves accentText has to
+// exist: white on that lime is unreadable.
+const BRANDS = {
+  nimiq: null,
+  swellet: {
+    theme: { font: 'inherit', primary: '#0C8C77', accent: '#2FD9BE', accentText: '#04120C',
+             surface: '#0E241B', text: '#E7F3EE' },
+    page: { bg: '#071A12', fg: '#E7F3EE' },
+  },
+  hashmark: {
+    theme: { font: "'Outfit',system-ui,sans-serif", primary: '#c4ff3a', primaryText: '#0c0e0f',
+             accent: '#c4ff3a', accentText: '#0c0e0f', surface: '#1a1d1f', text: '#ffffff' },
+    page: { bg: '#0c0e0f', fg: '#ffffff' },
+  },
+  cool: {
+    theme: { accent: '#21bca5', primary: '#1f2348', surface: '#ffffff', text: '#1f2348' },
+    page: { bg: '#f2f2f4', fg: '#1f2348' },
+  },
+};
+
+function paintStrips() {
+  const brand = BRANDS[radio('brand')];
+  const navy = document.querySelector('.strip-navy');
+  const light = document.querySelector('.strip-light');
+  if (!brand) {
+    navy.style.cssText = '';
+    light.style.cssText = '';
+    return;
+  }
+  // Both strips take the brand: the point is the control against ITS page, and
+  // the two are kept so a brand that only works on one of them still shows it.
+  navy.style.background = brand.page.bg;
+  navy.style.color = brand.page.fg;
+  light.style.background = brand.theme.surface;
+  light.style.color = brand.theme.text;
+}
+
 function remount() {
   for (const c of corners) c.destroy();
   corners = [];
@@ -527,6 +573,9 @@ function remount() {
   wallet.onAccountChange((acc) => { log('info', 'onAccountChange', acc ? acc.address : 'null'); renderState(); });
 
   const o = buildOptions();
+  const brand = BRANDS[radio('brand')];
+  if (brand) o.theme = brand.theme;
+  paintStrips();
   for (const id of ['corner-navy', 'corner-light']) {
     corners.push(mountMiniWallet($(id), o));
   }
