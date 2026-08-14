@@ -1,6 +1,9 @@
 // Filipino shell UI strings. Mirrors en.ts key for key.
-// Machine-assisted and NOT yet reviewed by a native speaker: see the
-// note in locales/index.ts.
+// Machine-assisted, then TERMINOLOGY-SOURCED from Nimiq's own human
+// translation: the Hub ships fil.po, and where it names a term we use its
+// word, because that is what a user already reads in the Hub popup this app's
+// own Connect button opens. Still not reviewed end to end by a native speaker;
+// see the note in locales/index.ts.
 export default {
   "shell.connectWallet": "Ikonekta ang wallet",
   "shell.connecting": "Kumokonekta",
@@ -9,22 +12,22 @@ export default {
   "shell.saveContact": "I-save ang tatanggap na ito bilang?",
   "shell.profile": "Profile",
   "shell.account": "Account",
-  "shell.address": "Address",
+  "shell.address": "Adres",
   "shell.copyAddress": "Kopyahin ang address",
   "shell.copied": "Nakopya",
   "shell.balance": "Balanse",
   "shell.language": "Wika",
   "shell.notConnected": "Hindi nakakonekta",
   "shell.send": "Ipadala",
-  "shell.cancel": "Kanselahin",
-  "shell.retry": "Subukan ulit",
+  "shell.cancel": "Ikansela",
+  "shell.retry": "Subukang muli",
   "shell.receive": "Tumanggap",
   "shell.amountsIn": "Ipakita ang halaga sa",
   "shell.openInPay": "Buksan sa Nimiq Pay",
   "shell.network": "Network",
   "shell.tapToCopy": "I-tap ang address para kopyahin",
   "shell.networkOnly": "Magpadala ng {ticker} sa {network} lamang. Nawawala ang ipinadala sa ibang network.",
-  "shell.createCashlink": "Gumawa ng Cashlink",
+  "shell.createCashlink": "Lumikha ng isang Cashlink",
   "shell.newToNimiq": "Bago sa Nimiq? Gumawa ng wallet",
   "shell.recipient": "Tatanggap",
   "shell.available": "Magagamit",
