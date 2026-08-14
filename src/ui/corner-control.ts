@@ -494,8 +494,14 @@ button.nq-cc-name:focus-visible { outline:2px solid var(--nq-cc-accent, #0582ca)
 /* The recipient identicon leads the row, the label follows it, which is the
    order of an avatar beside a name everywhere else. The slot keeps its width
    whether or not a face is in it, so the label never jumps sideways at the
-   moment the address becomes valid. */
-.nq-cc-field-head { display:flex; align-items:center; gap:9px; min-height:36px; }
+   moment the address becomes valid, and the pair stays centred.
+
+   CENTRED, because everything it belongs to is: the view title above it and
+   the block grid below it both centre on the card, and a left-aligned pair
+   between them read as a third alignment in a column of two. Amount stays left
+   over its full-width input, which has nothing to centre against. */
+.nq-cc-field-head { display:flex; align-items:center; justify-content:center;
+  gap:9px; min-height:36px; }
 .nq-cc-recipient-icon { display:block; width:36px; height:36px; flex:none; }
 .nq-cc-recipient-icon > * { display:block; width:100%; height:100%; }
 

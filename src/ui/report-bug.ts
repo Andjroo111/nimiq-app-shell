@@ -336,12 +336,19 @@ const SHEET_STYLE_ID = 'nimiq-shell-report-bug-style';
 
 /** The bug glyph, in the corner's stroke-icon language (the same weight as the
  *  wallet/scan glyphs), sized by .nq-cc-cashlink-slot's 24px box. */
-/** Stroke 0.95 and not 1.6: this glyph sits in the corner menu's shared slot
- *  next to the cashlink and switch-account marks, which are 2.5 on a 64 viewBox
- *  = 0.94px at 24px. At 1.6 on a 24 viewBox this drew 1.6px, so Report a bug
- *  read a full weight heavier and visibly darker than the row above it. */
+/** The viewBox is the ARTWORK's bounds, not a round 24. Measured with getBBox,
+ *  the drawing occupies 18x16 of the 24x24 box it used to declare, so in the
+ *  corner's 24px slot it rendered 18x16 beside a hexagon rendering 20.5x20 and
+ *  read visibly smaller and fainter (Andrew, 2026-08-14). Cropping to
+ *  2.5 3.5 19 17 (the bounds plus half a stroke, so no cap clips) scales it to
+ *  22.7x20.2, which matches.
+ *
+ *  Stroke 0.76 and not 1.6: at the new crop this renders 0.96px, the same as
+ *  the cashlink and switch glyphs beside it (0.72 on an 18 viewBox). At the
+ *  original 1.6 it drew 1.6px and read a full weight darker than its
+ *  neighbours; a bigger crop needs a thinner number to hold the same weight. */
 export const BUG_ICON =
-  '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="0.95" ' +
+  '<svg viewBox="2.5 3.5 19 17" fill="none" stroke="currentColor" stroke-width="0.76" ' +
   'stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">' +
   '<path d="M12 20a6 6 0 0 0 6-6v-3a6 6 0 0 0-12 0v3a6 6 0 0 0 6 6Z"/>' +
   '<path d="M10 6.5 8.5 4M14 6.5 15.5 4"/><path d="M12 8v12"/>' +
