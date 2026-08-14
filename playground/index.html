@@ -420,7 +420,15 @@ function buildAssets() {
    the switch is on, so you can watch it drop OUT of the total rather than
    being counted as zero. */
 const USD_PER = { NIM: 0.0021, USDT: 1.0, USDC: 1.0 };
-const FX = { USD: 1, EUR: 0.92, GBP: 0.79, BRL: 5.4 };
+/* Rough rates, enough to exercise formatting across every offered ticker. A
+   ticker missing here returns null, which is the "never priced" path: the asset
+   is left OUT of the fiat total rather than counted as zero. */
+const FX = { USD: 1, EUR: 0.92, GBP: 0.79, BRL: 5.4, INR: 83, CNY: 7.2, VND: 25400,
+  PHP: 58, NGN: 1500, PKR: 278, IDR: 16200, TRY: 33, KRW: 1350, JPY: 157, MXN: 18,
+  ZAR: 18.5, RUB: 92, UAH: 41, PLN: 4.0, THB: 36, AED: 3.67, ARS: 950, AUD: 1.5,
+  CAD: 1.37, CHF: 0.88, SEK: 10.5, NOK: 10.7, DKK: 6.9, CZK: 23, HUF: 360,
+  ILS: 3.7, MYR: 4.5, NZD: 1.6, SGD: 1.35, TWD: 32, HKD: 7.8, CLP: 950,
+  CRC: 520, GTQ: 7.8, GMD: 68, XOF: 600 };
 async function rate(ticker, asset = 'NIM') {
   if (asset === 'USDC' && opt('opt-nofiat-btc')) return null;
   const usd = USD_PER[asset];
@@ -460,7 +468,15 @@ function buildOptions() {
 
   if (opt('opt-fiat')) {
     o.fiat = {
-      currencies: ['USD', 'EUR', 'GBP', 'BRL'],
+      /* The Nimiq wallet's full FIAT_CURRENCIES_OFFERED (41). The shell does not
+         limit this: the host passes whatever it wants and a ticker with no
+         bundled flag renders text-only rather than being refused. Showing all
+         41 here is deliberate, because it makes visible exactly which ones are
+         missing hexagon artwork. */
+      currencies: ['AED', 'ARS', 'AUD', 'BRL', 'CAD', 'CHF', 'CLP', 'CNY', 'CRC', 'CZK',
+        'DKK', 'EUR', 'GBP', 'GMD', 'GTQ', 'HKD', 'HUF', 'IDR', 'ILS', 'INR', 'JPY',
+        'KRW', 'MXN', 'MYR', 'NGN', 'NOK', 'NZD', 'PHP', 'PKR', 'PLN', 'RUB', 'SEK',
+        'SGD', 'THB', 'TRY', 'TWD', 'UAH', 'USD', 'VND', 'XOF', 'ZAR'],
       default: 'USD',
       rate,
       onChange: (t) => { log('info', 'fiat.onChange()', t); renderState(); },

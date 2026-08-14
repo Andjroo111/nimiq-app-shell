@@ -404,10 +404,20 @@ real even where the shell's own strings fall back to English.
 | `FEATURED_LANGUAGES` (the default) | 11 | + hi zh tr ha ko vi |
 | Nimiq wallet, for comparison | 9 | has nl ru uk, lacks hi ha ko tr vi |
 
-Pass `languages` to narrow or widen it. Currencies are not limited by this
-package at all: the host passes `fiat.currencies`, and a ticker without bundled
-flag artwork renders text-only rather than being refused, so the wallet's full
-41-currency list already works.
+Pass `languages` to narrow or widen it.
+
+**Currencies: all 40 of the wallet's list carry flag artwork** (v0.16.0). The
+package still does not limit them, since the host passes `fiat.currencies` and
+an unknown ticker renders text-only rather than being refused. XOF is
+deliberately text-only: the West African CFA franc is legal tender in eight
+countries, so any single flag names the wrong one.
+
+Both sets are checked against crypto ownership rather than intuition. Of the ten
+largest crypto-owning countries, the mini wallet now speaks the language of six
+(India, China, USA, Brazil, Vietnam, Nigeria) and shows the currency of nine.
+The gaps are the Philippines, Pakistan, Indonesia and Iran; Filipino and
+Indonesian are cheap to add, while Urdu and Persian need right-to-left support
+this package does not have yet.
 
 ### Switching account (v0.14.0)
 
