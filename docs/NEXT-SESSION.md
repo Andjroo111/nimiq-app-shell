@@ -6,8 +6,8 @@ The **mini wallet**: the fleet's one header control. `mountMiniWallet` is the
 canonical export; `mountCornerControl` is kept as an alias because ~25 apps
 import that name.
 
-**Current: v0.18.1**, tagged and on jsDelivr:
-`https://cdn.jsdelivr.net/gh/Andjroo111/nimiq-app-shell@v0.18.1/dist/app-shell.js`
+**Current: v0.18.2**, tagged and on jsDelivr:
+`https://cdn.jsdelivr.net/gh/Andjroo111/nimiq-app-shell@v0.18.2/dist/app-shell.js`
 
 ## Playground, the way to see any of this
 
@@ -154,6 +154,36 @@ be nimiq.party renamed, and a push would have fought party's own branch.
   no `workflow` scope**, so that edit cannot be pushed: `gh auth refresh -s
   workflow` first. party #176 is red for this reason alone and carries the exact
   diff in a comment.
+
+## Next lane: an installing app must be able to wear its own brand
+
+Andrew, 2026-08-14: *"if the person installs it onto their app, they should be
+able to also make it match their branding"*, measured against nimiq.cool,
+hashmark and swellet.
+
+The seam exists but is half-built. **16 `--nq-cc-*` vars** cover the menu chrome
+(bg, fg, muted, hover, line, border, shadow, accent, card-bg, and the
+language-only face). **~20 hardcoded Nimiq colours have no escape hatch at all**,
+and they are the loud ones:
+
+| What | Hardcoded | Why it shows |
+| --- | --- | --- |
+| Connect button | navy radial `#260133`→`#1f2348` | the primary CTA, on every signed-out page |
+| Send + Send-confirm | blue radial `#265dd7`→`#0582ca` | the primary CTA once signed in |
+| Inputs + focus rings | `#0582ca` | recipient, amount, rename |
+| Address chip, contacts | `rgba(5,130,202,…)` + `#0582ca` | the receive view |
+| Status colours | `#d94432` red, `#13b59d` green, `#fc8702` orange | errors and testnet |
+| Font | `'Mulish','Muli'` | inherits nothing from the host |
+
+swellet is the proof: its `--nq-cc-*` block themes the card correctly in forest
+dark and white light, and the Connect button inside it is still Nimiq navy on a
+teal-brand page. That is the whole gap in one screenshot.
+
+Worth deciding before writing vars one at a time: whether this is **more vars**
+or **one `theme` option** on `CornerControlOptions` that stamps a scoped
+stylesheet. More vars is additive and safe; a theme object is a real interface
+and stops the list growing forever. hashmark (v0.17.1) and nimiq.cool both have
+their own palettes and are the other two test cases.
 
 ## What the Hub will not allow
 
