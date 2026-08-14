@@ -18,6 +18,7 @@ export default {
   "shell.balance": "Bakiye",
   "shell.language": "Dil",
   "shell.notConnected": "Bağlı değil",
+  "shell.back": "Geri",
   "shell.send": "Gönder",
   "shell.cancel": "İptal et",
   "shell.retry": "Tekrar dene",

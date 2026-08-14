@@ -31,6 +31,8 @@ import { BUG_ICON, openReportBugSheet, type ReportBugOptions } from './report-bu
 import { installReportCapture } from './report-capture';
 import { mountAssetList, type AssetListHandle, type ShellAsset } from './asset-list';
 import { applyTheme, type ShellTheme } from './theme';
+import { nimiqQr } from './qr';
+import { formatAddressBlocks, reformatInPlace, significantChars } from './address-input';
 
 /** A NIM address: NQ + 2 check digits + 32 base32 chars. */
 const NIM_ADDRESS_SHAPE = /^NQ[0-9]{2}[0-9A-HJ-NP-VXY]{32}$/;
@@ -127,8 +129,10 @@ export interface CornerControlOptions {
   languages?: ShellLanguage[];
   /** Identicon renderer for the face + wallet block (self-sized element). */
   identicon?: (address: string, sizePx: number) => HTMLElement;
-  /** QR renderer for the receive view. Without it the receive view shows the
-   *  address grid only. */
+  /** OVERRIDE the receive QR. Without it the mini wallet draws the wallet's own
+   *  (registry `qr-code`: rounded modules, the light-blue radial), so this is a
+   *  seam rather than a requirement. It was host-only until v0.20.0, which had
+   *  nineteen apps about to hand-roll the one graphic here a camera must read. */
   qr?: (text: string, sizePx: number) => HTMLElement;
   /** Show the Receive flow (address + QR behind the Receive button). Default true. */
   receive?: boolean;
@@ -486,7 +490,81 @@ button.nq-cc-name:focus-visible { outline:2px solid var(--nq-cc-accent, #0582ca)
 .nq-cc.nq-cc-show-send .nq-cc-view-main { display:none; }
 .nq-cc.nq-cc-show-send .nq-cc-view-send { display:block; }
 .nq-cc-send-body { display:flex; flex-direction:column; gap:8px; padding:10px 8px 8px; }
-.nq-cc-field-label { font-size:12px; font-weight:600; color:var(--nq-cc-menu-muted, rgba(31,35,72,.5)); }
+/* display is DECLARED, not inherited from the host. A page with a global
+   label{display:flex} (the playground had exactly that, for its own control
+   rows) turns this into a flex container, and then text-align does nothing
+   because flex packs its children to the start instead. The component cannot
+   assume anything about a bare element selector on the page it is dropped
+   into. */
+.nq-cc-field-label { display:block; font-size:12px; font-weight:600;
+  color:var(--nq-cc-menu-muted, rgba(31,35,72,.5)); }
+/* The identicon sits LEFT and the label centres on the card, independently.
+   Same three-column grid as the view header above it, and for the same reason:
+   the label lines up with the title and the block grid, all three centred on
+   the menu, while the face keeps the left edge an avatar belongs on. Centring
+   the PAIR instead put the label off-centre by half an identicon, which is the
+   version Andrew rejected.
+
+   The third column is the identicon's width again, so the label's centre is
+   the card's centre rather than whatever is left beside the face. The slot
+   holds its width whether or not a face is in it, so nothing shifts at the
+   moment the address becomes valid. Amount stays left over its full-width
+   input, which has nothing to centre against. */
+.nq-cc-field-head { display:grid; grid-template-columns:36px 1fr 36px;
+  align-items:center; min-height:36px; }
+.nq-cc-field-head .nq-cc-field-label { grid-column:2; text-align:center; }
+.nq-cc-recipient-icon { display:block; width:36px; height:36px; flex:none; }
+.nq-cc-recipient-icon > * { display:block; width:100%; height:100%; }
+
+/* Recipient: nine four-char blocks in a 3x3 grid, the wallet's send-modal field
+   scaled to this menu. One textarea holding a 14-character line per row
+   ("XXXX XXXX XXXX"), so the blocks sit at fixed FRACTIONS of the line in any
+   monospace font. Everything below is in ch for that reason: a px or rem
+   geometry drifts the moment Fira Mono is missing and the fallback's advance
+   differs, which is the documented cause of address grids looking wonky.
+
+   Inset box-shadow for the border, never border (rule 1). */
+.nq-cc-addr-field { position:relative; border-radius:8px; padding:7px 0;
+  background:var(--nq-cc-input-bg, var(--nq-cc-card-bg, #fff));
+  box-shadow:inset 0 0 0 2px color-mix(in srgb, var(--nq-cc-menu-fg, #1f2348) 12%, transparent);
+  transition:box-shadow .15s var(--nimiq-ease, cubic-bezier(.25,0,0,1)); }
+.nq-cc-addr-field:focus-within { box-shadow:inset 0 0 0 2px var(--nq-cc-accent, #0582ca); }
+/* A formatted line is 14 characters plus two block gaps. The gap is
+   WORD-SPACING rather than a bigger font or letter-spacing, because the
+   reference is tight four-character blocks separated by air: widening the
+   letters would space the characters inside a block too, and the four
+   characters of a block read as one unit. */
+.nq-cc-addr-input { display:block; margin:0 auto; padding:0; border:none;
+  --nq-cc-addr-gap:4.9ch;
+  width:calc(14ch + 2 * var(--nq-cc-addr-gap));
+  word-spacing:var(--nq-cc-addr-gap);
+  outline:none; resize:none; overflow:hidden; background:transparent;
+  font-family:'Fira Mono',ui-monospace,monospace; font-size:14px; line-height:26px;
+  text-transform:uppercase; text-align:center;
+  color:var(--nq-cc-input-fg, var(--nq-cc-menu-fg, #1f2348)); }
+.nq-cc-addr-input::placeholder { opacity:.32; }
+/* The separators, drawn on ONE element behind the text so the textarea keeps a
+   single caret and a single selection.
+
+   The column rules sit in the two gaps between blocks, at characters 4.5 and
+   9.5 of the 14-character line, which is 2.5ch either side of centre. This
+   element must carry the same font as the textarea, or its ch unit is Mulish's
+   and the rules land in the middle of the text.
+   NOTE: this block is a JS template literal, so it must never contain a
+   backtick. Writing ch in code quotes here is what broke the build once. */
+.nq-cc-addr-rules { position:absolute; inset:7px 0; pointer-events:none;
+  font-family:'Fira Mono',ui-monospace,monospace; font-size:14px;
+  --nq-cc-addr-rule:color-mix(in srgb, var(--nq-cc-menu-fg, #1f2348) 10%, transparent);
+  --nq-cc-addr-gap:4.9ch;
+  /* Block 1 ends at char 4 and block 2 starts at char 5 plus the gap, so the
+     gap centre is 2.5ch + half a gap either side of the line's centre. Derived
+     rather than eyeballed, so changing the gap moves the rules with it. */
+  --nq-cc-addr-rule-x:calc(2.5ch + var(--nq-cc-addr-gap) / 2);
+  background:
+    linear-gradient(var(--nq-cc-addr-rule), var(--nq-cc-addr-rule)) calc(50% - var(--nq-cc-addr-rule-x)) 50%/1px 100% no-repeat,
+    linear-gradient(var(--nq-cc-addr-rule), var(--nq-cc-addr-rule)) calc(50% + var(--nq-cc-addr-rule-x)) 50%/1px 100% no-repeat,
+    linear-gradient(var(--nq-cc-addr-rule), var(--nq-cc-addr-rule)) 50% 33.333%/calc(100% - 20px) 1px no-repeat,
+    linear-gradient(var(--nq-cc-addr-rule), var(--nq-cc-addr-rule)) 50% 66.667%/calc(100% - 20px) 1px no-repeat; }
 /* inputs: inset box-shadow border, never border (rule 1) */
 .nq-cc-input { width:100%; border:none; border-radius:8px; padding:9px 10px; font-family:inherit;
   font-size:14px; font-weight:600;
@@ -496,8 +574,6 @@ button.nq-cc-name:focus-visible { outline:2px solid var(--nq-cc-accent, #0582ca)
 .nq-cc-input:focus { outline:none; box-shadow:inset 0 0 0 2px var(--nq-cc-accent, #0582ca); }
 .nq-cc-input::placeholder { font-weight:600;
   color:color-mix(in srgb, var(--nq-cc-menu-fg, #1f2348) 30%, transparent); }
-.nq-cc-input-addr { font-family:'Fira Mono',ui-monospace,monospace; font-size:12px;
-  letter-spacing:.02em; text-transform:uppercase; }
 .nq-cc-amount-row { position:relative; }
 .nq-cc-amount-row .nq-cc-input { padding-right:44px; }
 .nq-cc-amount-suffix { position:absolute; right:11px; top:50%; transform:translateY(-50%);
@@ -521,16 +597,26 @@ button.nq-cc-name:focus-visible { outline:2px solid var(--nq-cc-accent, #0582ca)
   padding:16px 0 10px; color:var(--nq-cc-success, #13b59d); font-size:14px; font-weight:700; }
 .nq-cc-view-send.nq-cc-sent .nq-cc-send-body { display:none; }
 .nq-cc-view-send.nq-cc-sent .nq-cc-send-done { display:flex; }
-.nq-cc-back { display:flex; align-items:center; gap:6px; width:100%; padding:7px 10px; border:none;
-  border-radius:6px; background:none; font-family:inherit; font-size:15px;
-  color:var(--nq-cc-menu-muted, rgba(31,35,72,.6)); text-align:left; cursor:pointer;
+/* Sub-view header: back chevron left, the view's name CENTRED in the card.
+   Three columns and not a flex row, so the title is centred on the menu rather
+   than on whatever is left over beside the button. The third column is the
+   chevron's width again, holding the symmetry. */
+.nq-cc-view-head { display:grid; grid-template-columns:34px 1fr 34px; align-items:center;
+  padding:2px 2px 0; }
+.nq-cc-view-title { grid-column:2; text-align:center; font-size:15px; font-weight:600;
+  color:var(--nq-cc-menu-fg, #1f2348); }
+.nq-cc-back { grid-column:1; display:inline-flex; align-items:center; justify-content:center;
+  width:34px; height:34px; padding:0; border:none; border-radius:50%; background:none;
+  font-family:inherit; color:var(--nq-cc-menu-muted, rgba(31,35,72,.6)); cursor:pointer;
   transition:background .15s var(--nimiq-ease, cubic-bezier(.25,0,0,1)); }
 .nq-cc-back:hover { background:var(--nq-cc-menu-hover, rgba(31,35,72,.06)); }
 .nq-cc-back:focus-visible { outline:2px solid var(--nq-cc-accent, #0582ca); outline-offset:-2px; }
+.nq-cc-chevron { display:block; width:8px; height:13px; }
 .nq-cc-receive-body { display:flex; flex-direction:column; align-items:center; padding:10px 8px 8px; }
-.nq-cc-qr { display:block; width:164px; height:164px; }
-.nq-cc-qr:empty { display:none; }
-.nq-cc-qr > * { display:block; width:100%; height:100%; }
+.nq-cc-qr { display:block; padding:10px; border-radius:8px;
+  background:var(--nq-cc-qr-plate, #fff); }
+.nq-cc-qr:empty { display:none; padding:0; }
+.nq-cc-qr > * { display:block; width:164px; height:164px; }
 .nq-cc-receive-hint { font-size:12px; font-weight:600; color:var(--nq-cc-menu-muted, rgba(31,35,72,.45)); margin:8px 0 2px; }
 
 /* tap-to-copy address: upstream Copyable verbatim: light-blue tooltip, tinted
@@ -708,6 +794,13 @@ button.nq-cc-name:focus-visible { outline:2px solid var(--nq-cc-accent, #0582ca)
   document.head.appendChild(style);
 }
 
+/** Back chevron. Same stroke weight and linecaps as the caret it sits beside,
+ *  so the two read as one family rather than two icon sets. */
+const CHEVRON_LEFT =
+  '<svg class="nq-cc-chevron" viewBox="0 0 6 10" aria-hidden="true">' +
+  '<path d="M5 1L1 5l4 4" fill="none" stroke="currentColor" stroke-width="1.15" ' +
+  'stroke-linecap="round" stroke-linejoin="round"/></svg>';
+
 const CARET =
   '<svg class="nq-cc-caret" viewBox="0 0 10 6" aria-hidden="true">' +
   '<path d="M1 1l4 4 4-4" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>';
@@ -733,14 +826,44 @@ const ARROW =
 const SCAN_QR =
   '<svg class="nq-cc-scan-glyph" viewBox="0 0 40 40" xmlns="http://www.w3.org/2000/svg" aria-hidden="true"><g fill="currentColor"><path d="M1.21 7.06c.67 0 1.21-.54 1.21-1.21l-.04-3.12a.3.3 0 0 1 .3-.3H5.7a1.21 1.21 0 1 0 0-2.43H2.37A2.4 2.4 0 0 0 0 2.42v3.43c0 .67.54 1.21 1.21 1.21zM5.69 37.58H2.73a.3.3 0 0 1-.3-.3v-3.13a1.21 1.21 0 1 0-2.43 0v3.43A2.4 2.4 0 0 0 2.37 40H5.7a1.21 1.21 0 0 0 0-2.42zM38.79 32.94c-.67 0-1.21.54-1.21 1.21l.04 3.12a.3.3 0 0 1-.3.3H34.3a1.21 1.21 0 1 0 0 2.43h3.32A2.4 2.4 0 0 0 40 37.58v-3.43c0-.67-.54-1.21-1.21-1.21zM37.63 0H34.3a1.21 1.21 0 1 0 0 2.42h2.96c.17 0 .3.14.3.3v3.13a1.21 1.21 0 0 0 2.43 0V2.42A2.4 2.4 0 0 0 37.63 0z"/><path fill-rule="evenodd" clip-rule="evenodd" d="M13.94 15.15H6.67c-.67 0-1.22-.54-1.22-1.21V6.67c0-.67.55-1.21 1.22-1.21h7.27c.67 0 1.21.54 1.21 1.2v7.28c0 .67-.54 1.21-1.21 1.21zM8.18 7.88a.3.3 0 0 0-.3.3v4.24c0 .17.13.3.3.3h4.24a.3.3 0 0 0 .3-.3V8.18a.3.3 0 0 0-.3-.3H8.18zM6.67 24.85h7.27c.67 0 1.21.54 1.21 1.21v7.27c0 .67-.54 1.22-1.21 1.22H6.67c-.67 0-1.22-.55-1.22-1.22v-7.27c0-.67.55-1.21 1.22-1.21zm5.75 7.27a.3.3 0 0 0 .3-.3v-4.24a.3.3 0 0 0-.3-.3H8.18a.3.3 0 0 0-.3.3v4.24c0 .17.13.3.3.3h4.24zM26.06 5.45h7.27c.67 0 1.21.55 1.21 1.22v7.27c0 .67-.54 1.21-1.2 1.21h-7.28c-.67 0-1.21-.54-1.21-1.21V6.67c0-.67.54-1.22 1.21-1.22zm5.76 7.28a.3.3 0 0 0 .3-.3V8.17a.3.3 0 0 0-.3-.3h-4.24a.3.3 0 0 0-.3.3v4.24c0 .17.13.3.3.3h4.24z"/><path d="M17.58 10.6h1.2a.9.9 0 1 0 0-1.81.3.3 0 0 1-.3-.3V6.66a.9.9 0 1 0-1.81 0V9.7c0 .5.4.9.9.9zM21.21 7.58c.17 0 .3.13.3.3v6.66a.9.9 0 1 0 1.82 0V6.67c0-.5-.4-.91-.9-.91H21.2a.9.9 0 1 0 0 1.82zM12.42 18.18c0 .5.41.91.91.91h4.25c.5 0 .9-.4.9-.9v-4.86a.9.9 0 1 0-1.81 0v3.64a.3.3 0 0 1-.3.3h-3.04c-.5 0-.9.4-.9.91z"/><path d="M9.09 17.27c-.5 0-.9.4-.9.91v3.03a.3.3 0 0 1-.31.3H6.67a.9.9 0 1 0 0 1.82h15.75c.5 0 .91-.4.91-.9v-3.64a.9.9 0 0 0-1.82 0v2.42a.3.3 0 0 1-.3.3h-10.9a.3.3 0 0 1-.31-.3v-3.03c0-.5-.4-.9-.91-.9zM22.12 26.06c0-.5-.4-.9-.9-.9h-3.64c-.5 0-.91.4-.91.9v4.85a.9.9 0 1 0 1.81 0v-3.64c0-.16.14-.3.3-.3h2.43c.5 0 .91-.4.91-.9zM33.33 32.42h-10.3a.3.3 0 0 1-.3-.3V29.7a.9.9 0 1 0-1.82 0v3.63c0 .5.4.91.9.91h11.52a.9.9 0 0 0 0-1.82z"/><path fill-rule="evenodd" clip-rule="evenodd" d="M29.1 30h-3.65a.9.9 0 0 1-.9-.91v-3.64c0-.5.4-.9.9-.9h3.64c.5 0 .91.4.91.9v3.64c0 .5-.4.91-.9.91zm-2.43-3.64a.3.3 0 0 0-.3.3v1.22c0 .17.13.3.3.3h1.2a.3.3 0 0 0 .31-.3v-1.21a.3.3 0 0 0-.3-.3h-1.21z"/><path d="M32.73 20.9c-.5 0-.91.42-.91.92v7.88a.9.9 0 0 0 1.82 0v-7.88c0-.5-.41-.91-.91-.91zM33.64 17.58c0-.5-.41-.91-.91-.91h-6.67c-.5 0-.9.4-.9.9v3.64a.9.9 0 0 0 1.8 0V18.8c0-.17.15-.3.31-.3h5.46c.5 0 .9-.41.9-.91z"/></g></svg>';
 
-// Switch-account glyph: two arrows swapping. Same 64 viewBox, stroke width and
-// linecaps as CASHLINK_ICON so it lands at the same optical weight in the shared
-// glyph slot rather than looking heavier or lighter than its neighbours.
+// Switch-account glyph: the Nimiq hexagon IS the two arrows.
+//
+// Andrew drew this one, 2026-08-14, after the first pass put arrows inside a
+// hexagon frame: the outline itself is cut at the left and right points into
+// two halves, and each half ends in an arrowhead pointing the way it was
+// travelling. Rotational, the way a refresh mark is, but in the brand's shape.
+//
+// Both halves are slices of the shipped `logos-nimiq-hexagon-outline-mono`
+// path, VERBATIM (rule 2: never reconstruct an SVG path). The four rounded
+// corners come along with them, which is what makes it read as the hexagon
+// rather than as a generic six-sided ring; the only pieces removed are the two
+// pointed tips, and those are exactly where the gaps go.
+//
+// currentColor, never gold. Gold belongs to the logo, and this is a UI icon.
+//
+// Stroke 0.72 on the 18 viewBox is 0.95px at 24, matching the cashlink and bug
+// glyphs beside it. The asset ships at 1.5, which is its weight as a standalone
+// logo; carried into a row of UI icons it drew at 2px and read a full weight
+// darker than its neighbours, which is what Andrew spotted.
+//
+// EACH HALF STOPS 0.9 SHORT OF ITS POINT. Ending exactly at the tips left the
+// two arrowheads nearly touching, and at 24px on a phone they read as one
+// continuous outline rather than as two arrows going opposite ways (Andrew,
+// 2026-08-14). Pulling both ends back along their own edge opens the break
+// without shortening the shape enough to stop being the hexagon: 1.4 and 2.0
+// were also drawn, and past about 1 the halves start reading as two chevrons.
+//
+// The arrowhead barbs straddle the travel axis at 32 degrees, 2.1 long. Every
+// coordinate here is stated rather than computed, because this is a static
+// asset: an icon that does trigonometry at runtime is a drawing pretending to
+// be code.
 const SWITCH_ICON =
-  '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" aria-hidden="true">' +
-  '<g fill="none" stroke="currentColor" stroke-linecap="round" stroke-width="2.5px" ' +
-  'stroke-linejoin="round"><path d="M14 24.5h36"/><path d="M40.5 15l9.5 9.5-9.5 9.5"/>' +
-  '<path d="M50 39.5H14"/><path d="M23.5 30L14 39.5l9.5 9.5"/></g></svg>';
+  '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 18 17" aria-hidden="true">' +
+  '<g fill="none" stroke="currentColor" stroke-width="0.72" stroke-linecap="round" ' +
+  'stroke-linejoin="round">' +
+  '<path d="M16.603 6.779l-2.987-5.306a1.37 1.37 0 00-1.189-.702H5.57c-.489 0-.941.267-1.186.703L1.396 6.779"/>' +
+  '<path d="M1.396 9.752l2.988 5.304a1.36 1.36 0 001.186.703h6.858a1.36 1.36 0 001.186-.703l2.988-5.304"/>' +
+  '<path d="M3.24 5.773L1.396 6.779L1.3 4.681M14.758 10.757L16.602 9.752L16.697 11.85"/></g></svg>';
 
 // wallet-verbatim cashlink glyph (upstream nimiq-style cashlink.svg)
 const CASHLINK_ICON =
@@ -1263,13 +1386,37 @@ export function mountMiniWallet(
   const badge = el('span', 'nq-cc-badge', netGroup);
   badge.textContent = 'Testnet';
 
+  /** A sub-view header: a back CHEVRON on the left, the view's name centred.
+   *
+   *  The name used to BE the back button ("< Send"), which asked the one
+   *  control on the screen to mean two things at once, and the one it looked
+   *  like was "send". A title is not an action. The chevron is the action, the
+   *  centred name says where you are, and the two stop competing.
+   *
+   *  Three columns rather than a flex row: the title is centred in the CARD, so
+   *  it does not shift by the width of the chevron beside it. */
+  function viewHeader(parent: HTMLElement, titleKey: string, onBack: () => void): HTMLElement {
+    const head = el('div', 'nq-cc-view-head', parent);
+    const btn = el('button', 'nq-cc-back', head);
+    btn.type = 'button';
+    btn.setAttribute('aria-label', i18n.t('shell.back'));
+    btn.insertAdjacentHTML('beforeend', CHEVRON_LEFT);
+    const title = el('span', 'nq-cc-view-title', head);
+    tNode(title, titleKey);
+    btn.addEventListener('click', onBack);
+    // The i18n subscription retranslates tNode content, but an aria-label is an
+    // attribute and is not one of those nodes.
+    backLabels.push(btn);
+    return title;
+  }
+  const backLabels: HTMLElement[] = [];
+
   // ---- receive view content -------------------------------------------------
-  const backBtn = el('button', 'nq-cc-back', viewReceive);
-  backBtn.type = 'button';
-  backBtn.appendChild(document.createTextNode('‹ '));
-  const backLabel = el('span', 'nq-cc-strong', backBtn);
-  tNode(backLabel, 'shell.receive');
-  backBtn.addEventListener('click', () => root.classList.remove('nq-cc-show-receive'));
+  // The title carries the asset when one is being received, so repaintReceive
+  // holds it: "Receive USDC" rather than a bare "Receive" over a Polygon address.
+  const receiveTitle = viewHeader(
+    viewReceive, 'shell.receive', () => root.classList.remove('nq-cc-show-receive'),
+  );
   el('div', 'nq-cc-divider', viewReceive);
   const receiveBody = el('div', 'nq-cc-receive-body', viewReceive);
   const qrSlot = el('div', 'nq-cc-qr', receiveBody);
@@ -1306,20 +1453,35 @@ export function mountMiniWallet(
   addressBtn.addEventListener('blur', () => copyWrap.classList.remove('nq-cc-copied-hold'));
 
   // ---- send view content ----------------------------------------------------
-  const sendBackBtn = el('button', 'nq-cc-back', viewSend);
-  sendBackBtn.type = 'button';
-  sendBackBtn.appendChild(document.createTextNode('‹ '));
-  const sendBackLabel = el('span', 'nq-cc-strong', sendBackBtn);
-  tNode(sendBackLabel, 'shell.send');
-  sendBackBtn.addEventListener('click', () => closeSend());
+  viewHeader(viewSend, 'shell.send', () => closeSend());
   el('div', 'nq-cc-divider', viewSend);
   const sendBody = el('div', 'nq-cc-send-body', viewSend);
-  const recipientLabel = el('label', 'nq-cc-field-label', sendBody);
+  // The label row carries the recipient identicon, because the identicon is the
+   // only thing on this screen that tells you at a GLANCE that you are paying
+   // the person you meant to. Reading 36 characters back is not something people
+   // do; recognising a face they have seen before is. It appears the moment the
+   // address is a real one and goes again if you edit it back into nonsense, so
+   // its presence IS the validity signal.
+  const recipientHead = el('div', 'nq-cc-field-head', sendBody);
+  const recipientIcon = el('span', 'nq-cc-recipient-icon', recipientHead);
+  const recipientLabel = el('label', 'nq-cc-field-label', recipientHead);
   tNode(recipientLabel, 'shell.recipient');
-  const recipientInput = el('input', 'nq-cc-input nq-cc-input-addr', sendBody);
-  recipientInput.placeholder = 'NQ00 0000 0000 0000 0000 0000 0000 0000 0000';
+
+  // Nine four-char blocks in a 3x3 grid, the wallet's own send-modal field.
+  const recipientWrap = el('div', 'nq-cc-addr-field', sendBody);
+  el('span', 'nq-cc-addr-rules', recipientWrap);
+  const recipientInput = el('textarea', 'nq-cc-addr-input', recipientWrap);
+  recipientInput.rows = 3;
+  recipientInput.placeholder = formatAddressBlocks('NQ00000000000000000000000000000000000');
   recipientInput.autocomplete = 'off';
   recipientInput.spellcheck = false;
+  recipientInput.setAttribute('aria-label', i18n.t('shell.recipient'));
+  // Format as they type, and after a paste, which is how most addresses arrive.
+  recipientInput.addEventListener('input', () => reformatInPlace(recipientInput));
+  // Enter would add a fourth line to a three-line field.
+  recipientInput.addEventListener('keydown', (e) => {
+    if ((e as KeyboardEvent).key === 'Enter') e.preventDefault();
+  });
   // Saved recipients. Chips rather than a dropdown: there are only ever a
   // handful of people you pay repeatedly, and a select would hide them behind a
   // tap while a row of names is readable at a glance.
@@ -1377,16 +1539,14 @@ export function mountMiniWallet(
       chip.textContent = contact.label;
       chip.title = contact.address;
       chip.addEventListener('click', () => {
-        recipientInput.value = contact.address;
+        recipientInput.value = formatAddressBlocks(contact.address);
         validateSend();
         recipientInput.focus();
-        // Scroll back to the START. Filling an input leaves the caret at the
-        // end, so a 36-character address shows its last few blocks and hides
-        // the first, which is the half people actually recognise. The point of
-        // filling the field rather than bypassing it is that the address stays
-        // checkable, and it is not checkable if you cannot see where it begins.
+        // Caret to the START. The grid shows all nine blocks at once now, so
+        // this is no longer about scrolling the first ones back into view; it
+        // is so the field reads from its beginning, which is the half people
+        // actually recognise, rather than parking mid-address.
         recipientInput.setSelectionRange(0, 0);
-        recipientInput.scrollLeft = 0;
       });
     }
   }
@@ -1416,13 +1576,34 @@ export function mountMiniWallet(
 
   // 36 chars in Nimiq's base32 alphabet (no I, O, W, Z), NQ + check + 8 blocks
   const NIM_ADDRESS_RE = /^NQ\d{2}[0-9A-HJ-NP-VXY]{32}$/;
-  const compactRecipient = (): string => recipientInput.value.toUpperCase().replace(/[\s-]+/g, '');
+
+  /** Draw (or clear) the recipient identicon. Only ever called with an address
+   *  that already passed the shape check, so it never renders a face for
+   *  something half-typed: a face appearing early would be read as "this is
+   *  who you are paying" while the address is still wrong.
+   *
+   *  A host that wired no `identicon` renderer gets nothing rather than the
+   *  neutral hexagon the account face falls back to. The hexagon is a
+   *  PLACEHOLDER, and a placeholder here would say "identity confirmed" while
+   *  showing no identity at all. */
+  let recipientIconFor = '';
+  function renderRecipientIcon(address: string | null): void {
+    if (!options.identicon || recipientIconFor === (address ?? '')) return;
+    recipientIconFor = address ?? '';
+    recipientIcon.textContent = '';
+    // visibility, not hidden: the slot holds its width either way, so the label
+    // beside it does not jump sideways the moment the address becomes valid.
+    recipientIcon.style.visibility = address ? '' : 'hidden';
+    if (address) recipientIcon.appendChild(options.identicon(address, 36));
+  }
+  const compactRecipient = (): string => significantChars(recipientInput.value);
   const amountNim = (): number => {
     const n = Number(amountInput.value.replace(',', '.'));
     return Number.isFinite(n) ? n : 0;
   };
   function validateSend(): void {
     const okAddress = NIM_ADDRESS_RE.test(compactRecipient());
+    renderRecipientIcon(okAddress ? compactRecipient() : null);
     const nim = amountNim();
     const okAmount = nim > 0 && (balanceLuna === null || nim <= lunaToNim(balanceLuna));
     sendConfirm.disabled = !(okAddress && okAmount);
@@ -1494,7 +1675,7 @@ export function mountMiniWallet(
    *  address. Held so a language switch can restate the label and warning. */
   let receiveAsset: ShellAsset | null = null;
   repaintReceive = (): void => {
-    backLabel.textContent = receiveAsset
+    receiveTitle.textContent = receiveAsset
       ? `${i18n.t('shell.receive')} ${receiveAsset.ticker}`
       : i18n.t('shell.receive');
     netWarn.hidden = !receiveAsset;
@@ -1542,9 +1723,11 @@ export function mountMiniWallet(
     // applied to the account address. An asset says what it wants via `uri`, and
     // the default is the bare address, which every scanner understands.
     const payload = asset ? (asset.uri?.(compact) ?? compact) : `nimiq:${compact}`;
-    if (options.qr && qrFor !== payload) {
+    if (qrFor !== payload) {
       qrSlot.textContent = '';
-      qrSlot.appendChild(options.qr(payload, 164));
+      // The host's renderer wins; without one this is the wallet's own QR
+      // rather than nothing, which is what it used to be.
+      qrSlot.appendChild(options.qr ? options.qr(payload, 164) : nimiqQr(payload, 164, qrSlot));
       qrFor = payload;
     }
   }
@@ -1713,6 +1896,7 @@ export function mountMiniWallet(
     : () => { /* language-only: no wallet to subscribe to */ };
   const unsubLang = i18n.onChange(() => {
     applyLang();
+    for (const btn of backLabels) btn.setAttribute('aria-label', i18n.t('shell.back'));
     renderLangValue();
     renderFaceFlag();
     renderFace();

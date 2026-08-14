@@ -15,6 +15,7 @@ export default {
   "shell.balance": "Ma’auni",
   "shell.language": "Harshe",
   "shell.notConnected": "Ba a haɗa ba",
+  "shell.back": "Koma",
   "shell.send": "Aika",
   "shell.cancel": "Soke",
   "shell.retry": "Sake gwadawa",

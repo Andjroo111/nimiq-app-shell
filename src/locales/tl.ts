@@ -18,6 +18,7 @@ export default {
   "shell.balance": "Balanse",
   "shell.language": "Wika",
   "shell.notConnected": "Hindi nakakonekta",
+  "shell.back": "Bumalik",
   "shell.send": "Ipadala",
   "shell.cancel": "Ikansela",
   "shell.retry": "Subukang muli",

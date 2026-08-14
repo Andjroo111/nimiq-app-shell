@@ -18,6 +18,7 @@ export default {
   "shell.balance": "余额",
   "shell.language": "语言",
   "shell.notConnected": "未连接",
+  "shell.back": "返回",
   "shell.send": "发送",
   "shell.cancel": "取消",
   "shell.retry": "重试",

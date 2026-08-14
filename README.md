@@ -543,6 +543,40 @@ render your own UI. `openReportBugSheet`, `submitToBot`, `submitFeedback` and
 
 ---
 
+### The send and receive screens (v0.20.0)
+
+Both are the wallet's own, ported from the `nq` registry rather than approximated.
+
+**The recipient field is the wallet's send-modal grid**: nine four-character
+blocks in a 3x3 layout, formatting live as you type or paste (a `nimiq:` prefix,
+lowercase and dashes all come off). It was one flat line until v0.20.0.
+
+**A recipient identicon appears the moment the address is real**, next to the
+label, and goes again if you edit it back into nonsense. That is the point of
+the screen: nobody reads 36 characters back, but everybody recognises a face
+they have seen before. It needs the `identicon` option wired; without one there
+is deliberately no placeholder hexagon, because a placeholder there would say
+"identity confirmed" while showing no identity.
+
+**The receive QR is now built in** (registry `qr-code`: rounded modules, the
+light-blue radial). `qr` stays a seam and still overrides it, but an app that
+passes nothing gets the wallet's QR instead of no QR.
+
+```ts
+mountMiniWallet(slot, {
+  wallet, i18n,
+  identicon: (address, size) => Identicons.render(address, size),  // the recipient face
+  // qr: myRenderer,   // optional; omit for the built-in
+});
+```
+
+The QR sits on a white plate (`--nq-cc-qr-plate`). That is not decoration: a
+reader needs dark modules on a light field, so a blue QR drawn straight onto a
+dark themed card is unscannable, not just off-brand. Retint it with
+`--nq-cc-qr-from` / `--nq-cc-qr-to` only if you have checked it still scans.
+
+---
+
 ### Wearing your brand (v0.19.0)
 
 Pass `theme` and the mini wallet stops looking like a Nimiq control someone
@@ -612,7 +646,7 @@ git tag, no install, no bundler, no vendored assets:
   import {
     createI18n, createWallet, mergeLocales, shellLocales,
     mountLanguagePill, mountWalletPill,
-  } from 'https://cdn.jsdelivr.net/gh/Andjroo111/nimiq-app-shell@v0.19.0/dist/app-shell.js';
+  } from 'https://cdn.jsdelivr.net/gh/Andjroo111/nimiq-app-shell@v0.20.0/dist/app-shell.js';
 
   const i18n = createI18n({ locales: mergeLocales(shellLocales), fallback: 'en' });
   const wallet = createWallet({ appName: 'My App' });
