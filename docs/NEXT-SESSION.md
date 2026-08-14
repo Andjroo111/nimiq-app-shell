@@ -48,17 +48,19 @@ Registry: `nimiq-branding-cli` #30 (rename/onboard notes) and #31 (the
 
 ## The fleet sweep, issue #112
 
-**6 of 20 apps converted**, all six CDN. PRs are open and none are merged.
+**9 of 20 apps converted**, the six CDN and the three bundled. PRs are open and
+none are merged.
 
 | Model | Apps | Work per app |
 | --- | --- | --- |
 | CDN | cards ✅, gives ✅, ninja ✅, software ✅, stream ✅, swellet ✅ | one URL + one mount call |
-| Bundled | casino, life, work | dep bump + mount swap |
+| Bundled | casino ✅, life ✅, work ✅ | dep bump + mount swap |
 | Vendored | cool, gift, money, name, party, talk, tax, tips, splitlink | bump **and rebuild `public/vendor/app-shell.js`**, or it is a no-op live |
 | Own shape | sale, vote | needs a look each |
 
-`nimiq.gives` #58, `nimiq.ninja` #108, `nimiq.software` #65, `nimiq.stream` #48,
-`swellet` #99. CI is green on the four repos that run it; swellet has a
+Open PRs: `nimiq.gives` #58, `nimiq.ninja` #108, `nimiq.software` #65,
+`nimiq.stream` #48, `swellet` #99, `nimiq.casino` #31, `nimiq.life` #39,
+`nimiq.work` #129. CI is green on all seven repos that run it; swellet has a
 deploy-only workflow, so it was verified by its own `bun test` (1245 pass) and
 in a browser.
 
@@ -92,6 +94,26 @@ knowing before starting:
 - **Version bumps are per-repo law.** gives, software, stream and swellet each
   require a `package.json` bump plus a CHANGELOG entry per PR. ninja requires
   neither. Read the repo's own CLAUDE.md first.
+
+### And what the bundled three cost
+
+All three were on the git dep `#v0.2.0`, a sixteen-release jump to `#v0.18.1`.
+`tsc --noEmit` was clean in all three across that jump, so the package's shape
+has not drifted.
+
+- **casino and life had TWO controls** (`#lang-pill` + `#wallet-slot`), so they
+  consolidate like swellet. Both parents are flex rows with a `gap`, so the
+  emptied `#lang-pill` div has to be **removed**, not left behind, or it leaves a
+  hole. work had one control and was a straight rename.
+- **The bigger bundle can break a file-size guard.** casino commits its minified
+  `public/dist/chrome.js`, and v0.18.1's inlined flag artwork took it from under
+  800 lines to 842. Excluded `public/dist/` from its guard, which is what
+  nimiq.life's own CI already did. Expect this in any repo that commits a
+  minified bundle and counts lines on it.
+- **An app can offer more languages than it translates.** nimiq.life renders 5
+  (`lifeLocales`) and its picker offered 11, now 13. Preserve whatever the app
+  chose rather than narrowing it: ninja filters to 4 on purpose, swellet to 5,
+  life defaults. Narrowing uninvited is a product change.
 
 ## What the Hub will not allow
 
