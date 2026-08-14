@@ -1,6 +1,9 @@
 // Mandarin Chinese shell UI strings. Mirrors en.ts key for key.
-// Machine-assisted and NOT yet reviewed by a native speaker: see the
-// note in locales/index.ts. English fallback was strictly worse.
+// Machine-assisted, then TERMINOLOGY-SOURCED from Nimiq's own human
+// translation: the Hub ships zh.po, and where it names a term we use its
+// word, because that is what a user already reads in the Hub popup this app's
+// own Connect button opens. Still not reviewed end to end by a native speaker;
+// see the note in locales/index.ts. English fallback was strictly worse.
 export default {
   "shell.connectWallet": "连接钱包",
   "shell.connecting": "连接中",
@@ -30,7 +33,7 @@ export default {
   "shell.available": "可用",
   "shell.sending": "发送中",
   "shell.sent": "已发送",
-  "shell.sendFailed": "出错了",
+  "shell.sendFailed": "出了点问题",
   "shell.amount": "金额",
   "shell.reportBug": "报告问题",
   "shell.fbType": "类型",

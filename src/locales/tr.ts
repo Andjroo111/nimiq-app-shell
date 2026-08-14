@@ -1,6 +1,9 @@
 // Turkish shell UI strings. Mirrors en.ts key for key.
-// Machine-assisted and NOT yet reviewed by a native speaker: see the
-// note in locales/index.ts. English fallback was strictly worse.
+// Machine-assisted, then TERMINOLOGY-SOURCED from Nimiq's own human
+// translation: the Hub ships tr.po, and where it names a term we use its
+// word, because that is what a user already reads in the Hub popup this app's
+// own Connect button opens. Still not reviewed end to end by a native speaker;
+// see the note in locales/index.ts. English fallback was strictly worse.
 export default {
   "shell.connectWallet": "Cüzdanı bağla",
   "shell.connecting": "Bağlanıyor",
@@ -16,10 +19,10 @@ export default {
   "shell.language": "Dil",
   "shell.notConnected": "Bağlı değil",
   "shell.send": "Gönder",
-  "shell.cancel": "Vazgeç",
+  "shell.cancel": "İptal et",
   "shell.retry": "Tekrar dene",
   "shell.receive": "Al",
-  "shell.amountsIn": "Tutarları şu para biriminde göster",
+  "shell.amountsIn": "Miktarları göster",
   "shell.openInPay": "Nimiq Pay'de aç",
   "shell.network": "Ağ",
   "shell.tapToCopy": "Kopyalamak için adrese dokunun",
@@ -31,7 +34,7 @@ export default {
   "shell.sending": "Gönderiliyor",
   "shell.sent": "Gönderildi",
   "shell.sendFailed": "Bir şeyler ters gitti",
-  "shell.amount": "Tutar",
+  "shell.amount": "Miktar",
   "shell.reportBug": "Hata bildir",
   "shell.fbType": "Tür",
   "shell.fbBug": "Hata",
