@@ -338,40 +338,64 @@ const SHEET_STYLE_ID = 'nimiq-shell-report-bug-style';
  *  wallet/scan glyphs), sized by .nq-cc-cashlink-slot's 24px box. */
 /** A LADYBUG, and the legs reach the shell.
  *
- *  Andrew, 2026-08-14, zoomed all the way in: the two back legs floated. They
- *  ran from (6.5,18.5) outward, and the body's lower arc is a radius-6 circle
- *  about (12,14), so that inner end sat 1.1 units off the shell it was supposed
- *  to grow from. Every leg here is now placed ON the ellipse and pulled 0.35
- *  inside it, so the stroke overlaps rather than approaches. The antennae get
- *  the same treatment: they used to start inside the head and left two stubs
- *  floating in it, invisible at 24px and obvious the moment anyone zooms, which
- *  is exactly how the legs were caught.
+ *  A FUNCTION and not a const, because the spots are CLIPPED and a clipPath
+ *  needs an id. Two of these render on one page (the menu row and the sheet
+ *  header), and a duplicate id is the same hazard rule 3 names for gradients,
+ *  so each call mints its own. Same pattern as the corner's gold hexagon.
+ *
+ *  THE SPOTS ARE CLIPPED TO THE SHELL so the ones at the rim are cut, which is
+ *  what a real ladybug's are (Andrew, 2026-08-14: "some of them kinda cutting
+ *  off, something a little bit more random"). Three of them, three sizes, off
+ *  the centre line: a mirrored pair reads as a diagram, and it is the uneven
+ *  scatter that reads as an animal. The clip is the shell's INNER edge, half a
+ *  stroke inside the path, so a cut spot stops against the outline rather than
+ *  under it.
+ *
+ *  THE LEGS END EXACTLY ON the ellipse, and the number that makes that work is
+ *  the stroke: at 0.76 the round cap has a radius of 0.38, precisely the shell
+ *  stroke's half-width, so the cap lands flush inside it and disappears.
+ *  Insetting them instead (0.35 was the first try) pushes the cap past the
+ *  stroke's inner edge and leaves a visible nub on every leg. Before that they
+ *  did not reach at all: they ran outward from (6.5,18.5) while the body's
+ *  lower arc is a radius-6 circle about (12,14), so the inner end sat 1.1 units
+ *  off the shell it was supposed to grow from. Andrew caught each of those by
+ *  zooming, which is the only way any of them are visible.
+ *
+ *  The antennae land on the shell for the same reason; they used to start
+ *  inside the head and leave two stubs floating in it.
  *
  *  There is no bug in the official Nimiq asset library (searched: bug, beetle,
- *  ladybug, insect, feedback, report), which is why this glyph was hand-drawn
- *  in the first place. It follows the house icon rules rather than a registry
- *  entry: one weight, currentColor, no baked colour, and the spots are
- *  currentColor fills because a stroked ring at 24px is mud.
- *
- *  Two spots and not four. Four read at 48px and turned to noise at 24, which
- *  is the size that actually ships; drawn at 24, 48 and 96 before choosing.
- *  The antennae stay for the same reason: without them the shell reads as a
- *  helmet rather than a bug.
+ *  ladybug, insect, feedback, report), which is why this glyph is hand-drawn.
+ *  It follows the house icon rules rather than a registry entry: one weight,
+ *  currentColor, no baked colour, and the spots are fills because a stroked
+ *  ring at 24px is mud.
  *
  *  The viewBox is the ARTWORK's bounds plus half a stroke, not a round 24.
  *  Declaring 24x24 around a 16x13 drawing rendered it visibly smaller than the
  *  hexagon beside it in the corner's shared 24px slot. Stroke 0.76 holds 0.96px
- *  at this crop, the same weight as the cashlink and switch glyphs. */
-export const BUG_ICON =
-  '<svg viewBox="3.4 5.9 17.2 14.3" fill="none" stroke="currentColor" stroke-width="0.76" ' +
-  'stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">' +
-  '<path d="M12 8.2a6 5.8 0 1 1-.01 0Z"/>' +
-  '<path d="M7.292 10.404h9.415"/><path d="M12 10.404V19.65"/>' +
-  '<path d="M6.569 12.498 4.118 11.795M6.35 14H3.8M7.107 16.725 4.899 18' +
-  'M17.431 12.498 19.882 11.795M17.65 14h2.55M16.893 16.725 19.101 18"/>' +
-  '<path d="M10.232 8.767 9 6.3M13.768 8.767 15 6.3"/>' +
-  '<circle cx="9.4" cy="14.9" r="1.1" fill="currentColor" stroke="none"/>' +
-  '<circle cx="14.6" cy="14.9" r="1.1" fill="currentColor" stroke="none"/></svg>';
+ *  at this crop, the same weight as the cashlink and switch glyphs.
+ *
+ *  Every arrangement was drawn at 24, 48 and 96 and judged in the menu row
+ *  rather than on its own, because 24px is the only size that ships. */
+let bugUid = 0;
+export function bugIcon(): string {
+  const id = `nq-bug-shell-${(bugUid += 1)}`;
+  return (
+    '<svg viewBox="3.4 5.9 17.2 14.3" aria-hidden="true">' +
+    `<defs><clipPath id="${id}">` +
+    '<path d="M12 8.58a5.62 5.42 0 1 1-.01 0Z"/></clipPath></defs>' +
+    '<g fill="none" stroke="currentColor" stroke-width="0.76" stroke-linecap="round" ' +
+    'stroke-linejoin="round">' +
+    '<path d="M12 8.2a6 5.8 0 1 1-.01 0Z"/>' +
+    '<path d="M7.292 10.404h9.415"/><path d="M12 10.404V19.65"/>' +
+    '<path d="M6.232 12.401 4.118 11.795M6 14H3.8M6.804 16.9 4.899 18' +
+    'M17.768 12.401 19.882 11.795M18 14h2.2M17.196 16.9 19.101 18"/>' +
+    '<path d="M10.232 8.767 9 6.3M13.768 8.767 15 6.3"/></g>' +
+    `<g fill="currentColor" clip-path="url(#${id})">` +
+    '<circle cx="9.7" cy="11.9" r="1.15"/><circle cx="7.9" cy="16.4" r="1.35"/>' +
+    '<circle cx="16" cy="15.6" r="1.45"/></g></svg>'
+  );
+}
 
 function ensureSheetStyles(doc: Document): void {
   if (doc.getElementById(SHEET_STYLE_ID)) return;
@@ -455,7 +479,7 @@ export function openReportBugSheet(doc: Document, i18n: I18n, options: ReportBug
   if (options.theme) applyTheme(scrim, options.theme);
   scrim.innerHTML = `
     <div class="nq-fb-card" role="dialog" aria-modal="true" aria-labelledby="nq-fb-title">
-      <div class="nq-fb-head">${BUG_ICON}<h2 class="nq-fb-title" id="nq-fb-title">${escapeHtml(t('shell.reportBug'))}</h2></div>
+      <div class="nq-fb-head">${bugIcon()}<h2 class="nq-fb-title" id="nq-fb-title">${escapeHtml(t('shell.reportBug'))}</h2></div>
       <label class="nq-fb-field">
         <span class="nq-fb-label">${escapeHtml(t('shell.fbType'))}</span>
         <select class="nq-fb-input" id="nq-fb-type">
