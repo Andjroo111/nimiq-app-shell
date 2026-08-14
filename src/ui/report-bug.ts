@@ -359,11 +359,11 @@ const SHEET_STYLE_ID = 'nimiq-shell-report-bug-style';
  *  leg in past about 0.3 and the cap clears that inner edge and wears a visible
  *  blob, which is what an earlier 0.35 did.
  *
- *  The antennae go in 1.5, far enough to read as emerging from under the shell
- *  rather than resting on it. Drawn at 0, 0.9, 1.5 and 2.1 at 150px: past about
- *  2 they close on the top of the centre seam and the three marks converge into
- *  one. None of this is visible at 24px, which is why all of it was judged
- *  zoomed.
+ *  The antennae go in 1.2, far enough to read as emerging from under the shell
+ *  rather than resting on it. Drawn at 0, 0.9, 1.2, 1.5 and 2.1 at 150px: past
+ *  about 2 they close on the top of the centre seam and the three marks
+ *  converge into one. None of this is visible at 24px, which is why every round
+ *  of it was judged zoomed.
  *
  *  Before any of that neither reached the shell: the legs
  *  ran outward from (6.5,18.5) while the body's lower arc is a radius-6 circle
@@ -388,7 +388,7 @@ export const BUG_ICON =
   '<path d="M12 10.404V19.65"/>' +
   '<path d="M6.232 12.401 4.118 11.795M6 14H3.8M6.804 16.9 4.899 18' +
   'M17.768 12.401 19.882 11.795M18 14h2.2M17.196 16.9 19.101 18"/>' +
-  '<path d="M10.902 10.109 9 6.3M13.098 10.109 15 6.3"/></svg>';
+  '<path d="M10.768 9.841 9 6.3M13.232 9.841 15 6.3"/></svg>';
 
 function ensureSheetStyles(doc: Document): void {
   if (doc.getElementById(SHEET_STYLE_ID)) return;
