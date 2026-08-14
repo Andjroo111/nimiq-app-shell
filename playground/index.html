@@ -101,6 +101,16 @@
   }
   .nq-pg-select:focus-visible { outline: 2px solid var(--blue); outline-offset: 3px; }
 
+  /* Address book editor */
+  .ab-list { display: flex; flex-direction: column; gap: 4px; margin: 2px 0 8px; }
+  .ab-row { display: flex; align-items: center; gap: 8px; font-size: 12px; }
+  .ab-row b { font-weight: 700; }
+  .ab-row code { font-family: 'Fira Mono', ui-monospace, monospace; font-size: 11px;
+    color: var(--muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .ab-row .mini { margin-left: auto; flex: none; }
+  .ab-add { display: grid; grid-template-columns: 1fr 1.6fr auto; gap: 6px; }
+  .ab-empty { color: var(--muted); font-size: 12px; font-style: italic; }
+
   /* Standalone asset list: the same stack, mounted outside the corner. */
   #standalone { max-width: 340px; border: 1px solid var(--line); border-radius: 10px; overflow: hidden; }
   .empty { color: var(--muted); font-size: 12px; font-style: italic; }
@@ -192,6 +202,16 @@
           <label><input type="checkbox" id="opt-testnet"> Testnet (shows network row)</label>
           <label><input type="checkbox" id="opt-contacts" checked> Saved recipients (address book)</label>
           <p class="hint">An unwired seam renders no row, which is the corner's no-dead-buttons rule. Toggle one off and watch it vanish.</p>
+        </fieldset>
+        <fieldset>
+          <legend>Address book</legend>
+          <div id="ab-list" class="ab-list"></div>
+          <div class="ab-add">
+            <input id="ab-label" class="nq-pg-select" placeholder="Name" autocomplete="off">
+            <input id="ab-addr" class="nq-pg-select" placeholder="NQ… or 0x…" autocomplete="off" spellcheck="false">
+            <button class="mini" id="ab-save">add</button>
+          </div>
+          <p class="hint">What the host's <code>contacts.list</code> hands over. Editing it here is the only way to see how a name of a given length wraps, or what a book of nine does to the chip row. Kept in <code>localStorage</code>, so a reload does not undo the set you built.</p>
         </fieldset>
         <fieldset>
           <legend>Send</legend>
@@ -451,11 +471,54 @@ async function rate(ticker, asset = 'NIM') {
 
 /* The host owns the address book. This one is in memory and starts with a
    Polygon entry on purpose: it must NOT be offered when sending NIM. */
-const contacts = [
+/* The address book is EDITABLE and persisted, because the interesting states
+   are the ones a frozen three-entry fixture cannot reach: an empty book, a name
+   long enough to wrap the chip row, nine of them, the one whose address is a
+   Polygon address. The corner's own `contacts.add` writes here too, so the
+   save-after-send flow can be watched end to end. */
+const AB_KEY = 'nq-pg:contacts';
+const AB_SEED = [
   { label: 'Mum', address: 'NQ21 8LNC MJD3 D7T4 8FSX N5M8 5V2M A9GY 4KUJ' },
   { label: 'Savings', address: 'NQ73 6XLE 6VTP U4TX D3H0 UAKG 9YKR NRHR YVFB' },
   { label: 'Polygon till', address: '0x71C7656EC7ab88b098defB751B7401B5f6d8976F', asset: 'USDT' },
 ];
+let contacts = (() => {
+  try {
+    const raw = localStorage.getItem(AB_KEY);
+    if (raw) return JSON.parse(raw);
+  } catch { /* storage unavailable or holding something else */ }
+  return AB_SEED.slice();
+})();
+function saveContacts() {
+  try { localStorage.setItem(AB_KEY, JSON.stringify(contacts)); } catch { /* ignore */ }
+  renderAddressBook();
+}
+function renderAddressBook() {
+  const host = $('ab-list');
+  if (!host) return;
+  host.textContent = '';
+  if (!contacts.length) {
+    const p = document.createElement('p');
+    p.className = 'ab-empty';
+    p.textContent = 'Empty. The chip row hides itself rather than showing a heading over nothing.';
+    host.appendChild(p);
+    return;
+  }
+  contacts.forEach((c, i) => {
+    const row = document.createElement('div');
+    row.className = 'ab-row';
+    const name = document.createElement('b');
+    name.textContent = c.label;
+    const addr = document.createElement('code');
+    addr.textContent = c.address;
+    const del = document.createElement('button');
+    del.className = 'mini';
+    del.textContent = 'remove';
+    del.addEventListener('click', () => { contacts.splice(i, 1); saveContacts(); remount(); });
+    row.append(name, addr, del);
+    host.appendChild(row);
+  });
+}
 
 /* ------------------------------------------------------------------ mount */
 const i18n = createI18n({ locales: mergeLocales(shellLocales), fallback: 'en' });
@@ -510,7 +573,7 @@ function buildOptions() {
   if (opt('opt-contacts')) {
     o.contacts = {
       list: () => { log('info', `contacts.list() -> ${contacts.length}`); return contacts; },
-      add: (entry) => { contacts.push(entry); log('info', 'contacts.add()', entry); },
+      add: (entry) => { contacts.push(entry); saveContacts(); log('info', 'contacts.add()', entry); },
     };
   }
 
@@ -697,6 +760,22 @@ function waitFor(read, timeoutMs = 2000) {
     tick();
   });
 }
+
+$('ab-save').addEventListener('click', () => {
+  const label = $('ab-label').value.trim();
+  const address = $('ab-addr').value.trim();
+  if (!label || !address) return log('warn', 'address book: a name and an address, both');
+  // asset rides along for a non-NIM address, which is what makes the corner
+  // offer that contact only on the matching asset's send.
+  const entry = { label, address };
+  if (/^0x/i.test(address)) entry.asset = 'USDT';
+  contacts.push(entry);
+  saveContacts();
+  $('ab-label').value = '';
+  $('ab-addr').value = '';
+  remount();
+});
+renderAddressBook();
 
 const boot = applyDeepLink();
 remount();
