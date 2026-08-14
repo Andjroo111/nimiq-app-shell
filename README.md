@@ -543,6 +543,61 @@ render your own UI. `openReportBugSheet`, `submitToBot`, `submitFeedback` and
 
 ---
 
+### Wearing your brand (v0.19.0)
+
+Pass `theme` and the mini wallet stops looking like a Nimiq control someone
+dropped onto your page. Eleven tokens, all optional; anything you leave out
+stays Nimiq.
+
+```ts
+mountMiniWallet(document.querySelector('#wallet-slot')!, {
+  wallet, i18n,
+  theme: {
+    font: 'inherit',        // take the page's own font
+    surface: '#0E241B',     // the menu card
+    text: '#E7F3EE',        // text on it
+    primary: '#0C8C77',     // the signed-out Connect button
+    accent: '#2FD9BE',      // Send, focus rings, the copied address, contacts
+    accentText: '#04120C',  // label ON accent, for a brand too bright for white
+  },
+});
+```
+
+| Token | Reaches |
+| --- | --- |
+| `font` | face and menu |
+| `primary`, `primaryText` | the Connect button, its lit corner and its hover |
+| `accent`, `accentText` | Send, send-confirm, every focus ring, input focus, the copy tint and tooltip, contact chips |
+| `surface`, `text` | the card, and every muted tone, hairline, hover wash, well and scrollbar derived from them |
+| `face`, `faceText` | the language-only pill, which sits on YOUR header rather than on the card (defaults to `surface` / `text`) |
+| `danger`, `success`, `warning` | send errors and Disconnect hover, the sent confirmation, the wrong-network guard and TESTNET badge |
+
+Two tokens usually carry a dark theme, because the tints derive rather than
+being named: `surface` + `text` also darken the address well, the currency grid,
+the scrollbar, the hairlines and the hover wash.
+
+**Under it are the `--nq-cc-*` custom properties**, still the mechanism.
+`theme` expands into them. Set one directly for anything the tokens do not
+reach:
+
+```css
+:root {
+  --nq-cc-menu-shadow: 0 12px 32px rgba(8, 32, 26, .16);
+  --nq-cc-menu-border: 1.5px solid rgba(236, 242, 235, .12);
+}
+```
+
+Each var holds a WHOLE value rather than a component of one, so
+`--nq-cc-connect-image` can be a flat colour where Nimiq uses a radial. `theme`
+is stamped inline on the mounted element, so it wins where both are set, and two
+mini wallets on one page can wear different brands.
+
+A value may be any CSS colour, including a `var()` pointing at your own design
+token: `accent: 'var(--brand-teal)'` works, and follows your dark-mode switch
+for free.
+
+---
+
 ## Use without a bundler (prebuilt ESM)
 
 Apps with **no build step** (raw `<script type="module">`, no bundler) can't
@@ -557,7 +612,7 @@ git tag, no install, no bundler, no vendored assets:
   import {
     createI18n, createWallet, mergeLocales, shellLocales,
     mountLanguagePill, mountWalletPill,
-  } from 'https://cdn.jsdelivr.net/gh/Andjroo111/nimiq-app-shell@v0.2.1/dist/app-shell.js';
+  } from 'https://cdn.jsdelivr.net/gh/Andjroo111/nimiq-app-shell@v0.19.0/dist/app-shell.js';
 
   const i18n = createI18n({ locales: mergeLocales(shellLocales), fallback: 'en' });
   const wallet = createWallet({ appName: 'My App' });
