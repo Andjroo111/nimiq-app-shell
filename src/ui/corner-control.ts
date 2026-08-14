@@ -53,6 +53,21 @@ const NIM_ADDRESS_SHAPE = /^NQ[0-9]{2}[0-9A-HJ-NP-VXY]{32}$/;
  *  looks perfectly tidy while doing it. For a string people paste money into
  *  that is not a rounding error. Rows here are near-equal thirds instead, so
  *  every character survives at any length. */
+/** How far to shift a right-anchored menu so it clears the viewport's left edge,
+ *  in CSS `right` pixels: 0 to leave it alone, negative to move it right.
+ *
+ *  Split out from the DOM because `getBoundingClientRect` is the only part that
+ *  needs a browser, and the arithmetic is the part that can be wrong. Never
+ *  shifts further than the room on the right, so pulling a card away from one
+ *  edge cannot push it off the other. */
+export function menuShift(left: number, right: number, viewportWidth: number, gutter = 8): number {
+  const overLeft = gutter - left;
+  if (overLeft <= 0) return 0;
+  const roomRight = viewportWidth - gutter - right;
+  const shift = Math.min(overLeft, Math.max(0, roomRight));
+  return shift > 0 ? -Math.round(shift) : 0;
+}
+
 export function addressGrid(address: string): { cells: string[]; columns: number } {
   const compact = address.replace(/\s+/g, '');
   if (!compact) return { cells: [], columns: 1 };
@@ -358,7 +373,7 @@ function ensureStyles(): void {
 /* stays a compact card hanging off the corner on EVERY viewport (Andjroo,
    mobile review 7/23: full-width phone sheet rejected, "it should just come
    out of the corner"); max-width only guards sub-300px screens */
-.nq-cc-menu { position:absolute; top:calc(100% + 8px); right:0; z-index:60; width:272px;
+.nq-cc-menu { position:absolute; top:calc(100% + 8px); right:var(--nq-cc-menu-shift, 0px); z-index:60; width:272px;
   max-width:calc(100vw - 24px); padding:6px;
   background:var(--nq-cc-menu-bg, #fff); border:var(--nq-cc-menu-border, none); border-radius:10px;
   box-shadow:var(--nq-cc-menu-shadow, 0 4px 28px rgba(0,0,0,.16));
@@ -1546,17 +1561,33 @@ export function mountMiniWallet(
   }
 
   // ---- open / close ---------------------------------------------------------
+  /** Nudge the card back on-screen when the trigger is not the rightmost thing
+   *  in its header. The menu hangs off the corner (`right:0`), which only lands
+   *  on-screen when the mount slot is at least a card-width from the left edge.
+   *  nimiq.ninja puts an "Open the wallet" CTA to the right of the pill, so at
+   *  430px the card started 14px past the left edge, and at 360px, 36px past.
+   *  Shifting beats re-anchoring to the left: the card stays under its own
+   *  trigger, which is what the corner is for. */
+  function clampMenu(): void {
+    menu.style.setProperty('--nq-cc-menu-shift', '0px');
+    const r = menu.getBoundingClientRect();
+    const shift = menuShift(r.left, r.right, window.innerWidth);
+    if (shift) menu.style.setProperty('--nq-cc-menu-shift', `${shift}px`);
+  }
   function setOpen(open: boolean): void {
     menu.hidden = !open;
     face.setAttribute('aria-expanded', String(open));
     faceFlag.setAttribute('aria-expanded', String(open));
     if (open) {
+      clampMenu();
+      window.addEventListener('resize', clampMenu);
       document.addEventListener('click', onDocClick, true);
       document.addEventListener('keydown', onKeydown);
       void refreshBalance();
     } else {
       root.classList.remove('nq-cc-show-receive');
       root.classList.remove('nq-cc-show-send');
+      window.removeEventListener('resize', clampMenu);
       document.removeEventListener('click', onDocClick, true);
       document.removeEventListener('keydown', onKeydown);
     }
