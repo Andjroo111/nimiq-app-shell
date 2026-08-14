@@ -336,23 +336,42 @@ const SHEET_STYLE_ID = 'nimiq-shell-report-bug-style';
 
 /** The bug glyph, in the corner's stroke-icon language (the same weight as the
  *  wallet/scan glyphs), sized by .nq-cc-cashlink-slot's 24px box. */
-/** The viewBox is the ARTWORK's bounds, not a round 24. Measured with getBBox,
- *  the drawing occupies 18x16 of the 24x24 box it used to declare, so in the
- *  corner's 24px slot it rendered 18x16 beside a hexagon rendering 20.5x20 and
- *  read visibly smaller and fainter (Andrew, 2026-08-14). Cropping to
- *  2.5 3.5 19 17 (the bounds plus half a stroke, so no cap clips) scales it to
- *  22.7x20.2, which matches.
+/** A LADYBUG, and the legs reach the shell.
  *
- *  Stroke 0.76 and not 1.6: at the new crop this renders 0.96px, the same as
- *  the cashlink and switch glyphs beside it (0.72 on an 18 viewBox). At the
- *  original 1.6 it drew 1.6px and read a full weight darker than its
- *  neighbours; a bigger crop needs a thinner number to hold the same weight. */
+ *  Andrew, 2026-08-14, zoomed all the way in: the two back legs floated. They
+ *  ran from (6.5,18.5) outward, and the body's lower arc is a radius-6 circle
+ *  about (12,14), so that inner end sat 1.1 units off the shell it was supposed
+ *  to grow from. Every leg here is now placed ON the ellipse and pulled 0.35
+ *  inside it, so the stroke overlaps rather than approaches. The antennae get
+ *  the same treatment: they used to start inside the head and left two stubs
+ *  floating in it, invisible at 24px and obvious the moment anyone zooms, which
+ *  is exactly how the legs were caught.
+ *
+ *  There is no bug in the official Nimiq asset library (searched: bug, beetle,
+ *  ladybug, insect, feedback, report), which is why this glyph was hand-drawn
+ *  in the first place. It follows the house icon rules rather than a registry
+ *  entry: one weight, currentColor, no baked colour, and the spots are
+ *  currentColor fills because a stroked ring at 24px is mud.
+ *
+ *  Two spots and not four. Four read at 48px and turned to noise at 24, which
+ *  is the size that actually ships; drawn at 24, 48 and 96 before choosing.
+ *  The antennae stay for the same reason: without them the shell reads as a
+ *  helmet rather than a bug.
+ *
+ *  The viewBox is the ARTWORK's bounds plus half a stroke, not a round 24.
+ *  Declaring 24x24 around a 16x13 drawing rendered it visibly smaller than the
+ *  hexagon beside it in the corner's shared 24px slot. Stroke 0.76 holds 0.96px
+ *  at this crop, the same weight as the cashlink and switch glyphs. */
 export const BUG_ICON =
-  '<svg viewBox="2.5 3.5 19 17" fill="none" stroke="currentColor" stroke-width="0.76" ' +
+  '<svg viewBox="3.4 5.9 17.2 14.3" fill="none" stroke="currentColor" stroke-width="0.76" ' +
   'stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">' +
-  '<path d="M12 20a6 6 0 0 0 6-6v-3a6 6 0 0 0-12 0v3a6 6 0 0 0 6 6Z"/>' +
-  '<path d="M10 6.5 8.5 4M14 6.5 15.5 4"/><path d="M12 8v12"/>' +
-  '<path d="M6 11H3M6 15H3M6.5 18.5 4 20M18 11h3M18 15h3M17.5 18.5 20 20"/></svg>';
+  '<path d="M12 8.2a6 5.8 0 1 1-.01 0Z"/>' +
+  '<path d="M7.292 10.404h9.415"/><path d="M12 10.404V19.65"/>' +
+  '<path d="M6.569 12.498 4.118 11.795M6.35 14H3.8M7.107 16.725 4.899 18' +
+  'M17.431 12.498 19.882 11.795M17.65 14h2.55M16.893 16.725 19.101 18"/>' +
+  '<path d="M10.232 8.767 9 6.3M13.768 8.767 15 6.3"/>' +
+  '<circle cx="9.4" cy="14.9" r="1.1" fill="currentColor" stroke="none"/>' +
+  '<circle cx="14.6" cy="14.9" r="1.1" fill="currentColor" stroke="none"/></svg>';
 
 function ensureSheetStyles(doc: Document): void {
   if (doc.getElementById(SHEET_STYLE_ID)) return;
