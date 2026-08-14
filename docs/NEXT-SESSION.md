@@ -51,7 +51,7 @@ Registry: `nimiq-branding-cli` #30 (rename/onboard notes) and #31 (the
 **10 of 19 apps converted**: the six CDN, the three bundled, and party. PRs are
 open and none are merged.
 
-⚠ **splitlink is not a nineteenth app.** `Andjroo111/splitlink` was RENAMED to
+**splitlink is not a nineteenth app.** `Andjroo111/splitlink` was RENAMED to
 `Andjroo111/nimiq.party`; the GitHub API redirects, and `~/gdkc/projects/splitlink`
 is a stale local clone of that same repo whose `origin` still points at
 nimiq.party. Its five chrome files were byte-identical to party's, which is what
