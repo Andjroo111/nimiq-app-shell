@@ -104,7 +104,7 @@ unreadable as well as unsendable. Issue #124 has the three routes.
 
 - Feature branch, PR, squash merge, delete branch. CI is `typecheck + tests`.
 - `bun run check && bun test` before pushing; `ai-slop <file>` on any prose.
-- `bun run build:dist` and commit `dist/` — jsDelivr serves it from the tag.
+- `bun run build:dist` and commit `dist/`; jsDelivr serves it from the tag.
 - Tag every release and verify the CDN returns 200 for the new tag.
 - **Re-derive the version before bumping.** Parallel sessions merge here; a
   `sed` on the version you remember silently no-ops.
