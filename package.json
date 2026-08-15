@@ -11,7 +11,8 @@
     "test": "bun test",
     "playground": "bun run build:dist && bun run scripts/playground.ts",
     "build:dist": "bun build src/index.ts --target browser --format esm --minify --outfile dist/app-shell.js",
-    "gen:flags": "node scripts/gen-flags.mjs"
+    "gen:flags": "node scripts/gen-flags.mjs",
+    "bump-fleet": "bun run scripts/bump-fleet.ts"
   },
   "dependencies": {
     "@nimiq/hub-api": "^1.14.0",
