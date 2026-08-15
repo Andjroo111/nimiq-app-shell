@@ -841,10 +841,18 @@ const SCAN_QR =
 //
 // currentColor, never gold. Gold belongs to the logo, and this is a UI icon.
 //
-// Stroke 0.72 on the 18 viewBox is 0.95px at 24, matching the cashlink and bug
-// glyphs beside it. The asset ships at 1.5, which is its weight as a standalone
-// logo; carried into a row of UI icons it drew at 2px and read a full weight
-// darker than its neighbours, which is what Andrew spotted.
+// Stroke 1.28 on the 18 viewBox is 1.81px at 24. It was 0.72 (0.95px), matched to
+// the cashlink and to the bug when the bug was still an OUTLINE. v0.20.2 filled the
+// bug, and a silhouette carries far more weight than a hairline, so the row read as
+// one heavy glyph beside two faint ones. Raising this stroke closes that gap while
+// leaving the drawing alone.
+//
+// ⚠ THE SHAPE IS NOT THE PROBLEM AND MUST NOT BE "FIXED" (Andrew, 2026-08-15:
+// "I like the arrows that I originally created"). A filled version was drawn and
+// rejected: solid readings of a hexagon either lose the two arrows entirely or turn
+// the cut ends into ragged notches. The mismatch was always WEIGHT, so weight is the
+// only thing that moves. The asset ships at 1.5, which is its weight as a standalone
+// logo; that still draws too dark here.
 //
 // EACH HALF STOPS 0.9 SHORT OF ITS POINT. Ending exactly at the tips left the
 // two arrowheads nearly touching, and at 24px on a phone they read as one
@@ -859,7 +867,7 @@ const SCAN_QR =
 // be code.
 const SWITCH_ICON =
   '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 18 17" aria-hidden="true">' +
-  '<g fill="none" stroke="currentColor" stroke-width="0.72" stroke-linecap="round" ' +
+  '<g fill="none" stroke="currentColor" stroke-width="1.28" stroke-linecap="round" ' +
   'stroke-linejoin="round">' +
   '<path d="M16.603 6.779l-2.987-5.306a1.37 1.37 0 00-1.189-.702H5.57c-.489 0-.941.267-1.186.703L1.396 6.779"/>' +
   '<path d="M1.396 9.752l2.988 5.304a1.36 1.36 0 001.186.703h6.858a1.36 1.36 0 001.186-.703l2.988-5.304"/>' +
