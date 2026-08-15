@@ -362,11 +362,26 @@ both worth re-reading before anyone reopens this:
 The usual counter-argument, that urgent fixes land instantly, is weak here: the shell
 has no auth, no secrets and no network calls of its own. It is chrome.
 
-**What to build instead of floating:** a committed `scripts/bump-fleet.sh` that does
-what the v0.20.3 pass did by hand. Loop the repos, bump the pin, install, rebuild the
-committed artifact, run that repo's own gates, apply its version-and-CHANGELOG law,
-open the PR. The pin was never the bottleneck; the rebuilds and the per-repo law were.
-NOT BUILT YET, and Andrew has not asked for it.
+**The bump is scripted instead.** `bun run bump-fleet -- v0.20.4` walks all 19: bumps
+the pin, installs, rebuilds the committed artifact, applies that repo's
+version-and-CHANGELOG law, runs its gates, commits and opens a PR. It NEVER merges.
+
+```
+bun run bump-fleet -- v0.20.4 --dry-run          # the plan, nothing written
+bun run bump-fleet -- v0.20.4                    # PR per app
+bun run bump-fleet -- v0.20.4 --only swellet --no-pr
+```
+
+The registry is `scripts/fleet.ts`, one record per app: model, build script, whether
+the artifact is COMMITTED, whether the repo's law applies, its gate names, and whether
+it needs a worktree. Add an app there, not in the driver.
+
+It refuses to guess. The tag must exist AND be on jsDelivr before any repo is touched;
+`git remote -v` must name the expected repo; a `dep` app must RESOLVE to the target in
+`node_modules` rather than merely say so in package.json; an app that commits its
+artifact must show that artifact moved; and a commit is confirmed by re-reading HEAD.
+A worktree that fails is left in place, because it holds the state the failure
+happened in.
 
 ### What the v0.20.3 sweep cost
 
