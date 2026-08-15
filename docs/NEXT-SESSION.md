@@ -6,8 +6,11 @@ The **mini wallet**: the fleet's one header control. `mountMiniWallet` is the
 canonical export; `mountCornerControl` is kept as an alias because ~25 apps
 import that name.
 
-**Current: v0.20.1**, tagged and on jsDelivr:
-`https://cdn.jsdelivr.net/gh/Andjroo111/nimiq-app-shell@v0.20.1/dist/app-shell.js`
+**Current: v0.20.3**, tagged and on jsDelivr:
+`https://cdn.jsdelivr.net/gh/Andjroo111/nimiq-app-shell@v0.20.3/dist/app-shell.js`
+
+**All 19 fleet apps pin v0.20.3.** No split, and the pin is deliberate: see
+"How the fleet takes an update" below before proposing a floating tag.
 
 ## Playground, the way to see any of this
 
@@ -24,7 +27,7 @@ slow read, an unpriced asset, and the three send outcomes.
 route makes `page.goto` time out while curl works fine, which reads as a broken
 page for a while.
 
-## Shipped 2026-08-14
+## Shipped 2026-08-14 and 08-15
 
 | Release | What |
 | --- | --- |
@@ -33,12 +36,18 @@ page for a while.
 | v0.19.2 (#145) | a saved recipient was a 23px tap target |
 | v0.20.0 (#146) | the send and receive screens are the wallet's own: the 3x3 recipient grid, a recipient identicon, a built-in QR |
 | v0.20.1 (#148) | the report-bug glyph: legs and antennae that reach the shell, and the right size beside the hexagon |
+| v0.20.2 (#149) | the report-bug glyph goes SOLID: filled body, negative-space seam, a head whose underside arcs with the shell |
+| v0.20.3 (#151) | switch account's stroke 0.72 → 1.28, so it reads at the solid bug's weight |
 
-**#149 is OPEN and unmerged** (still, as of 2026-08-15): v0.20.2, the bug glyph goes SOLID
-(filled body, negative-space seam, a head whose underside arcs with the shell). Andrew asked for
-it from a reference and has not said merge. CI green. Nothing depends on it, and it is visible in
-exactly ONE app: `nimiq.work` is the only repo in the fleet that wires `reportBug` at all. Its own
-open question is whether switch-account should go solid too, to even up the weight beside it.
+**⚠ THE SWITCH-ACCOUNT SHAPE IS ANDREW'S AND DOES NOT MOVE.** He asked for it to "go solid
+too" alongside the bug; a filled version was drawn and rejected the moment he saw it
+("I like the arrows that I originally created", 2026-08-15). Every solid reading of a hexagon
+either loses the two arrows (a filled hex with a seam is a hexagon with a minus sign) or turns
+the cut ends into ragged notches. The mismatch was WEIGHT, and weight is all that moved. If
+this comes up again, change the stroke, never the path.
+
+The bug glyph is visible in exactly ONE app: `nimiq.work` is the only repo in the fleet that
+wires `reportBug` at all.
 
 ### What the review rounds on v0.20.0 changed
 
@@ -104,7 +113,7 @@ Eleven releases, v0.11.0 → v0.17.1.
 Registry: `nimiq-branding-cli` #30 (rename/onboard notes) and #31 (the
 `address-display` ethereum format silently truncated any non-42 address).
 
-## The fleet sweep, issue #112 — CLOSED 2026-08-14
+## The fleet sweep, issue #112, CLOSED 2026-08-14
 
 **All 19 apps converted, merged and deployed. Every one is on v0.20.1.** There is
 no split version left in the fleet.
@@ -242,7 +251,7 @@ has not drifted.
   chose rather than narrowing it: ninja filters to 4 on purpose, swellet to 5,
   life defaults. Narrowing uninvited is a product change.
 
-#### The vendored batch: party is the worked example
+#### The vendored batch, worked through party
 
 `git remote -v` FIRST in every vendored repo. That is how splitlink turned out to
 be nimiq.party renamed, and a push would have fought party's own branch.
@@ -321,6 +330,62 @@ them. `bun run playground`, then Host brand.
 **All 19 sweep apps are on v0.20.1 as of 2026-08-14**, so theming is available
 fleet-wide. Only swellet uses it (#100). Every other app paints Nimiq navy/gold/
 light-blue as its actual identity, so the untouched default is correct for them.
+
+## How the fleet takes an update
+
+**Decided 2026-08-15: everything stays PINNED.** Andrew asked whether a future
+release could move all 19 apps on its own. It cannot,
+and the answer is not "not yet", it is "the mechanism only reaches a third of them".
+
+**The fleet consumes this package two ways:**
+
+- **7 apps fetch at RUNTIME from jsDelivr** (cards, gives, ninja, software, stream,
+  swellet, vote). jsDelivr does resolve floating refs for this repo, verified:
+  `@v0.20`, `@v0.20.x` and `@latest` all return 200 and served v0.20.3 within
+  minutes of the tag. So these could float.
+- **12 apps BAKE the shell into their own committed artifact** (casino, life, work,
+  party, cool, gift, money, name, talk, tax, tips, and sale's hand-copied dist). No
+  version syntax reaches them. Even a floating dep only lands at the next install,
+  rebuild and deploy.
+
+**Decision: keep every app pinned** (Andrew, 2026-08-15, "pinned it is"). Two reasons,
+both worth re-reading before anyone reopens this:
+
+1. Floating solves 7 of 19 and permanently splits the fleet into two update models.
+   Today every app moves the same way, which is why the v0.20.3 sweep was one pass.
+2. The blast radius is wrong for the mechanism. A glyph shipped today; the same pipe
+   carries the SEND screen. A floating pin puts a bad tag on seven live apps with no
+   PR, no CI in those repos, no review, and no rollback but another tag. cool's CI
+   greps its built bundle for API symbols precisely because this fleet has been bitten
+   by silent shell drift.
+
+The usual counter-argument, that urgent fixes land instantly, is weak here: the shell
+has no auth, no secrets and no network calls of its own. It is chrome.
+
+**What to build instead of floating:** a committed `scripts/bump-fleet.sh` that does
+what the v0.20.3 pass did by hand. Loop the repos, bump the pin, install, rebuild the
+committed artifact, run that repo's own gates, apply its version-and-CHANGELOG law,
+open the PR. The pin was never the bottleneck; the rebuilds and the per-repo law were.
+NOT BUILT YET, and Andrew has not asked for it.
+
+### What the v0.20.3 sweep cost
+
+- **Per-repo law is not uniform.** cards, gives, software, stream, swellet, money,
+  tips, casino, life, work, party and talk each need a `package.json` bump AND a
+  CHANGELOG entry. ninja, vote, gift, name and tax need neither. Read the repo.
+- **ninja keeps its app under `app/`**, not `public/`. A `grep public src` misses it and
+  reports "no change" while doing nothing.
+- **stream carries the URL on four pages**, tips on nine. Never just `index.html`.
+- **life, work and talk have GITIGNORED bundles**, so the bump is package.json only and
+  nothing to commit. Build anyway and check the artifact carries the change, or a
+  broken dep resolution looks identical to a clean no-op.
+- ⚠ **cool is a contested clone.** A parallel session merged #209 mid-flight and both
+  sides had rebuilt `public/vendor/app-shell.js`. Resolve a built artifact by
+  REGENERATING it, never by picking a side. cool also had 19 failing tests that came in
+  with #209; confirmed by stashing, they are not the bumper's.
+- ⚠ **macOS `/bin/bash` is 3.2 and has no associative arrays.** `declare -A` fails
+  silently enough that a commit loop reports success while committing nothing. Use a
+  `case`, and verify with `git log` rather than the loop's own echo.
 
 ## What the Hub will not allow
 
