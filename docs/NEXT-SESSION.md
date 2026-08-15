@@ -34,9 +34,11 @@ page for a while.
 | v0.20.0 (#146) | the send and receive screens are the wallet's own: the 3x3 recipient grid, a recipient identicon, a built-in QR |
 | v0.20.1 (#148) | the report-bug glyph: legs and antennae that reach the shell, and the right size beside the hexagon |
 
-**#149 is OPEN and unmerged**: v0.20.2, the bug glyph goes SOLID (filled body, negative-space
-seam, a head whose underside arcs with the shell). Andrew asked for it from a reference and has
-not said merge. CI green. Nothing else depends on it.
+**#149 is OPEN and unmerged** (still, as of 2026-08-15): v0.20.2, the bug glyph goes SOLID
+(filled body, negative-space seam, a head whose underside arcs with the shell). Andrew asked for
+it from a reference and has not said merge. CI green. Nothing depends on it, and it is visible in
+exactly ONE app: `nimiq.work` is the only repo in the fleet that wires `reportBug` at all. Its own
+open question is whether switch-account should go solid too, to even up the weight beside it.
 
 ### What the review rounds on v0.20.0 changed
 
@@ -102,53 +104,111 @@ Eleven releases, v0.11.0 → v0.17.1.
 Registry: `nimiq-branding-cli` #30 (rename/onboard notes) and #31 (the
 `address-display` ethereum format silently truncated any non-42 address).
 
-## The fleet sweep, issue #112
+## The fleet sweep, issue #112 — CLOSED 2026-08-14
 
-**10 of 19 apps converted**: the six CDN, the three bundled, and party. PRs are
-open and none are merged.
+**All 19 apps converted, merged and deployed. Every one is on v0.20.1.** There is
+no split version left in the fleet.
 
 **splitlink is not a nineteenth app.** `Andjroo111/splitlink` was RENAMED to
 `Andjroo111/nimiq.party`; the GitHub API redirects, and `~/gdkc/projects/splitlink`
 is a stale local clone of that same repo whose `origin` still points at
 nimiq.party. Its five chrome files were byte-identical to party's, which is what
-gave it away. Converting it and pushing would have force-fought party's own
-branch. 20 becomes 19, and party #176 already covers it.
+gave it away. 20 becomes 19, and party #176 covered it.
+
+**nimmesh is out of the sweep** (Andrew, 2026-08-14): it is a wallet, and a wallet
+does not wear the mini wallet. Same reason `nimiq.ninja/app` was always excluded
+while its landing converted.
 
 | Model | Apps | Work per app |
 | --- | --- | --- |
-| CDN | cards ✅, gives ✅, ninja ✅, software ✅, stream ✅, swellet ✅ | one URL + one mount call |
-| Bundled | casino ✅, life ✅, work ✅ | dep bump + mount swap |
-| Vendored | party ✅, cool, gift, money, name, talk, tax, tips | bump **and rebuild `public/vendor/app-shell.js`**, or it is a no-op live |
-| Own shape | sale, vote | needs a look each |
+| CDN | cards, gives, ninja, software, stream, swellet, vote | one URL + one mount call |
+| Bundled | casino, life, work | dep bump + mount swap |
+| Vendored | party, cool, gift, money, name, talk, tax, tips | bump **and rebuild the committed bundle**, or it is a no-op live |
+| Hand-vendored | sale | replace `public/js/vendor/app-shell.js` with the dist; no dep, no build script |
 
-All ten PRs now pin **v0.18.2**. Open PRs: `nimiq.gives` #58, `nimiq.ninja` #108, `nimiq.software` #65,
-`nimiq.stream` #48, `swellet` #99, `nimiq.casino` #31, `nimiq.life` #39,
-`nimiq.work` #129, `nimiq.party` #176. Every one is GREEN.
+Merged PRs: gift #56, money #58, name #34, talk #52, tips #130, tax #23, vote #91,
+sale #115, gives #58, ninja #108, software #65, stream #48, work #129, swellet #99,
+casino #31, life #39, party #176.
 
-CI is green on all seven CDN and bundled repos that run it. swellet has a
-deploy-only workflow, so it was verified by its own `bun test` (1245 pass) and in
-a browser. party #176 needed its CI marker list moved with the API; that landed
-over SSH, since the `workflow`-scope block is an OAuth App rule SSH is not
-subject to.
+**The nine that had sat on v0.18.2 were split before merge, on the evidence.**
+Everything v0.18.2→v0.20.1 changed lands on the SEND and RECEIVE screens, and
+`viewHeader` is called by those two views alone. So the five language-only apps
+merged as-is; only the four with a wallet were re-pinned. If it comes up again,
+the test is whether the mount call passes `wallet`.
 
-**nimmesh is out of the sweep** (Andrew, 2026-08-14): it is a wallet, and a
-wallet does not wear the mini wallet. Same reason `nimiq.ninja/app` was always
-excluded while its landing converted.
+### What the conversion cost, per app
 
-12 of the 19 mount a language pill only, no wallet; those become the
-language-only mini wallet. 7 have a wallet too, and swellet is the worked
-example: two controls collapse to one, and the three old theme var blocks
-(`--nq-langpill-*`, `--nq-walletpill-*`, `--nq-profile-*`) collapse to one
-`--nq-cc-*` block.
+Traps that were not in the v0.18.2 round:
 
-**Two clones need care.** `nimiq.cool` has a build loop running (contested
-clone, a parallel session builds there). `nimiq.sale` serves live from its clone
-via launchd. Do those last, and not under a running process.
+- ⚠ **A clip box on the mount's ancestor hides the menu, and it looks like a
+  no-op.** `nimiq.name`'s `.lang-slot` carried `overflow:hidden` to contain the old
+  flag row's overscan; `nimiq.sale`'s `.app-bar` carries it on a 52px bar. Both
+  cut the menu to whatever falls inside. sale's was hiding the OLD wallet pill's
+  dropdown too and nobody had noticed, because a profile card nobody opens looks
+  fine shut. The menu measures correctly in `getBoundingClientRect` while being
+  invisible, so only a screenshot catches it.
+- **A shorthand `padding` beats a shared utility class at equal specificity.**
+  `nimiq.tax`'s `.site-header` carries `.site-header` AND `.wrap`; writing
+  `padding: var(--space-3) 0` silently dropped `.wrap`'s horizontal gutter and ran
+  the header edge to edge. Invisible behind a small Connect button; obvious the
+  moment a wide pill lands flush against the screen.
+- **`--nq-flag-w` is language-switcher-only.** The mini wallet never reads it, so
+  every per-page override sizing the old flag row becomes dead code that still
+  reads as deliberate. nimiq.tips had seven.
+- **`MiniAppProvider` gained a required `sign()`** between v0.1.0/v0.2.0 and
+  v0.20.0. Any test fake of that shape needs one; nothing calls it.
+- **Service-worker caches are load-bearing on this change, not hygiene.** money v4→v5,
+  vote nv-v1→nv-v2, sale v45→v46. A returning visitor otherwise keeps the precached
+  old bundle and mounts a control into slots the same commit removed.
+- ⚠ **sale's shell fingerprint has to be refreshed AFTER the last shell edit.** I
+  refreshed it, then edited `app.1.css` again, and shipped a hash describing the
+  shell one edit ago. CI caught it. Re-run `bun test` as the final step, not the
+  middle one.
+- **tips has NINE pages with chrome**, each with its own slot id and inline sizing.
+  Grep the whole `public/`, never just `index.html`.
 
-### What the CDN six actually cost
+### Where a wallet is deliberately NOT passed
 
-Four were the advertised one-liner. Two were not, and both surprises are worth
-knowing before starting:
+`mountMiniWallet` renders language-only without a wallet, and three apps use that
+on purpose. Do not "fix" these by handing them one:
+
+- **gift** has no wallet at all: the service mints the cashlink, the claim page
+  hands off to the Hub.
+- **tips** would otherwise grow a Connect pill competing with the one action the
+  fan page exists for; the tip resolves its account at Hub checkout. Its profile
+  widget only ever mounted in-app, which is exactly the mode the fleet control
+  treats the wallet as ambient.
+- **vote** never connects one: a poll is a link, and governance weight is read from
+  the chain by address.
+
+### Host branding, and which apps need it
+
+Andrew, 2026-08-15: *"some of my apps are gonna need their own branded version."*
+
+**swellet is the worked example, and it was HALF done.** Its `--nq-cc-*` block
+themed the menu (card, ink, hairlines, focus ring) and never touched the buttons.
+Connect kept painting fleet navy, which is the one part of the control a
+first-time visitor looks at. swellet #100 adds `--nq-cc-connect-*` and
+`--nq-cc-send-*` from `var(--nq-blue-grad)`, the app's own CTA gradient.
+
+- **Theme through the `--nq-cc-*` vars, not the `theme` option, when an app
+  already has a var block.** `theme` is stamped INLINE, so it beats a stylesheet
+  rule for anything it touches. The vars also reach three values the tokens do
+  not: the menu border, its shadow, and the card tint.
+- **A gradient cannot be `color-mix`'d**, so a hover pair has to be stated rather
+  than derived. 68% of each stop is the ratio Nimiq's own pairs use.
+- **Pass `var()` references, not hex**, for anything that should follow a
+  light/dark toggle. swellet's menu follows `--nq-card` / `--nq-navy`; its buttons
+  deliberately do not, because its own primary button does not either.
+
+### Earlier rounds, kept for the traps
+
+From the v0.18.x round. The apps are all converted now, but these still describe
+how each model behaves.
+
+#### What the CDN six actually cost
+
+Four were the advertised one-liner. Two were not:
 
 - **stream carried the block on four pages**, not one. Grep the whole `public/`,
   never just `index.html`.
@@ -162,7 +222,7 @@ knowing before starting:
   require a `package.json` bump plus a CHANGELOG entry per PR. ninja requires
   neither. Read the repo's own CLAUDE.md first.
 
-### And what the bundled three cost
+#### And what the bundled three cost
 
 All three were on the git dep `#v0.2.0`, a sixteen-release jump to `#v0.18.1`.
 `tsc --noEmit` was clean in all three across that jump, so the package's shape
@@ -182,7 +242,7 @@ has not drifted.
   chose rather than narrowing it: ninja filters to 4 on purpose, swellet to 5,
   life defaults. Narrowing uninvited is a product change.
 
-### The vendored batch: party is the worked example
+#### The vendored batch: party is the worked example
 
 `git remote -v` FIRST in every vendored repo. That is how splitlink turned out to
 be nimiq.party renamed, and a push would have fought party's own branch.
@@ -258,9 +318,9 @@ Worth knowing before touching it again:
 The playground has all three brands as a switch and repaints its strips with
 them. `bun run playground`, then Host brand.
 
-**The ten open sweep PRs stay pinned to v0.18.2 on purpose.** They are green and
-waiting on Andrew; 0.19.0 changes no default, so re-pinning would cost ten
-review states and buy nothing.
+**All 19 sweep apps are on v0.20.1 as of 2026-08-14**, so theming is available
+fleet-wide. Only swellet uses it (#100). Every other app paints Nimiq navy/gold/
+light-blue as its actual identity, so the untouched default is correct for them.
 
 ## What the Hub will not allow
 
