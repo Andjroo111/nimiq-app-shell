@@ -336,59 +336,60 @@ const SHEET_STYLE_ID = 'nimiq-shell-report-bug-style';
 
 /** The bug glyph, in the corner's stroke-icon language (the same weight as the
  *  wallet/scan glyphs), sized by .nq-cc-cashlink-slot's 24px box. */
-/** The bug, and its legs reach the shell.
+/** The bug, SOLID.
  *
- *  Andrew picked the plain one out of six drawn together (plain, ladybug,
- *  beetle, ant, capsule, spider), each judged at 24, 48 and 96 and in the menu
- *  row rather than on its own, because 24px is the only size that ships. A
- *  ladybug with spots read as a picture of a ladybug; a menu row wants a glyph
- *  you recognise without studying it, and the extra marks were noise at the one
- *  size that matters.
+ *  Andrew, 2026-08-14, with a reference: filled body, one colour. Five rounds
+ *  of chasing an outline drawing's leg joins ended here, and the shape is the
+ *  reason why. An outline bug is a diagram of a bug and every join in it is a
+ *  detail somebody has to get right; a filled one is a silhouette, and a
+ *  silhouette has no joins to get wrong. It also survives 24px better, which is
+ *  the only size that ships.
  *
- *  Nothing here is decoration, which is why it is also the version with no
- *  clipPath and no minted ids: the ladybug needed both to cut its spots at the
- *  rim, and neither survives a shape that has no spots.
+ *  THE SEAM IS NEGATIVE SPACE, not a drawn line. The elytra are two half
+ *  ellipses either side of a 0.7 gap, so the split is the background showing
+ *  through and stays exactly one pixel-perfect width at any size. Drawing it as
+ *  a stroke over a filled body would put a line on top of a shape and make the
+ *  seam thicken with the icon.
  *
- *  THE LEGS STOP AT THE EDGE and the ANTENNAE RUN DEEP, which is Andrew's
- *  call and reads as the anatomy: a leg is jointed onto the shell, a feeler
- *  comes out from under it.
+ *  The head is a separate dome with a gap under it, the same trick again: the
+ *  neck is the space between two shapes rather than a line across one.
  *
- *  A leg ends exactly on the ellipse. The stroke is what makes that land: at
- *  0.76 the round cap has a radius of 0.38, precisely the shell stroke's
- *  half-width, so the cap sits flush inside the outline and disappears. Push a
- *  leg in past about 0.3 and the cap clears that inner edge and wears a visible
- *  blob, which is what an earlier 0.35 did.
+ *  ITS UNDERSIDE IS AN ARC, NOT A FLAT EDGE, and that is the difference between
+ *  a head and a bar. A straight bottom leaves a straight slot across a round
+ *  body, which reads as a line laid on top of the shell (Andrew: "like a solid
+ *  line ... it curves more with the body"). The bottom edge is an arc
+ *  CONCENTRIC with the body's top, offset out by the neck gap, so the gap is an
+ *  even crescent that follows the shell all the way to the shoulders. Sweep
+ *  matters: the other flag bows the same edge downward INTO the body and eats
+ *  the neck entirely.
  *
- *  The antennae go in 1.2, far enough to read as emerging from under the shell
- *  rather than resting on it. Drawn at 0, 0.9, 1.2, 1.5 and 2.1 at 150px: past
- *  about 2 they close on the top of the centre seam and the three marks
- *  converge into one. None of this is visible at 24px, which is why every round
- *  of it was judged zoomed.
+ *  Limbs stay strokes because they are lines in the reference too, at 1.7 with
+ *  round caps and joins, so a limb reads as a jointed leg rather than a
+ *  tapering blade. They tuck UNDER the body: each starts inside the fill, so
+ *  the join is hidden by the silhouette and there is nothing to align.
  *
- *  Before any of that neither reached the shell: the legs
- *  ran outward from (6.5,18.5) while the body's lower arc is a radius-6 circle
- *  about (12,14), so the inner end sat 1.1 units off the shell it was supposed
- *  to grow from, and the antennae started INSIDE the head, leaving two stubs
- *  floating in it. Andrew found both by zooming, which is the only way either
- *  is visible.
+ *  ONE COLOUR throughout (Andrew). The reference greys the head and limbs; the
+ *  house rule is that a UI icon is currentColor, and a second tone would also
+ *  mean picking one, which is a decision this component has no business making
+ *  on a host page it does not own.
  *
- *  There is no bug in the official Nimiq asset library (searched: bug, beetle,
- *  ladybug, insect, feedback, report), which is why this glyph is hand-drawn.
- *  It follows the house icon rules rather than a registry entry: one weight,
- *  currentColor, no baked colour.
+ *  Three head-and-antennae shapes were drawn at 24, 48 and 150px before this
+ *  one. A wide flat head reads as a hat with the feelers sprouting from its
+ *  corners; the dome has to be narrow enough that they come off its crown.
  *
- *  The viewBox is the ARTWORK's bounds plus half a stroke, not a round 24.
- *  Declaring 24x24 around a 16x13 drawing rendered it visibly smaller than the
- *  hexagon beside it in the corner's shared 24px slot. Stroke 0.76 holds 0.96px
- *  at this crop, the same weight as the cashlink and switch glyphs. */
+ *  The viewBox is the artwork's bounds, with half a stroke added around the
+ *  limbs only, since a fill has no stroke to allow for. */
 export const BUG_ICON =
-  '<svg viewBox="3.4 5.9 17.2 14.3" fill="none" stroke="currentColor" stroke-width="0.76" ' +
-  'stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">' +
-  '<path d="M12 8.2a6 5.8 0 1 1-.01 0Z"/>' +
-  '<path d="M12 10.404V19.65"/>' +
-  '<path d="M6.232 12.401 4.118 11.795M6 14H3.8M6.804 16.9 4.899 18' +
-  'M17.768 12.401 19.882 11.795M18 14h2.2M17.196 16.9 19.101 18"/>' +
-  '<path d="M10.768 9.841 9 6.3M13.232 9.841 15 6.3"/></svg>';
+  '<svg viewBox="2.55 4.45 18.9 17.5" aria-hidden="true">' +
+  '<path fill="currentColor" d="M11.65 9.412A5.4 5.6 0 0 0 11.65 20.588Z"/>' +
+  '<path fill="currentColor" d="M12.35 9.412A5.4 5.6 0 0 1 12.35 20.588Z"/>' +
+  '<path fill="currentColor" d="M9.1 9.746A2.9 3.346 0 0 1 14.9 9.746' +
+  'A5.85 6.05 0 0 0 9.1 9.746Z"/>' +
+  '<g fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" ' +
+  'stroke-linejoin="round">' +
+  '<path d="M7.8 12.2 5.6 10.8 5 8.9M7 15H3.4M7.8 17.8 5.6 19.2 5 21.1' +
+  'M16.2 12.2 18.4 10.8 19 8.9M17 15h3.6M16.2 17.8 18.4 19.2 19 21.1"/>' +
+  '<path d="M10.8 7.6 9.5 5.9 8 5.3M13.2 7.6 14.5 5.9 16 5.3"/></g></svg>';
 
 function ensureSheetStyles(doc: Document): void {
   if (doc.getElementById(SHEET_STYLE_ID)) return;
