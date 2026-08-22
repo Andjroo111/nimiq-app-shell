@@ -281,6 +281,18 @@ for (const app of apps) {
     }
 
     // ---- gates --------------------------------------------------------------
+    // INSTALL FIRST, or the gates measure the worktree instead of the change.
+    // The dep model already installed above; the others had not, and a fresh
+    // worktree has no node_modules at all. On 2026-08-22 that failed nimiq.sale
+    // with `check: Script not found "tsc"` and a test run of 797 of its 1125
+    // tests, because the rest could not import their subjects — a red that
+    // looked like the bump broke the app and was the harness having no deps.
+    // The CDN apps got away with it only because their gates happen not to
+    // need a binary. `bun install` on an already-installed tree is a no-op.
+    if (app.gates.length && app.model !== 'dep') {
+      const inst = await sh(work, 'bun install');
+      if (!inst.ok) throw new Error(`bun install before gates: ${inst.out.slice(-300)}`);
+    }
     const failed: string[] = [];
     for (const g of app.gates) {
       const r = await sh(work, `bun run ${g}`);
