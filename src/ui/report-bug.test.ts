@@ -8,6 +8,8 @@ import {
   submitFeedback,
   submitToBot,
   scrubAddresses,
+  defaultReportBugRepo,
+  REPORTABLE_REPOS,
   type FeedbackInput,
 } from './report-bug';
 import { shellLocales } from '../locales';
@@ -469,4 +471,67 @@ describe('submitToBot: the host fields the service has no place for', () => {
     expect(String(calls[0]!.text)).toContain('[address redacted]');
     expect(String(calls[0]!.text)).not.toContain('NQ07 0000');
   });
+});
+
+// The row is DEFAULTED as of v0.21.0, so this function decides where a stranger's
+// bug report lands. Its whole job is to be sure or say nothing: filing into the
+// wrong repo is worse than the blank row the fleet had before.
+describe('defaultReportBugRepo', () => {
+  test('a fleet host IS its repo', () => {
+    expect(defaultReportBugRepo('nimiq.cool')).toBe('nimiq.cool');
+    expect(defaultReportBugRepo('nimiq.kids')).toBe('nimiq.kids');
+    expect(defaultReportBugRepo('nimiq.party')).toBe('nimiq.party');
+  });
+
+  test('www and trailing dot and case are all the same host', () => {
+    expect(defaultReportBugRepo('www.nimiq.cool')).toBe('nimiq.cool');
+    expect(defaultReportBugRepo('NIMIQ.COOL')).toBe('nimiq.cool');
+    expect(defaultReportBugRepo('nimiq.cool.')).toBe('nimiq.cool');
+  });
+
+  // Andrew tests on the Fly host, and a bug he hits there is a bug in the app.
+  test('a preview host resolves to the app it previews', () => {
+    expect(defaultReportBugRepo('nimiq-cool.fly.dev')).toBe('nimiq.cool');
+    expect(defaultReportBugRepo('nimiq-kids.pages.dev')).toBe('nimiq.kids');
+  });
+
+  test('swellet is the one fleet app whose repo is not its hostname', () => {
+    expect(defaultReportBugRepo('swellet.app')).toBe('swellet');
+  });
+
+  // A developer already has the repo open, and auto-filed issues from a dev
+  // server are noise in a public tracker.
+  test('no row on a development host', () => {
+    expect(defaultReportBugRepo('localhost')).toBeNull();
+    expect(defaultReportBugRepo('127.0.0.1')).toBeNull();
+    expect(defaultReportBugRepo('192.168.1.250')).toBeNull();
+    expect(defaultReportBugRepo('mini.local')).toBeNull();
+    expect(defaultReportBugRepo('')).toBeNull();
+  });
+
+  // The half that has to hold: anything the derivation is not SURE about gets
+  // no row, and the app is exactly where it was before the default existed.
+  test('no row for a host it cannot place', () => {
+    expect(defaultReportBugRepo('docs.nimiq.cool')).toBeNull();
+    // The reason this is an allowlist and not a `nimiq.<word>` pattern: this
+    // one matches the pattern and is Nimiq's own site, with no repo of ours.
+    expect(defaultReportBugRepo('nimiq.com')).toBeNull();
+    expect(defaultReportBugRepo('example.com')).toBeNull();
+    expect(defaultReportBugRepo('hashmark.io')).toBeNull();
+    expect(defaultReportBugRepo('some-app.fly.dev')).toBeNull();
+  });
+});
+
+// The drift guard. scripts/fleet.ts is what `bun run bump-fleet` walks, so it is
+// the truth about which apps exist; a new app added there and forgotten here
+// would ship a mini wallet whose Report a bug row silently never appears.
+// One-directional on purpose: extras (nimiq.kids pins the shell on its own
+// schedule and is not in fleet.ts) are fine, omissions are not.
+test('every app in scripts/fleet.ts can be reported into', async () => {
+  const source = await Bun.file(new URL('../../scripts/fleet.ts', import.meta.url)).text();
+  const repos = [...source.matchAll(/repo: '([^']+)'/g)].map((m) => m[1]!);
+  expect(repos.length).toBeGreaterThan(15);
+  for (const repo of repos) {
+    expect(REPORTABLE_REPOS, `${repo} is in fleet.ts but not REPORTABLE_REPOS`).toContain(repo);
+  }
 });

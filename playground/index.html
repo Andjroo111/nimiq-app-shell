@@ -172,9 +172,11 @@
       <div class="panel">
         <h2>Balances</h2>
         <fieldset>
-          <label><input type="radio" name="bal" value="none"> No balance</label>
-          <label><input type="radio" name="bal" value="nim" checked> NIM only (<code>getBalanceLuna</code>)</label>
+          <label><input type="radio" name="bal" value="builtin" checked> Built-in read (the DEFAULT, live RPC)</label>
+          <label><input type="radio" name="bal" value="none"> No balance (<code>balance: false</code>)</label>
+          <label><input type="radio" name="bal" value="nim"> NIM only (<code>getBalanceLuna</code>)</label>
           <label><input type="radio" name="bal" value="multi"> Multi-asset (<code>assets</code>)</label>
+          <p class="hint">Built-in is what an app gets wiring NOTHING, and it hits the real node, so the mock address reads its real mainnet balance. Until v0.21.0 this state showed no balance at all, which is why no app in the fleet had one.</p>
           <p class="hint">Multi-asset shows NIM plus USDC and USDT on Polygon. Tap a row to receive THAT asset: its own address, its own chain warning. BTC is deliberately absent, see issue #124.</p>
         </fieldset>
         <fieldset>
@@ -226,7 +228,8 @@
         </fieldset>
         <fieldset>
           <legend>Report a bug</legend>
-          <label><input type="radio" name="bug" value="off"> No row</label>
+          <label><input type="radio" name="bug" value="off"> Wire nothing (derive from the hostname)</label>
+          <label><input type="radio" name="bug" value="none"> No row (<code>reportBug: false</code>)</label>
           <label><input type="radio" name="bug" value="stub" checked> Row, stubbed (logs only)</label>
           <label><input type="radio" name="bug" value="real"> Row, REAL (files a GitHub issue)</label>
           <label style="margin-top:6px">File into
@@ -301,8 +304,16 @@ document.getElementById('clear').onclick = () => { logEl.textContent = ''; };
    The corner consumes the `Wallet` INTERFACE, never a concrete Hub client,
    which is exactly why Hashmark can hand it a betting-key adapter instead.
    That same seam is what makes a playground possible with no network at all. */
-const MOCK_ADDRESS  = 'NQ34 248H 8MB8 8QK2 5RVK EM8Q QJ8N 2Q5R 3XRK';
-const MOCK_ADDRESS_B = 'NQ21 8LNC MJD3 D7T4 8FSX N5M8 5V2M A9GY 4KUJ';
+// Both of these are CHECKSUM-VALID mainnet addresses, and they have to be: the
+// built-in balance read is the default now, so a mock account the node rejects
+// with "Unknown format" would show the built-in reader as permanently broken.
+// The old pair (NQ34 248H…, NQ21 8LNC…) were typed-looking strings that failed
+// the IBAN check. A is the public burn address, deliberately: it is funded, it
+// is nobody's wallet, and the figure it shows is real. B is a fresh address
+// that has never been used, so it reads 0 — which is the right answer and the
+// one that proves the switch clears A's balance rather than keeping it.
+const MOCK_ADDRESS  = 'NQ07 0000 0000 0000 0000 0000 0000 0000 0000';
+const MOCK_ADDRESS_B = 'NQ60 R21B PBC5 A01G 5KJU FHER 1XVU 8RAK U67S';
 const MOCK_POLYGON  = '0x71C7656EC7ab88b098defB751B7401B5f6d8976F';
 /* No BTC row on purpose. Through the Hub, chooseAddress hands back a fresh
    unused BTC address on every call, so a balance read against it is not the
@@ -413,7 +424,7 @@ function qrEl(text, sizePx) {
 
 /* Shown in the Report a bug context so a filed issue says which build produced
    it. Kept in step with package.json by hand; it is a label, not a dependency. */
-const SHELL_VERSION = '0.20.2';
+const SHELL_VERSION = '0.21.0';
 
 /* ------------------------------------------------------------ mock assets */
 const $ = (id) => document.getElementById(id);
@@ -540,6 +551,9 @@ function buildOptions() {
   // Unchecked is the DEFAULT now: the shell draws the wallet's own QR.
   if (opt('opt-qr')) o.qr = qrEl;
 
+  // 'builtin' passes NOTHING: that is the point of the option, it exercises the
+  // same code path an app that never thought about balances gets.
+  if (bal === 'none') o.balance = false;
   if (bal === 'nim') o.getBalanceLuna = async () => nimLuna;
   if (bal === 'multi') o.assets = buildAssets;   // a FUNCTION: re-read every refresh
 
@@ -578,6 +592,10 @@ function buildOptions() {
   }
 
   const bug = radio('bug');
+  // 'off' wires nothing and lets the default derive a repo from location.hostname.
+  // On this playground that hostname is localhost, which derives to NO repo and
+  // therefore NO row — which is exactly the behaviour being demonstrated.
+  if (bug === 'none') o.reportBug = false;
   if (bug === 'stub') {
     o.reportBug = () => log('warn', 'reportBug() stubbed. Switch to REAL to file an actual issue.');
   } else if (bug === 'real') {

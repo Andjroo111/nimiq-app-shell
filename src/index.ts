@@ -36,6 +36,14 @@ export {
   type MiniAppProvider,
   type HubClient,
 } from './wallet';
+// The mini wallet's own NIM balance read — the one chain read in this package,
+// and only because an opt-in balance meant nineteen apps showing none. See the
+// file header for why settlement is still not welcome here.
+export {
+  createNimBalanceReader,
+  DEFAULT_NIM_RPC,
+  type NimBalanceReaderOptions,
+} from './wallet/balance';
 
 // ---- nim-format ----
 export {
@@ -135,6 +143,7 @@ export {
 // hosts that want the sheet from their own entry point, or the validator alone.
 export {
   openReportBugSheet,
+  defaultReportBugRepo,
   validateFeedbackInput,
   submitFeedback,
   submitToBot,

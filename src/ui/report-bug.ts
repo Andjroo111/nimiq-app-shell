@@ -64,6 +64,63 @@ export interface ReportBugOptions {
   theme?: ShellTheme;
 }
 
+/** Every repo the derived default is allowed to file into.
+ *
+ *  An ALLOWLIST rather than a pattern, because the pattern that looked right
+ *  (`nimiq.<word>` is a fleet app) also matches `nimiq.com` — Nimiq's own site,
+ *  no repo of ours behind it — and a report that vanishes into `unknown_repo`
+ *  after someone typed it out is a worse outcome than the blank row the fleet
+ *  had before this default existed.
+ *
+ *  `scripts/fleet.ts` is the source of truth for the 19, and
+ *  report-bug.test.ts fails if a repo listed there is missing here, so adding
+ *  a fleet app without adding it to this line cannot ship quietly. Repos NOT
+ *  in fleet.ts (nimiq.kids pins the shell on its own schedule) are listed too;
+ *  the test allows extras, it only forbids omissions. */
+export const REPORTABLE_REPOS: readonly string[] = [
+  'nimiq.cards', 'nimiq.casino', 'nimiq.cool', 'nimiq.gift', 'nimiq.gives',
+  'nimiq.kids', 'nimiq.life', 'nimiq.money', 'nimiq.name', 'nimiq.ninja',
+  'nimiq.party', 'nimiq.sale', 'nimiq.software', 'nimiq.stream', 'nimiq.talk',
+  'nimiq.tax', 'nimiq.tips', 'nimiq.vote', 'nimiq.work', 'swellet',
+];
+
+/** Hosts whose repo name is not simply their hostname. Every other app in the
+ *  fleet is literally `nimiq.<word>` on both sides. */
+const HOST_REPO_OVERRIDES: Record<string, string> = {
+  'swellet.app': 'swellet',
+  'swellet.io': 'swellet',
+};
+
+/** Which repo a bug from THIS page belongs in, derived from where the page is
+ *  served, so a fleet app gets a working reporter without wiring one.
+ *
+ *  What this must never do is GUESS. A wrong repo sends someone's report into a
+ *  project that will never read it; an unknown repo makes the service reject a
+ *  submission they already typed. So it answers only for hosts it can place
+ *  against REPORTABLE_REPOS, and returns null for everything else — and the row
+ *  then stays hidden exactly as it did before the default existed.
+ *
+ *  Preview hosts resolve to the app they preview (`nimiq-cool.fly.dev` →
+ *  `nimiq.cool`): those are the hosts the apps are actually tested on, and a
+ *  bug found there is a bug in the app, not in Fly.
+ *
+ *  localhost and IP literals return null on purpose. A developer hitting a bug
+ *  on their own machine has the repo open already, and issues auto-filed from a
+ *  dev server are noise in a public tracker. */
+export function defaultReportBugRepo(hostname: string): string | null {
+  const host = hostname.trim().toLowerCase().replace(/^www\./, '').replace(/\.$/, '');
+  if (!host || host === 'localhost' || host.endsWith('.local')) return null;
+  // An IPv4 literal, or a bare LAN name with no dot at all.
+  if (/^\d+\.\d+\.\d+\.\d+$/.test(host) || !host.includes('.')) return null;
+
+  const preview = /^([a-z0-9-]+)\.(?:fly\.dev|pages\.dev|workers\.dev|vercel\.app|netlify\.app)$/.exec(host);
+  // A preview slug cannot hold a dot, so the fleet spells the app with a hyphen.
+  const candidate = HOST_REPO_OVERRIDES[host]
+    ?? (preview ? preview[1]!.replace(/-/g, '.') : host);
+
+  return REPORTABLE_REPOS.includes(candidate) ? candidate : null;
+}
+
 const BOT_SERVICE = 'https://bot.nimiq.tech';
 
 /** Redact anything identifier-shaped: NQ addresses (spaced and compact forms)
