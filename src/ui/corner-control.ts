@@ -1374,23 +1374,73 @@ export function mountMiniWallet(
     });
   }
 
-  // ---- Report a bug ---------------------------------------------------------
-  // No nq-cc-when-* gate: unlike the wallet rows above, this one is about the
-  // PAGE, not the account, so it shows connected or not, hub or mini-app.
+  // ---- switch account, then Report a bug ------------------------------------
+  // ORDER (Andrew, 2026-08-22): switching accounts is something a person does;
+  // reporting a bug is something that happens to them. The frequent action sits
+  // above the rare one, and the rare one sits nearest Disconnect where the rest
+  // of the exits are.
+  //
+  // Resolved up here because the group's single divider depends on which of the
+  // two actually renders, and because installReportCapture has to run at MOUNT:
+  // by the time someone taps "Report a bug" the error they are reporting has
+  // already happened, and the console line that explains it is the one nobody
+  // can retype.
   //
   // Undefined means "derive one", not "no reporter" — see the option's docs and
   // defaultReportBugRepo(). `false` is the opt-out.
   const reportBug: ReportBugOptions | (() => void) | undefined =
     options.reportBug === false ? undefined
       : options.reportBug ?? defaultReportBug();
+  if (typeof reportBug === 'object' && reportBug.bot) {
+    installReportCapture(reportBug.bot.service ?? 'https://bot.nimiq.tech');
+  }
+  const showSwitch = !!wallet && options.switchAccount !== false;
+
+  if (showSwitch || reportBug) {
+    // ONE divider for the pair, and it has to be gated as loosely as the group's
+    // most VISIBLE member. Report a bug carries no nq-cc-when-* gate (a bug on a
+    // signed-out page is still a bug), so with it present the divider is
+    // ungated. With only the switch row here it takes that row's gate, or a
+    // signed-out menu would show a rule with nothing under it.
+    const gate = reportBug ? '' : ' nq-cc-when-connected nq-cc-when-hub';
+    el('div', `nq-cc-divider${gate}`, viewMain);
+  }
+
+  // Connecting again IS the switcher: chooseAddress reopens the Hub's own
+  // account picker, which is the right screen for this and one we do not have
+  // to build. There is deliberately no in-menu account list, because a fleet
+  // app cannot enumerate the user's accounts (LIST is not third-party callable)
+  // and a worse copy of a screen the Hub already ships is not worth owning.
+  //
+  // Hub only. Inside Nimiq Pay the account is the host wallet's, not ours.
+  if (showSwitch) {
+    const switchRow = el('button', 'nq-cc-row nq-cc-when-connected nq-cc-when-hub', viewMain);
+    switchRow.type = 'button';
+    // Same glyph slot every other row uses. Without it this row's label starts
+    // where the others' ICONS start, so it hangs ~20px left of Report a bug and
+    // the cashlink row and the column reads as broken.
+    const switchGlyph = el('span', 'nq-cc-cashlink-slot', switchRow);
+    switchGlyph.insertAdjacentHTML('beforeend', SWITCH_ICON);
+    const switchLabel = el('span', 'nq-cc-strong', switchRow);
+    tNode(switchLabel, 'shell.switchAccount');
+    switchRow.addEventListener('click', async () => {
+      setOpen(false);
+      try {
+        // Cancelling the Hub picker resolves null and MUST be a no-op: the
+        // current account stays connected. Treating it as a disconnect would
+        // make an exploratory tap destructive, and this row sits two lines above
+        // the actual Disconnect.
+        await wallet!.connect();
+      } catch {
+        /* the picker was dismissed, or the popup was blocked. Either way the
+           account we already had is still the account we have. */
+      }
+    });
+  }
+
+  // No nq-cc-when-* gate: unlike the wallet rows above, this one is about the
+  // PAGE, not the account, so it shows connected or not, hub or mini-app.
   if (reportBug) {
-    // Hooks go in at MOUNT, not when the sheet opens: by the time someone taps
-    // "Report a bug" the error they are reporting has already happened, and the
-    // console error that explains it is the one nobody can retype.
-    if (typeof reportBug === 'object' && reportBug.bot) {
-      installReportCapture(reportBug.bot.service ?? 'https://bot.nimiq.tech');
-    }
-    el('div', 'nq-cc-divider', viewMain);
     const row = el('button', 'nq-cc-row nq-cc-report', viewMain);
     row.type = 'button';
     const glyph = el('span', 'nq-cc-cashlink-slot', row);
@@ -1406,39 +1456,6 @@ export function mountMiniWallet(
       // Forward the brand: the sheet portals to body, so it cannot inherit the
       // vars stamped on this root and has to be handed them.
       else openReportBugSheet(document, i18n, options.theme ? { ...target, theme: target.theme ?? options.theme } : target);
-    });
-  }
-
-  // ---- switch account -------------------------------------------------------
-  // Connecting again IS the switcher: chooseAddress reopens the Hub's own
-  // account picker, which is the right screen for this and one we do not have
-  // to build. There is deliberately no in-menu account list, because a fleet
-  // app cannot enumerate the user's accounts (LIST is not third-party callable)
-  // and a worse copy of a screen the Hub already ships is not worth owning.
-  //
-  // Hub only. Inside Nimiq Pay the account is the host wallet's, not ours.
-  if (wallet && options.switchAccount !== false) {
-    const switchRow = el('button', 'nq-cc-row nq-cc-when-connected nq-cc-when-hub', viewMain);
-    switchRow.type = 'button';
-    // Same glyph slot every other row uses. Without it this row's label starts
-    // where the others' ICONS start, so it hangs ~20px left of Report a bug and
-    // the cashlink row and the column reads as broken.
-    const switchGlyph = el('span', 'nq-cc-cashlink-slot', switchRow);
-    switchGlyph.insertAdjacentHTML('beforeend', SWITCH_ICON);
-    const switchLabel = el('span', 'nq-cc-strong', switchRow);
-    tNode(switchLabel, 'shell.switchAccount');
-    switchRow.addEventListener('click', async () => {
-      setOpen(false);
-      try {
-        // Cancelling the Hub picker resolves null and MUST be a no-op: the
-        // current account stays connected. Treating it as a disconnect would
-        // make an exploratory tap destructive, and this row sits one line above
-        // the actual Disconnect.
-        await wallet.connect();
-      } catch {
-        /* the picker was dismissed, or the popup was blocked. Either way the
-           account we already had is still the account we have. */
-      }
     });
   }
 
