@@ -239,9 +239,24 @@ an app gets is decided by which balance seam it wires, and nothing else:
 
 | The app holds | Wire | The account row shows |
 | --- | --- | --- |
-| NIM only | `getBalanceLuna` | the NIM balance |
+| NIM, and no node of its own | **nothing** | the NIM balance, read by the shell |
+| NIM, with its own reader | `getBalanceLuna` | the NIM balance, from your source |
 | more than NIM | `assets` | the fiat **total** over a per-asset stack |
-| nothing to show | neither | no balance block at all |
+| nothing to show | `balance: false` | no balance block at all |
+
+**The first row is the default as of v0.21.0, and it is a fix, not a feature.**
+The balance stack shipped in v0.14 behind an opt-in `getBalanceLuna`, and by
+v0.20.3 not one of the nineteen fleet apps had wired one — so every mini wallet
+in the fleet showed a connected account with no money in it, which is what
+Andrew hit on nimiq.cool. A control that calls itself a wallet has to answer
+"how much", so the shell now reads it (`getAccountByAddress` against
+`rpc.nimiqwatch.com`, cached 30s, one call per menu open) unless the host says
+otherwise. `balance: { rpc }` keeps the read on your own node; `balance: false`
+turns it off; `getBalanceLuna` and `assets` both override it outright.
+
+⚠ **It is skipped on `network: 'test'`.** The public testnet RPCs are all dead,
+and reading MAINNET figures into a testnet UI is a WRONG number — worse than a
+missing one. A testnet app wires `getBalanceLuna` itself.
 
 Two components would mean two things to keep pixel-identical forever, which is
 the exact drift this package exists to end. A betting app that adds USDC next
@@ -487,9 +502,20 @@ persists.
 
 ### Report a bug (v0.8.0)
 
-The corner control carries the fleet's bug reporter. Pass `reportBug` and a
-**Report a bug** row appears in the menu, above the footer; leave it off and there
-is no row, like every other seam here.
+The corner control carries the fleet's bug reporter, as a **Report a bug** row in
+the menu above the footer.
+
+**Since v0.21.0 a fleet app gets that row without wiring anything.** Left
+undefined, `reportBug` files through nimiq.bot into the repo derived from the
+page's own hostname — `nimiq.cool` → `nimiq.cool`, and `nimiq-cool.fly.dev` →
+`nimiq.cool` so a preview reports against the app it previews. The derivation
+answers only for hosts it can place against `REPORTABLE_REPOS`; anything else
+(localhost, a stranger's domain, `nimiq.com` — Nimiq's own site, no repo of
+ours) returns null and the row stays hidden, because a report filed into the
+wrong repo is worse than no row. `reportBug: false` opts out.
+
+Pass the object to say more than the default can derive — extra labels, a
+surface, your app version:
 
 ```ts
 mountMiniWallet(document.querySelector('#wallet-slot')!, {

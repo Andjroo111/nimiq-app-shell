@@ -27,9 +27,10 @@ import type { Wallet } from '../wallet';
 import { FEATURED_LANGUAGES, type ShellLanguage } from '../locales';
 import { buildFlagHex } from './flag-hex';
 import { fmtNim, fmtFiat, lunaToNim, nimToLuna } from '../format/nim';
-import { BUG_ICON, openReportBugSheet, type ReportBugOptions } from './report-bug';
+import { BUG_ICON, openReportBugSheet, defaultReportBugRepo, type ReportBugOptions } from './report-bug';
 import { installReportCapture } from './report-capture';
 import { mountAssetList, type AssetListHandle, type ShellAsset } from './asset-list';
+import { createNimBalanceReader } from '../wallet/balance';
 import { applyTheme, type ShellTheme } from './theme';
 import { nimiqQr } from './qr';
 import { formatAddressBlocks, reformatInPlace, significantChars } from './address-input';
@@ -166,12 +167,29 @@ export interface CornerControlOptions {
    *  EXTRA — called with the committed label for hosts that can sync it further
    *  (see header note on why Hub rename can't be the default). */
   onRename?: (label: string) => void | Promise<void>;
-  /** Balance source in luna. Without it the balance stack is hidden.
+  /** Balance source in luna. OVERRIDES the built-in read described under
+   *  `balance` — pass this when the host already has a node, an indexer or a
+   *  cache the shell should not duplicate.
    *
    *  NIM-only by construction: one address, one chain, luna's 5 decimals. Apps
    *  that hold more than NIM pass `assets` instead (this stays for the fleet
    *  already on it, and for the Send view's available-balance cap). */
   getBalanceLuna?: (address: string) => Promise<number>;
+  /** The built-in NIM balance read, which is ON by default whenever a wallet is
+   *  connected and neither `getBalanceLuna` nor `assets` is wired.
+   *
+   *  It defaults to on because opt-in did not work: the balance stack shipped
+   *  in v0.14 and by v0.20.3 not one of the nineteen fleet apps had wired a
+   *  reader, so every mini wallet in the fleet showed an account with no money
+   *  in it. A control that calls itself a wallet has to answer "how much".
+   *
+   *  `false` opts out entirely (the stack hides, exactly as before). `{ rpc }`
+   *  keeps the read and points it at your own node.
+   *
+   *  ⚠ Ignored on `network: 'test'`: the public testnet RPCs are dead, so a
+   *  testnet app must pass `getBalanceLuna` itself or show nothing. Silently
+   *  reading MAINNET balances into a testnet UI would be worse than a blank. */
+  balance?: false | { rpc?: string };
   /** Multi-asset balances. Supersedes `getBalanceLuna`: when present the mini
    *  wallet shows a per-asset stack, and the account row's right-hand figure
    *  becomes the fiat TOTAL across them.
@@ -256,8 +274,17 @@ export interface CornerControlOptions {
    *  your endpoint); function form = the host renders its own UI.
    *
    *  Present in EVERY presentation, including language-only and inside Nimiq
-   *  Pay: a bug on a wallet-less page is still a bug someone needs to report. */
-  reportBug?: ReportBugOptions | (() => void);
+   *  Pay: a bug on a wallet-less page is still a bug someone needs to report.
+   *
+   *  DEFAULTED since v0.21.0: left undefined, the row wires itself to nimiq.bot
+   *  against the repo `defaultReportBugRepo()` derives from the hostname, so a
+   *  fleet app gets a working reporter for free. That derivation returns null
+   *  for anything it does not recognise (localhost, a preview of a non-fleet
+   *  app, a stranger's domain), and then the row stays hidden as it always did
+   *  — the default can add a reporter, never a wrong one.
+   *
+   *  `false` opts out even on a host it does recognise. */
+  reportBug?: ReportBugOptions | (() => void) | false;
   /** Make the control wear the HOST's brand: eleven semantic tokens (font, the
    *  Connect colour, the act colour, their two label colours, surface, text,
    *  the face pill and its text, and the three status hues), expanded into the
@@ -943,6 +970,20 @@ function wireScrollFade(wrap: HTMLElement, grid: HTMLElement): void {
  *  everything written about it. `mountCornerControl` is kept as an alias below
  *  because 25 apps import it by that name and a rename that breaks them all to
  *  save a word is not a rename worth doing. New code should use this one. */
+/** The reporter an app gets when it wires nothing: nimiq.bot, the repo derived
+ *  from this page's hostname, and no context beyond what report-capture already
+ *  collects. Returns undefined off-browser and on any host the derivation does
+ *  not recognise, and the row then stays hidden.
+ *
+ *  Deliberately NO `labels`: a label the fleet has not agreed on is a label
+ *  nobody filters by, and the bot's own draft already picks sensible ones. An
+ *  app that wants `surface:kid` passes the whole object, as nimiq.kids does. */
+function defaultReportBug(): ReportBugOptions | undefined {
+  if (typeof window === 'undefined' || !window.location) return undefined;
+  const repo = defaultReportBugRepo(window.location.hostname);
+  return repo ? { bot: { repo } } : undefined;
+}
+
 export function mountMiniWallet(
   container: HTMLElement,
   options: CornerControlOptions,
@@ -951,10 +992,27 @@ export function mountMiniWallet(
   const languages = options.languages ?? FEATURED_LANGUAGES;
   const showReceive = options.receive !== false;
   const hasAssets = !!options.assets;
+  // Resolve the balance source ONCE, here, so everything downstream reads one
+  // name and no branch has to re-decide which of three seams is live.
+  //
+  //   assets            → the stack owns the figures; no built-in read at all.
+  //   getBalanceLuna    → the host's own reader wins.
+  //   balance: false    → off, the pre-v0.21 behaviour.
+  //   network: 'test'   → off; there is no public testnet RPC left alive, and
+  //                       reading MAINNET into a testnet UI is a wrong number,
+  //                       which is worse than a missing one.
+  //   otherwise         → the built-in read, which is the new default.
+  const balanceReader: ((address: string) => Promise<number>) | undefined =
+    options.getBalanceLuna
+    ?? (hasAssets || options.balance === false || options.network === 'test'
+      ? undefined
+      : createNimBalanceReader(
+        options.balance && options.balance.rpc ? { rpc: options.balance.rpc } : {},
+      ));
   // The asset stack carries its own balances, so it satisfies the same "there
   // is a balance to show" gate the single NIM line used to. Both are true only
   // while a host is migrating; the stack wins the account row either way.
-  const hasBalance = typeof options.getBalanceLuna === 'function' || hasAssets;
+  const hasBalance = !!balanceReader || hasAssets;
   // Currency choice stands on its own: a wallet-less page (the language-only
   // corner from v0.5.0) still wants to offer it, so this is gated on the fiat
   // feed alone. It used to require hasBalance, which made the picker
@@ -1319,12 +1377,18 @@ export function mountMiniWallet(
   // ---- Report a bug ---------------------------------------------------------
   // No nq-cc-when-* gate: unlike the wallet rows above, this one is about the
   // PAGE, not the account, so it shows connected or not, hub or mini-app.
-  if (options.reportBug) {
+  //
+  // Undefined means "derive one", not "no reporter" — see the option's docs and
+  // defaultReportBugRepo(). `false` is the opt-out.
+  const reportBug: ReportBugOptions | (() => void) | undefined =
+    options.reportBug === false ? undefined
+      : options.reportBug ?? defaultReportBug();
+  if (reportBug) {
     // Hooks go in at MOUNT, not when the sheet opens: by the time someone taps
     // "Report a bug" the error they are reporting has already happened, and the
     // console error that explains it is the one nobody can retype.
-    if (typeof options.reportBug === 'object' && options.reportBug.bot) {
-      installReportCapture(options.reportBug.bot.service ?? 'https://bot.nimiq.tech');
+    if (typeof reportBug === 'object' && reportBug.bot) {
+      installReportCapture(reportBug.bot.service ?? 'https://bot.nimiq.tech');
     }
     el('div', 'nq-cc-divider', viewMain);
     const row = el('button', 'nq-cc-row nq-cc-report', viewMain);
@@ -1337,7 +1401,7 @@ export function mountMiniWallet(
       // Close first: the sheet lands on top, and a menu left open underneath
       // shows through its scrim.
       setOpen(false);
-      const target = options.reportBug!;
+      const target = reportBug;
       if (typeof target === 'function') target();
       // Forward the brand: the sheet portals to body, so it cannot inherit the
       // vars stamped on this root and has to be handed them.
@@ -1771,7 +1835,7 @@ export function mountMiniWallet(
       // Keep the NIM figure the Send view caps against in sync with the stack.
       const nimUnits = assetList.units('NIM');
       if (nimUnits !== null) balanceLuna = Number(nimUnits);
-      if (!options.getBalanceLuna) return;
+      if (!balanceReader) return;
     }
     const now = Date.now();
     if (!force && now - balanceFetchedAt < 30_000 && balanceLuna !== null) {
@@ -1779,7 +1843,7 @@ export function mountMiniWallet(
       return;
     }
     try {
-      balanceLuna = await options.getBalanceLuna!(account.address);
+      balanceLuna = await balanceReader!(account.address);
       balanceFetchedAt = now;
     } catch { /* keep the last known value */ }
     renderBalance();
