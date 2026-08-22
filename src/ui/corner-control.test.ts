@@ -797,3 +797,86 @@ describe('the built-in balance read', () => {
     expect(r.urls).toEqual([]);
   });
 });
+
+// ---------------------------------------------------------------------------
+// Menu ORDER, pinned because it is a judgement call and judgement calls drift.
+//
+// Andrew, 2026-08-22: switching accounts is something a person DOES; reporting
+// a bug is something that HAPPENS to them. The frequent action goes above the
+// rare one, and the rare one sits nearest Disconnect with the other exits.
+describe('the menu order below the fold', () => {
+  const A = 'NQ07 0000 0000 0000 0000 0000 0000 0000 0000';
+
+  function mount(extra: Partial<CornerControlOptions> = {}) {
+    const w = new Window();
+    const i18n = createI18n({ locales: mergeLocales(shellLocales), fallback: 'en' });
+    const host = w.document.createElement('div') as unknown as HTMLElement;
+    const wallet = {
+      mode: 'hub',
+      account: { address: A, label: 'A' },
+      connect: async () => ({ address: A, label: 'A' }),
+      onAccountChange: () => () => {},
+      disconnect: () => {},
+    } as unknown as Wallet;
+    mountMiniWallet(host, { wallet, i18n, balance: false, ...extra });
+    return host;
+  }
+
+  /** The main view's rows in the order they are painted. */
+  function rows(host: HTMLElement): string[] {
+    const main = host.querySelector('.nq-cc-view-main')!;
+    return [...main.children].map((child) => {
+      if (child.classList.contains('nq-cc-divider')) {
+        return child.classList.contains('nq-cc-footer-divider') ? 'divider:footer' : 'divider';
+      }
+      if (child.classList.contains('nq-cc-report')) return 'report';
+      if (child.classList.contains('nq-cc-footer')) return 'footer';
+      if (child.classList.contains('nq-cc-row')) {
+        return child.textContent?.includes('Switch') ? 'switch' : 'row';
+      }
+      return 'section';
+    });
+  }
+
+  test('Switch account comes before Report a bug', () => {
+    const order = rows(mount({ reportBug: { bot: { repo: 'nimiq.cool' } } }));
+    expect(order.indexOf('switch')).toBeGreaterThan(-1);
+    expect(order.indexOf('report')).toBeGreaterThan(-1);
+    expect(order.indexOf('switch')).toBeLessThan(order.indexOf('report'));
+  });
+
+  test('the pair shares ONE divider, and nothing separates the two rows', () => {
+    const order = rows(mount({ reportBug: { bot: { repo: 'nimiq.cool' } } }));
+    const i = order.indexOf('switch');
+    expect(order[i - 1]).toBe('divider');
+    expect(order[i + 1]).toBe('report');
+    expect(order[i + 2]).toBe('divider:footer');
+  });
+
+  // With only the switch row in the group, the divider has to hide with it —
+  // otherwise a signed-out menu paints a rule above nothing.
+  test('alone, the switch row takes its divider gate with it', () => {
+    const host = mount({ reportBug: false });
+    const order = rows(host);
+    const i = order.indexOf('switch');
+    expect(i).toBeGreaterThan(-1);
+    expect(order).not.toContain('report');
+    const divider = host.querySelector('.nq-cc-view-main')!.children[i - 1]!;
+    expect(divider.className).toContain('nq-cc-when-connected');
+  });
+
+  // Report a bug carries no account gate (a bug on a signed-out page is still a
+  // bug), so with it present the shared divider must NOT be gated either.
+  test('with the bug row present the shared divider is ungated', () => {
+    const host = mount({ reportBug: { bot: { repo: 'nimiq.cool' } } });
+    const order = rows(host);
+    const divider = host.querySelector('.nq-cc-view-main')!.children[order.indexOf('switch') - 1]!;
+    expect(divider.className).not.toContain('nq-cc-when-connected');
+  });
+
+  test('neither row means no divider for the group', () => {
+    const order = rows(mount({ reportBug: false, switchAccount: false }));
+    expect(order).not.toContain('switch');
+    expect(order).not.toContain('report');
+  });
+});
