@@ -503,7 +503,10 @@ persists.
 ### Report a bug (v0.8.0)
 
 The corner control carries the fleet's bug reporter, as a **Report a bug** row in
-the menu above the footer.
+the menu, below **Switch account** and above the footer. That order is Andrew's
+call and it is deliberate: switching accounts is something a person DOES, and
+reporting a bug is something that HAPPENS to them, so the frequent action goes
+above the rare one and the rare one sits with the other exits.
 
 **Since v0.21.0 a fleet app gets that row without wiring anything.** Left
 undefined, `reportBug` files through nimiq.bot into the repo derived from the
