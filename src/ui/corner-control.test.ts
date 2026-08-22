@@ -674,3 +674,126 @@ describe('menuShift', () => {
     expect(menuShift(8, 8 + CARD, 430)).toBe(0);
   });
 });
+
+// ---------------------------------------------------------------------------
+// The built-in balance read, defaulted ON in v0.21.0.
+//
+// The bug it closes: the balance stack had shipped since v0.14 and NOT ONE of
+// the nineteen fleet apps ever showed a figure, because every one had to wire
+// `getBalanceLuna` first and none did. Andrew found it on nimiq.cool — wallet
+// connected, no balance anywhere. These tests pin the default itself and, more
+// importantly, every route by which a host turns it OFF, because a default that
+// cannot be overridden is a worse bug than the one it fixed.
+describe('the built-in balance read', () => {
+  const A = 'NQ07 0000 0000 0000 0000 0000 0000 0000 0000';
+
+  function connectedWallet(address = A) {
+    return {
+      mode: 'hub',
+      account: { address, label: 'A' },
+      connect: async () => ({ address, label: 'A' }),
+      signAndSend: async () => ({ txHash: '' }),
+      pay: async () => ({ txHash: 'ok' }),
+      signMessage: async () => ({ address: '', message: '', publicKeyHex: '', signatureHex: '' }),
+      onAccountChange: () => () => {},
+      disconnect: () => {},
+    } as unknown as Wallet;
+  }
+
+  /** Stub the GLOBAL fetch, which is what the built-in reader resolves at call
+   *  time. A test that forgets this makes a LIVE request to the public node. */
+  function withStubbedFetch<T>(reply: unknown, run: (urls: string[]) => T): T {
+    const urls: string[] = [];
+    const real = globalThis.fetch;
+    globalThis.fetch = (async (url: string) => {
+      urls.push(String(url));
+      return { ok: true, status: 200, json: async () => reply } as Response;
+    }) as unknown as typeof fetch;
+    try { return run(urls); } finally { globalThis.fetch = real; }
+  }
+
+  const balanceReply = (luna: number) => ({ result: { data: { address: A, balance: luna } } });
+  const settle = () => new Promise((r) => setTimeout(r, 20));
+
+  function mount(extra: Partial<CornerControlOptions> = {}) {
+    const w = new Window();
+    const i18n = createI18n({ locales: mergeLocales(shellLocales), fallback: 'en' });
+    const host = w.document.createElement('div') as unknown as HTMLElement;
+    mountMiniWallet(host, { wallet: connectedWallet(), i18n, ...extra });
+    return host;
+  }
+
+  test('a wallet with nothing wired now shows a balance', async () => {
+    const host = withStubbedFetch(balanceReply(4_218_37500), (urls) => {
+      const el = mount();
+      return { el, urls };
+    });
+    await settle();
+    expect(host.urls.length).toBeGreaterThan(0);
+    expect(host.urls[0]).toContain('rpc');
+    const stack = host.el.querySelector('.nq-cc-balance') as HTMLElement | null;
+    expect(stack?.hidden).toBe(false);
+    expect(host.el.querySelector('.nq-cc-balance-nim')?.textContent).toContain('NIM');
+  });
+
+  test('balance: false is the opt-out, and it makes no request at all', async () => {
+    const r = withStubbedFetch(balanceReply(1), (urls) => ({ el: mount({ balance: false }), urls }));
+    await settle();
+    expect(r.urls).toEqual([]);
+    expect((r.el.querySelector('.nq-cc-balance') as HTMLElement | null)?.hidden).toBe(true);
+  });
+
+  // Reading MAINNET figures into a testnet UI is a WRONG number, and a wrong
+  // balance is worse than a missing one. The public testnet nodes are all dead.
+  test('testnet gets no built-in read', async () => {
+    const r = withStubbedFetch(balanceReply(1), (urls) => ({ el: mount({ network: 'test' }), urls }));
+    await settle();
+    expect(r.urls).toEqual([]);
+  });
+
+  test("the host's own reader wins, and the built-in stays out of the way", async () => {
+    let asked = 0;
+    const r = withStubbedFetch(balanceReply(1), (urls) => ({
+      el: mount({ getBalanceLuna: async () => { asked += 1; return 500_00000; } }),
+      urls,
+    }));
+    await settle();
+    expect(asked).toBe(1);
+    expect(r.urls).toEqual([]);
+  });
+
+  test('an assets stack wins too', async () => {
+    const r = withStubbedFetch(balanceReply(1), (urls) => ({
+      el: mount({ assets: [{ ticker: 'NIM', name: 'Nimiq', network: 'Nimiq', decimals: 5,
+        address: A, balance: async () => 1n }] }),
+      urls,
+    }));
+    await settle();
+    expect(r.urls).toEqual([]);
+  });
+
+  test('a host can keep the read and point it at its own node', async () => {
+    const r = withStubbedFetch(balanceReply(1), (urls) => ({
+      el: mount({ balance: { rpc: 'https://node.example/rpc' } }),
+      urls,
+    }));
+    await settle();
+    expect(r.urls[0]).toBe('https://node.example/rpc');
+  });
+
+  // Signed OUT there is no address to read, so the default must not fire — a
+  // request per mount on every visitor who never connects is pure waste.
+  test('no request while nobody is connected', async () => {
+    const r = withStubbedFetch(balanceReply(1), (urls) => {
+      const w = new Window();
+      const i18n = createI18n({ locales: mergeLocales(shellLocales), fallback: 'en' });
+      const el = w.document.createElement('div') as unknown as HTMLElement;
+      const wallet = { mode: 'hub', account: null, connect: async () => null,
+        onAccountChange: () => () => {}, disconnect: () => {} } as unknown as Wallet;
+      mountMiniWallet(el, { wallet, i18n });
+      return { el, urls };
+    });
+    await settle();
+    expect(r.urls).toEqual([]);
+  });
+});
