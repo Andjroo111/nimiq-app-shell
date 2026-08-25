@@ -79,9 +79,9 @@ export interface ReportBugOptions {
  *  the test allows extras, it only forbids omissions. */
 export const REPORTABLE_REPOS: readonly string[] = [
   'nimiq.cards', 'nimiq.casino', 'nimiq.cool', 'nimiq.gift', 'nimiq.gives',
-  'nimiq.kids', 'nimiq.life', 'nimiq.money', 'nimiq.name', 'nimiq.ninja',
-  'nimiq.party', 'nimiq.sale', 'nimiq.software', 'nimiq.stream', 'nimiq.talk',
-  'nimiq.tax', 'nimiq.tips', 'nimiq.vote', 'nimiq.work', 'swellet',
+  'nimiq.kids', 'nimiq.life', 'nimiq.money', 'nimiq.multisend', 'nimiq.name',
+  'nimiq.ninja', 'nimiq.party', 'nimiq.sale', 'nimiq.software', 'nimiq.stream',
+  'nimiq.talk', 'nimiq.tax', 'nimiq.tips', 'nimiq.vote', 'nimiq.work', 'swellet',
 ];
 
 /** Hosts whose repo name is not simply their hostname. Every other app in the
