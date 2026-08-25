@@ -479,6 +479,9 @@ describe('submitToBot: the host fields the service has no place for', () => {
 describe('defaultReportBugRepo', () => {
   test('a fleet host IS its repo', () => {
     expect(defaultReportBugRepo('nimiq.cool')).toBe('nimiq.cool');
+    // Listed before it has a host, on purpose: the row then works the day it
+    // deploys rather than the day someone remembers this line exists.
+    expect(defaultReportBugRepo('nimiq.multisend')).toBe('nimiq.multisend');
     expect(defaultReportBugRepo('nimiq.kids')).toBe('nimiq.kids');
     expect(defaultReportBugRepo('nimiq.party')).toBe('nimiq.party');
   });
