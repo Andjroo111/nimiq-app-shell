@@ -60,6 +60,8 @@ export const FLEET: App[] = [
     note: 'brands the control through its own --nq-cc-* block; a bump must not touch that' },
   { repo: 'nimiq.vote', dir: `${P}/nimiq.vote`, model: 'cdn', gates: ['check', 'test', 'lint'],
     note: 'the URL is in public/js/i18n.js, not an html file' },
+  { repo: 'nimiq.multisend', dir: `${P}/nimiq-multisend`, model: 'cdn', gates: [],
+    note: 'one index.html and no package.json at all, so there is nothing to gate; its local checkout is nimiq-multisend, not the repo name' },
 
   // ---- dep: compiled into the app's own bundle -----------------------------
   { repo: 'nimiq.casino', dir: `${P}/nimiq.casino`, model: 'dep', build: 'build', commitsArtifact: true, law: true, gates: ['check', 'test'] },
