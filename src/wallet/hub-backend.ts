@@ -118,6 +118,16 @@ export class HubBackend implements WalletBackend {
     this.onChange = cb;
   }
 
+  /** #115: adopt an account createWallet restored from storage, so a reload does
+   *  not leave `current` null under a facade that says connected. Address and
+   *  label are all the checkout path uses (forceSender pins the address, the Hub
+   *  popup itself authenticates the user), so nothing is trusted that the popup
+   *  would not re-check. Silent on purpose: the wrapper already holds the value
+   *  and firing onChange here would echo it back. */
+  restore(account: Account): void {
+    this.current = { address: account.address, label: account.label ?? '' };
+  }
+
   async connect(): Promise<Account | null> {
     const client = await this.resolveClient();
     // Desktop popup resolves directly; the mobile redirect path resolves null

@@ -21,6 +21,12 @@ export interface WalletBackend {
   setAccountChange(cb: (account: Account | null) => void): void;
   /** Local disconnect. */
   disconnect(): void;
+  /** Rehydrate a session the wrapper persisted (#115). createWallet restores the
+   *  saved account into its own getter on load; a backend that keeps its own
+   *  notion of the connected account must be told too, or the facade says
+   *  connected while pay()/signAndSend() refuse. Optional: the mini-app backend
+   *  never persists, so it has nothing to restore. */
+  restore?(account: Account): void;
 }
 
 /** Encode SendArgs.data to the hex string the mini-app SDK expects, or to the
