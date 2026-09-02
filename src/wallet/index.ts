@@ -79,6 +79,10 @@ export function createWallet(
   const persist = mode === 'hub' && opts.persist !== false;
   const listeners = new Set<AccountChangeListener>();
   let account: Account | null = persist ? readPersisted() : null;
+  // #115: the backend keeps its own connected account. Without this a reload
+  // showed the pill connected while every pay()/signAndSend() threw "connect a
+  // wallet before paying", because only the wrapper had been rehydrated.
+  if (account) backend.restore?.(account);
 
   backend.setAccountChange((next) => {
     account = next;
