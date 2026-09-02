@@ -40,6 +40,12 @@ function fakeHubClient(overrides: Partial<HubClient> = {}): HubClient {
 afterEach(() => {
   delete (globalThis as any).window;
   delete (globalThis as any).navigator;
+  // Something in this run leaves a localStorage on globalThis (a fake from another file, or
+  // the runtime's own). A hub `connect()` test persists its account there, and since #115 a
+  // persisted account is a LIVE session for the next createWallet, so without this sweep a
+  // later "before connect throws" test finds itself connected. Passing before #115 was luck:
+  // the leak existed, it just had no effect while the backend ignored the restored account.
+  try { (globalThis as any).localStorage?.removeItem?.('nq-shell:hub-account'); } catch { /* none */ }
 });
 
 function setWindow(win: Record<string, unknown>): void {
@@ -306,5 +312,89 @@ describe('hub wallet', () => {
     setWindow({});
     const w = createWallet({}, { hub: { client: fakeHubClient(), isMobile: false } });
     await expect(w.signMessage('m')).rejects.toThrow(/connect/i);
+  });
+});
+
+// ---- hub persistence (#115) -------------------------------------------------
+// A reload restored the wrapper's `account` from localStorage but never told the
+// Hub backend, so the pill said connected while pay()/signAndSend() threw
+// "connect a wallet before ...". The backend must be rehydrated too.
+
+const PERSISTED = { address: 'NQ22 2222 2222 2222 2222 2222 2222 2222 2222', label: 'Saved' };
+
+function fakeStorage(seed: Record<string, string> = {}): Storage {
+  const m = new Map(Object.entries(seed));
+  return {
+    get length() { return m.size; },
+    clear: () => m.clear(),
+    getItem: (k: string) => m.get(k) ?? null,
+    key: (i: number) => [...m.keys()][i] ?? null,
+    removeItem: (k: string) => { m.delete(k); },
+    setItem: (k: string, v: string) => { m.set(k, v); },
+  } as Storage;
+}
+
+describe('hub persistence (#115)', () => {
+  afterEach(() => {
+    delete (globalThis as any).localStorage;
+  });
+
+  test('a persisted account is restored into the backend, so pay() reaches checkout with it as the forced sender', async () => {
+    setWindow({});
+    (globalThis as any).localStorage = fakeStorage({ 'nq-shell:hub-account': JSON.stringify(PERSISTED) });
+    const calls: any[] = [];
+    const client = fakeHubClient({
+      checkout: async (req: any) => { calls.push(req); return { serializedTx: 's', hash: 'h' }; },
+    });
+    const w = createWallet({ appName: 'Test' }, { hub: { client } });
+    expect(w.account?.address).toBe(PERSISTED.address);
+
+    const r = await w.pay({ recipient: 'NQ11 1111 1111 1111 1111 1111 1111 1111 1111', valueLuna: 100_000 });
+    expect(r.txHash).toBe('h');
+    expect(calls).toHaveLength(1);
+    expect(calls[0].sender).toBe(PERSISTED.address);
+    expect(calls[0].forceSender).toBe(true);
+  });
+
+  test('signAndSend works on a restored session too', async () => {
+    setWindow({});
+    (globalThis as any).localStorage = fakeStorage({ 'nq-shell:hub-account': JSON.stringify(PERSISTED) });
+    const calls: any[] = [];
+    const client = fakeHubClient({
+      signTransaction: async (req: any) => { calls.push(req); return { serializedTx: 's', hash: 'h' }; },
+    });
+    const w = createWallet({ appName: 'Test' }, { hub: { client, getBlockHeight: async () => 42 } });
+    await w.signAndSend({ recipient: 'NQ11 1111 1111 1111 1111 1111 1111 1111 1111', valueLuna: 1 });
+    expect(calls[0].sender).toBe(PERSISTED.address);
+    expect(calls[0].validityStartHeight).toBe(42);
+  });
+
+  test('nothing persisted: account is null and pay() still refuses before any popup', async () => {
+    setWindow({});
+    (globalThis as any).localStorage = fakeStorage();
+    let opened = 0;
+    const client = fakeHubClient({ checkout: async () => { opened++; return { serializedTx: 's', hash: 'h' }; } });
+    const w = createWallet({ appName: 'Test' }, { hub: { client } });
+    expect(w.account).toBeNull();
+    await expect(w.pay({ recipient: 'NQ11 1111 1111 1111 1111 1111 1111 1111 1111', valueLuna: 1 })).rejects.toThrow(/connect a wallet/);
+    expect(opened).toBe(0);
+  });
+
+  test('persist:false ignores storage and does not restore', () => {
+    setWindow({});
+    (globalThis as any).localStorage = fakeStorage({ 'nq-shell:hub-account': JSON.stringify(PERSISTED) });
+    const w = createWallet({ appName: 'Test', persist: false }, { hub: { client: fakeHubClient() } });
+    expect(w.account).toBeNull();
+  });
+
+  test('disconnect clears the restored session on both sides', async () => {
+    setWindow({});
+    const store = fakeStorage({ 'nq-shell:hub-account': JSON.stringify(PERSISTED) });
+    (globalThis as any).localStorage = store;
+    const w = createWallet({ appName: 'Test' }, { hub: { client: fakeHubClient() } });
+    w.disconnect();
+    expect(w.account).toBeNull();
+    expect(store.getItem('nq-shell:hub-account')).toBeNull();
+    await expect(w.pay({ recipient: 'NQ11 1111 1111 1111 1111 1111 1111 1111 1111', valueLuna: 1 })).rejects.toThrow(/connect a wallet/);
   });
 });

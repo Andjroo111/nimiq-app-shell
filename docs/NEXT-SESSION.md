@@ -27,6 +27,12 @@ slow read, an unpriced asset, and the three send outcomes.
 route makes `page.goto` time out while curl works fine, which reads as a broken
 page for a while.
 
+## Shipped 2026-09-02
+
+| Release | What |
+| --- | --- |
+| v0.21.2 (#115) | a restored Hub session can pay again. `createWallet` rehydrated its own `account` from `nq-shell:hub-account` but never told `HubBackend`, whose `current` stayed null, so after any reload the pill said connected and every `pay()`/`signAndSend()` threw "connect a wallet before ...". New optional `WalletBackend.restore(account)`; the Hub backend adopts the saved address and label (the checkout popup still authenticates the user, `forceSender` only pins the address). Five tests, including the leak that had hidden it: a `connect()` test persisted into a shared localStorage and later tests read it. |
+
 ## Shipped 2026-08-14 and 08-15
 
 | Release | What |
