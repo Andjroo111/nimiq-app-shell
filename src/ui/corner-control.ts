@@ -550,7 +550,7 @@ button.nq-cc-name:focus-visible { outline:2px solid var(--nq-cc-accent, #0582ca)
 .nq-cc.nq-cc-show-request .nq-cc-view-main { display:none; }
 .nq-cc.nq-cc-show-request .nq-cc-view-receive { display:none; }
 .nq-cc.nq-cc-show-request .nq-cc-view-request { display:block; }
-.nq-cc-request-body { display:flex; flex-direction:column; gap:8px; padding:12px 8px 8px; }
+.nq-cc-request-body { display:flex; flex-direction:column; gap:10px; padding:16px 8px 8px; }
 /* The link itself, shown rather than merely copied: people paste these into a
    chat and a link you cannot see before you send it is a link you have to
    trust. Wraps, because an address is 36 characters and this is 272px. */
@@ -571,13 +571,21 @@ button.nq-cc-name:focus-visible { outline:2px solid var(--nq-cc-accent, #0582ca)
   line-height:1.35; color:var(--nq-cc-accent, #0582ca); }
 /* The identicon hero. 120px, not the wallet's ~150: the same share of a 272px
    card that theirs is of a 390px one. */
-.nq-cc-receive-hero { display:block; width:120px; height:120px; margin:6px 0 2px; }
+.nq-cc-receive-hero { display:block; width:100px; height:100px; margin:34px 0 0; }
 .nq-cc-receive-hero > * { display:block; width:100%; height:100%; }
 .nq-cc-receive-hero[hidden] { display:none; }
-/* space-between, so the pill sits in from the left edge and the glyph holds
-   the right corner, which is the wallet's arrangement. */
-.nq-cc-receive-foot { display:flex; align-items:center; justify-content:space-between;
-  gap:8px; width:100%; margin-top:14px; }
+/* The pill CENTRES and the glyph rides the right corner, which is the wallet's
+   arrangement. space-between pushed the pill to the left edge and spread the
+   footer to 80.7% of the card against the wallet's 58.6%. */
+.nq-cc-receive-foot { position:relative; display:flex; align-items:center;
+  justify-content:center; width:100%; margin-top:30px;
+  padding-inline:42px; box-sizing:border-box; }
+.nq-cc-receive-foot .nq-cc-qr-open { position:absolute; right:0; top:50%;
+  transform:translateY(-50%); }
+/* The glyph's width is reserved on BOTH sides, so the pill's centre is the
+   card's centre and the two can never collide at 272px. */
+.nq-cc-receive-foot .nq-cc-request-open { max-width:100%; padding:0 12px;
+  overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
 .nq-cc-receive-foot[hidden] { display:none; }
 .nq-cc-qr-open { display:inline-flex; align-items:center; justify-content:center;
   width:38px; height:38px; padding:0; border:none; border-radius:8px; background:none;
@@ -597,7 +605,7 @@ button.nq-cc-name:focus-visible { outline:2px solid var(--nq-cc-accent, #0582ca)
 .nq-cc-request-open:hover {
   background:color-mix(in srgb, var(--nq-cc-menu-fg, #1f2348) 11%, transparent); }
 .nq-cc-request-open:focus-visible { outline:2px solid var(--nq-cc-accent, #0582ca); outline-offset:2px; }
-.nq-cc-send-body { display:flex; flex-direction:column; gap:8px; padding:10px 8px 8px; }
+.nq-cc-send-body { display:flex; flex-direction:column; gap:10px; padding:16px 8px 8px; }
 /* display is DECLARED, not inherited from the host. A page with a global
    label{display:flex} (the playground had exactly that, for its own control
    rows) turns this into a flex container, and then text-align does nothing
@@ -633,6 +641,7 @@ button.nq-cc-name:focus-visible { outline:2px solid var(--nq-cc-accent, #0582ca)
 
    Inset box-shadow for the border, never border (rule 1). */
 .nq-cc-addr-field { position:relative; border-radius:8px; padding:7px 0;
+  width:100%; max-width:236px; margin-inline:auto; box-sizing:border-box;
   background:var(--nq-cc-input-bg, var(--nq-cc-card-bg, #fff));
   box-shadow:inset 0 0 0 2px color-mix(in srgb, var(--nq-cc-menu-fg, #1f2348) 12%, transparent);
   transition:box-shadow .15s var(--nimiq-ease, cubic-bezier(.25,0,0,1)); }
@@ -682,17 +691,23 @@ button.nq-cc-name:focus-visible { outline:2px solid var(--nq-cc-accent, #0582ca)
 .nq-cc-input:focus { outline:none; box-shadow:inset 0 0 0 2px var(--nq-cc-accent, #0582ca); }
 .nq-cc-input::placeholder { font-weight:600;
   color:color-mix(in srgb, var(--nq-cc-menu-fg, #1f2348) 30%, transparent); }
-.nq-cc-amount-row { position:relative; }
-.nq-cc-amount-row .nq-cc-input { padding-right:54px; }
-.nq-cc-amount-suffix { position:absolute; right:12px; top:50%; transform:translateY(-50%);
-  font-size:15px; font-weight:700; pointer-events:none;
+/* The amount is a small centred box with the ticker BESIDE it, which is the
+   wallet's arrangement (its box is 30.4% of the sheet). A full-bleed input
+   with the ticker inside it is what a settings form looks like. */
+.nq-cc-amount-row { display:flex; align-items:center; justify-content:center; gap:8px; }
+.nq-cc-amount-row .nq-cc-input { width:auto; max-width:112px; padding:9px 10px;
+  text-align:center; }
+.nq-cc-amount-suffix { flex:none; font-size:16px; font-weight:700; pointer-events:none;
   color:color-mix(in srgb, var(--nq-cc-menu-fg, #1f2348) 45%, transparent); }
+/* Centred, because the field it labels is centred. */
+.nq-cc-send-body .nq-cc-field-label, .nq-cc-request-body .nq-cc-field-label { text-align:center; }
+.nq-cc-send-fiat, .nq-cc-request-hint { text-align:center; }
 .nq-cc-send-hint { font-size:12px; font-weight:600; color:var(--nq-cc-menu-muted, rgba(31,35,72,.5)); }
 .nq-cc-send-hint:empty { display:none; }
 /* Right-aligned, under the NIM suffix rather than under the digits: it belongs
    to the field's unit, and the field is the one thing on this view the user is
    typing into. */
-.nq-cc-send-fiat { margin:0; font-size:14px; font-weight:600; text-align:right;
+.nq-cc-send-fiat { margin:0; font-size:13px; font-weight:600;
   color:var(--nq-cc-menu-muted, rgba(31,35,72,.5)); }
 .nq-cc-send-confirm, .nq-cc-request-copy { width:100%; height:52px; border:none; border-radius:500px; margin-top:4px;
   font-family:inherit; font-size:16px; font-weight:700; cursor:pointer;
@@ -717,9 +732,15 @@ button.nq-cc-name:focus-visible { outline:2px solid var(--nq-cc-accent, #0582ca)
    chevron's width again, holding the symmetry. */
 .nq-cc-view-head { display:grid; grid-template-columns:34px 1fr 34px; align-items:center;
   padding:2px 2px 0; }
-.nq-cc-view-title { grid-column:2; min-width:0; text-align:center; font-size:22px; font-weight:700;
+/* PROPORTIONS, not absolute sizes. v0.23.0 matched the wallet's own px and
+   made this worse: 24px address type is 6.2% of a 390px sheet and 8.8% of a
+   272px card, so copying the number made our content RELATIVELY bigger than
+   the wallet's, and the card read as cramped rather than small.
+   Every size below is the wallet's share of its own sheet, measured off the
+   real screenshots and applied to 272px. Scale is 272/390 = 0.697. */
+.nq-cc-view-title { grid-column:2; min-width:0; text-align:center; font-size:19px; font-weight:700;
   line-height:1.2; text-wrap:balance; color:var(--nq-cc-menu-fg, #1f2348); }
-.nq-cc-view-sub { margin:8px 12px 0; text-align:center; font-size:13px; font-weight:600;
+.nq-cc-view-sub { margin:2px 12px 0; text-align:center; font-size:12px; font-weight:600;
   line-height:1.35; color:var(--nq-cc-menu-muted, rgba(31,35,72,.5)); }
 .nq-cc-back, .nq-cc-shut { grid-column:1; display:inline-flex; align-items:center; justify-content:center;
   width:34px; height:34px; padding:0; border:none; border-radius:50%; background:none;
@@ -746,7 +767,7 @@ button.nq-cc-name:focus-visible { outline:2px solid var(--nq-cc-accent, #0582ca)
    the rule too rather than restating it and drifting from it. */
 .nq-cc-shut { grid-column:3; }
 .nq-cc-cross { display:block; width:11px; height:11px; }
-.nq-cc-receive-body { display:flex; flex-direction:column; align-items:center; padding:10px 8px 8px; }
+.nq-cc-receive-body { display:flex; flex-direction:column; align-items:center; padding:0 8px 8px; }
 .nq-cc-qr { display:block; padding:10px; border-radius:8px;
   background:var(--nq-cc-qr-plate, #fff); }
 .nq-cc-qr:empty { display:none; padding:0; }
@@ -755,11 +776,12 @@ button.nq-cc-name:focus-visible { outline:2px solid var(--nq-cc-accent, #0582ca)
 
 /* tap-to-copy address: upstream Copyable verbatim: light-blue tooltip, tinted
    field, and the blue HOLDS after copy until focus leaves */
-.nq-cc-copy-wrap { position:relative; display:block; margin-top:10px; width:100%; }
-.nq-cc-address { display:grid; grid-template-columns:repeat(var(--nq-cc-addr-cols, 3), 1fr); gap:7px 0; justify-items:center;
-  width:100%; padding:12px 6px; border:none; border-radius:6px; cursor:pointer;
+.nq-cc-copy-wrap { position:relative; display:block; margin-top:28px; width:100%;
+  text-align:center; }
+.nq-cc-address { display:grid; grid-template-columns:repeat(var(--nq-cc-addr-cols, 3), 1fr); gap:10px 0; justify-items:center;
+  width:100%; max-width:var(--nq-cc-addr-plate, 169px); margin-inline:auto; padding:14px 6px; border:none; border-radius:6px; cursor:pointer;
   background:color-mix(in srgb, var(--nq-cc-menu-fg, #1f2348) 4%, transparent);
-  font-family:'Fira Mono',ui-monospace,monospace; font-size:24px; line-height:1.11;
+  font-family:'Fira Mono',ui-monospace,monospace; font-size:16px; line-height:1.11;
   color:var(--nq-cc-menu-muted, rgba(31,35,72,.7));
   transition:background .15s var(--nimiq-ease, cubic-bezier(.25,0,0,1)), color .15s var(--nimiq-ease, cubic-bezier(.25,0,0,1)); }
 .nq-cc-address:hover, .nq-cc-address:focus,
@@ -790,7 +812,7 @@ button.nq-cc-name:focus-visible { outline:2px solid var(--nq-cc-accent, #0582ca)
    now clears 36px on its shortest side, which is the floor nq lint enforces and
    the size the Connect button already was. The text stays 11.5px and the fill
    stays a wash: what grew is the target, not the voice. */
-.nq-cc-contacts { display:flex; flex-wrap:wrap; gap:5px; margin:6px 0 2px; }
+.nq-cc-contacts { display:flex; flex-wrap:wrap; justify-content:center; gap:5px; margin:6px 0 2px; }
 .nq-cc-contacts[hidden] { display:none; }
 .nq-cc-contact { max-width:100%; min-height:36px; display:inline-flex; align-items:center;
   padding:4px 12px; border:none; border-radius:999px;
@@ -1650,7 +1672,11 @@ export function mountMiniWallet(
   const receiveTitle = viewHeader(
     viewReceive, 'shell.receive', () => root.classList.remove('nq-cc-show-receive'),
   );
-  el('div', 'nq-cc-divider', viewReceive);
+  // No divider under the title on this sheet, or the QR and request ones: the
+  // wallet's sheets have no rule there, and ours both drew a line it does not
+  // have and pushed the subtitle 32px down where the wallet leaves 12.
+  // The main menu keeps its dividers; those separate SECTIONS, not a title.
+  //
   // The wallet's own one-line instruction. Receive is the one view where the
   // user's job is not on the screen: everything here is READ and handed to
   // someone else, so the line that says so is not decoration.
@@ -1708,7 +1734,7 @@ export function mountMiniWallet(
   const qrTitle = viewHeader(
     viewQr, 'shell.addressSheet', () => root.classList.remove('nq-cc-show-qr'),
   );
-  el('div', 'nq-cc-divider', viewQr);
+
   const qrBody = el('div', 'nq-cc-qr-body', viewQr);
   const qrBig = el('div', 'nq-cc-qr', qrBody);
   const qrLine = el('p', 'nq-cc-qr-line', qrBody);
@@ -1728,7 +1754,7 @@ export function mountMiniWallet(
   const requestTitle = viewHeader(
     viewRequest, 'shell.requestTitle', () => root.classList.remove('nq-cc-show-request'),
   );
-  el('div', 'nq-cc-divider', viewRequest);
+
   const requestBody = el('div', 'nq-cc-request-body', viewRequest);
   const requestAmountLabel = el('label', 'nq-cc-field-label', requestBody);
   tNode(requestAmountLabel, 'shell.amount');
@@ -1805,7 +1831,6 @@ export function mountMiniWallet(
   // "Send Amount", not "Send": the wallet splits this into Send Transaction
   // then Set Amount, and the half this sheet is standing in for is the second.
   viewHeader(viewSend, 'shell.sendAmount', () => closeSend());
-  el('div', 'nq-cc-divider', viewSend);
   const sendBody = el('div', 'nq-cc-send-body', viewSend);
   // The label row carries the recipient identicon, because the identicon is the
    // only thing on this screen that tells you at a GLANCE that you are paying
@@ -2123,7 +2148,7 @@ export function mountMiniWallet(
     qrSlot.hidden = hero;
     if (hero) {
       receiveHero.textContent = '';
-      receiveHero.appendChild(options.identicon!(address, 120));
+      receiveHero.appendChild(options.identicon!(address, 100));
     }
 
     // BEFORE the QR, because it does not depend on it. See the catch below.

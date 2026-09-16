@@ -1060,7 +1060,7 @@ describe('receive matches the wallet at its own scale', () => {
     await settle();
     const hero = host.querySelector('.nq-cc-receive-hero') as HTMLElement;
     expect(hero.hidden).toBe(false);
-    expect(hero.firstElementChild?.getAttribute('data-size')).toBe('120');
+    expect(hero.firstElementChild?.getAttribute('data-size')).toBe('100');
     expect((host.querySelector('.nq-cc-view-receive .nq-cc-qr') as HTMLElement).hidden).toBe(true);
     expect((host.querySelector('.nq-cc-receive-foot') as HTMLElement).hidden).toBe(false);
   });
@@ -1115,12 +1115,18 @@ describe('receive matches the wallet at its own scale', () => {
 // compute a stylesheet, and these are the values that stop the two sheets
 // reading as different components.
 describe('the type scale is the wallet\'s, not half of it', () => {
-  test('the address grid runs at the registry address-display size', async () => {
+  // The PLATE is what sets the address ink, not the font: the chunks centre in
+  // `1fr` cells, so the span tracks the plate's width and barely moves with
+  // type size. The wallet's plate is 242 of 390 (62%), which is 169px on a
+  // 272px card, and that lands the ink at 51.8% against the wallet's 52.7%.
+  //
+  // Absolute px are deliberately NOT pinned here. v0.23.0 pinned them and that
+  // was the bug: 24px is 6.2% of the wallet's sheet and 8.8% of our card, so
+  // copying the number made our content relatively bigger than theirs.
+  test('the address plate holds the wallet share of the card, not its px', async () => {
     const src = await Bun.file(new URL('./corner-control.ts', import.meta.url)).text();
-    // address-display ships font-size: 3rem at the legacy 8px root = 24px, with
-    // a 0.875rem = 7px chunk margin.
-    expect(src).toMatch(/\.nq-cc-address \{[^}]*font-size:24px/);
-    expect(src).toMatch(/\.nq-cc-address \{[^}]*gap:7px 0/);
+    expect(src).toMatch(/\.nq-cc-address \{[\s\S]*?max-width:var\(--nq-cc-addr-plate, 169px\)/);
+    expect(src).toMatch(/\.nq-cc-address \{[\s\S]*?margin-inline:auto/);
   });
 
   test('the primary button carries the nq-button weight', async () => {

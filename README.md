@@ -683,6 +683,59 @@ Two blocks a side in the elision, not the wallet's three: three plus the
 ellipsis is 33 characters of Fira Mono, which overruns 272px and wraps, and a
 wrapped elision is worse than a shorter one. The full 3x3 grid is one tap back.
 
+#### Proportions, not px (v0.25.0)
+
+v0.23.0 matched the wallet's absolute type sizes and made this **worse**, which
+is why the sheets still read as different components three passes in. 24px
+address type is **6.2%** of a 390px sheet and **8.8%** of a 272px card, so
+copying the number made our content relatively BIGGER than the wallet's, in
+half its whitespace. A mini version needs the wallet's shares, not its pixels.
+
+Measured off the real screenshots by ink-profiling both sheets, as a share of
+each one's own width:
+
+| element | wallet | before | now |
+| --- | --- | --- | --- |
+| Title | 59.5% | 65.1% | 61.9% |
+| Identicon | 36.8% | 43.9% | **36.6%** |
+| Address rows | 52.7% | 76.8% | **51.8%** |
+| Footer | 58.6% | 80.7% | 64.7% |
+
+And the gaps, which were the other half of it:
+
+| gap | wallet | scaled target | before | now |
+| --- | --- | --- | --- | --- |
+| above identicon | 60px | 42 | 27.5 | 43 |
+| above address | 68px | 47 | 35 | 50 |
+| above footer | 78.5px | 55 | 38.5 | 54.5 |
+
+⚠ **The address ink is set by the PLATE, not the font.** The chunks centre in
+`1fr` cells, so the span tracks the plate's width and barely moves with type
+size: dropping 24px to 16px moved the ink from 209px to 191px, and only
+capping the plate at **169px** (the wallet's 62% of its sheet) landed it.
+`--nq-cc-addr-plate` moves it.
+
+Three structural fixes came out of the same measurement:
+
+- **Send stopped being a form.** The wallet's amount is a small centred box at
+  30.4% of its sheet with the ticker beside it; ours was a full-bleed input at
+  89.7% with the ticker tucked inside. Labels, fiat line and contacts centre now
+  too.
+- **The title rule is gone** from receive, the QR sheet and the request sheet.
+  The wallet has no rule there, and ours both drew a line it has not got and
+  pushed the subtitle 32px down where the wallet leaves 12. The main menu keeps
+  its dividers, which separate sections rather than a title.
+- **The footer pill centres**, with the glyph riding the right corner. The
+  glyph's width is reserved on both sides so the pill's centre is the card's
+  centre and the two cannot collide.
+
+Two places a proportion loses on purpose, both to a legibility floor:
+
+| element | the share says | ships at | why |
+| --- | --- | --- | --- |
+| Subtitle | 10.4px | **12px** | below 12 it stops being comfortable to read |
+| Send address grid | 11px / 158px | **16px / 236px** | this is the field where a wrong character costs money |
+
 #### The receive footer, the X, and the request link (v0.24.0)
 
 | What | Was | Now |
