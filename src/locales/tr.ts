@@ -32,6 +32,8 @@ export default {
   "shell.sendTransaction": "İşlem gönder",
   "shell.enterAddress": "Adresi girin",
   "shell.publicMessage": "Herkese açık mesaj ekleyin...",
+  "shell.contacts": "Kişiler",
+  "shell.addressUnavailable": "Adres yok mu?",
   "shell.send": "Gönder",
   "shell.cancel": "İptal et",
   "shell.retry": "Tekrar dene",

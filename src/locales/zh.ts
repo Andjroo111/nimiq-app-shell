@@ -32,6 +32,8 @@ export default {
   "shell.sendTransaction": "发送交易",
   "shell.enterAddress": "输入地址",
   "shell.publicMessage": "添加公开留言...",
+  "shell.contacts": "联系人",
+  "shell.addressUnavailable": "没有地址？",
   "shell.send": "发送",
   "shell.cancel": "取消",
   "shell.retry": "重试",

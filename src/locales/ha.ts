@@ -29,6 +29,8 @@ export default {
   "shell.sendTransaction": "Aika ma'amala",
   "shell.enterAddress": "Shigar da adireshi",
   "shell.publicMessage": "Ƙara saƙo na jama'a...",
+  "shell.contacts": "Lambobin sadarwa",
+  "shell.addressUnavailable": "Babu adireshi?",
   "shell.send": "Aika",
   "shell.cancel": "Soke",
   "shell.retry": "Sake gwadawa",

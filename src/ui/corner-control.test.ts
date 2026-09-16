@@ -1464,3 +1464,132 @@ describe('send is the wallet\'s two sheets', () => {
     expect(paid[0] as object).not.toHaveProperty('data');
   });
 });
+
+// Step one's SHAPE, which was the thing still wrong after the split ("looks
+// completely different"). Text chips were the wrong shape for what a saved
+// recipient is, the label was sentence case where the wallet ships a grey
+// uppercase eyebrow, and the sheet simply ended where the wallet offers a way
+// out.
+describe('step one is the wallet\'s Send Transaction sheet', () => {
+  const ADDRESS = 'NQ34 248H 8MB8 8QK2 5RVK EM8Q QJ8N 2Q5R 3XRK';
+  const CONTACTS = [
+    { label: 'Mum', address: 'NQ07 0000 0000 0000 0000 0000 0000 0000 0000' },
+    { label: 'Savings', address: 'NQ21 1111 1111 1111 1111 1111 1111 1111 1111' },
+    { label: 'Rent', address: 'NQ32 2222 2222 2222 2222 2222 2222 2222 2222' },
+    { label: 'Fourth', address: 'NQ43 3333 3333 3333 3333 3333 3333 3333 3333' },
+  ];
+
+  function mount(opts: Partial<CornerControlOptions> = {}) {
+    const w = new Window();
+    for (const key of ['document', 'HTMLElement', 'navigator', 'localStorage',
+                       'getComputedStyle', 'Event']) {
+      (globalThis as unknown as Record<string, unknown>)[key] =
+        (w as unknown as Record<string, unknown>)[key];
+    }
+    const i18n = createI18n({ locales: mergeLocales(shellLocales), fallback: 'en' });
+    const wallet = {
+      mode: 'hub',
+      account: { address: ADDRESS, label: 'Test' },
+      connect: async () => null,
+      signAndSend: async () => ({ txHash: '' }),
+      pay: async () => ({ txHash: 'x' }),
+      signMessage: async () => ({ address: '', message: '', publicKeyHex: '', signatureHex: '' }),
+      onAccountChange: () => () => {},
+      disconnect: () => {},
+    } as unknown as Wallet;
+    const identicon = (address: string, size: number) => {
+      const d = w.document.createElement('div');
+      d.dataset.for = address; d.dataset.size = String(size);
+      return d as unknown as HTMLElement;
+    };
+    const host = w.document.createElement('div') as unknown as HTMLElement;
+    mountMiniWallet(host, {
+      wallet, i18n, balance: false, identicon,
+      contacts: { list: async () => CONTACTS },
+      ...opts,
+    } as never);
+    return { host };
+  }
+  const settle = () => new Promise((r) => setTimeout(r, 60));
+  async function openSend(host: HTMLElement) {
+    (host.querySelector('.nq-cc-face') as HTMLElement).click();
+    (host.querySelector('.nq-cc-send') as HTMLElement).click();
+    await settle();
+  }
+
+  // A row of faces reads as people; a row of grey pills reads as filter tags.
+  test('a saved recipient is a face and a name, not a text chip', async () => {
+    const { host } = mount();
+    await openSend(host);
+    const first = host.querySelector('.nq-cc-contact') as HTMLElement;
+    expect(first.querySelector('.nq-cc-contact-icon > *')?.getAttribute('data-for'))
+      .toBe('NQ07 0000 0000 0000 0000 0000 0000 0000 0000');
+    expect(first.querySelector('.nq-cc-contact-name')?.textContent).toBe('Mum');
+  });
+
+  // THREE, like the wallet's row of recents: a fourth either shrinks the faces
+  // past recognising or pushes the band wider than the card.
+  test('at most three recents are shown', async () => {
+    const { host } = mount();
+    await openSend(host);
+    expect(host.querySelectorAll('.nq-cc-contact').length).toBe(3);
+  });
+
+  test('the band carries the book and its hairline', async () => {
+    const { host } = mount();
+    await openSend(host);
+    const band = host.querySelector('.nq-cc-contacts-band') as HTMLElement;
+    expect(band.hidden).toBe(false);
+    expect(band.querySelector('.nq-cc-book-glyph')).toBeTruthy();
+    expect(band.querySelector('.nq-cc-book-label')?.textContent).toBe('Contacts');
+    expect(band.querySelector('.nq-cc-contacts-rule')).toBeTruthy();
+  });
+
+  test('no contacts wired leaves the band out entirely', async () => {
+    const { host } = mount({ contacts: undefined });
+    await openSend(host);
+    expect((host.querySelector('.nq-cc-contacts-band') as HTMLElement).hidden).toBe(true);
+  });
+
+  // The one uppercase nimiq-ui allows (rule 17, a short grey section label) and
+  // exactly what the wallet ships here.
+  test('the address label is the grey uppercase eyebrow', async () => {
+    const { host } = mount();
+    await openSend(host);
+    expect(host.querySelector('.nq-cc-view-sendto .nq-cc-eyebrow')?.textContent)
+      .toBe('Enter address');
+    const src = await Bun.file(new URL('./corner-control.ts', import.meta.url)).text();
+    expect(src).toMatch(/\.nq-cc-eyebrow \{[^}]*text-transform:uppercase/);
+  });
+
+  // An "Address unavailable?" that offers nothing is worse than no footer.
+  test('the footer appears only when the host wired a way out', async () => {
+    const bare = mount();
+    await openSend(bare.host);
+    expect((bare.host.querySelector('.nq-cc-sendto-foot') as HTMLElement).hidden).toBe(true);
+
+    const wired = mount({ createCashlink: () => {}, scan: () => {} } as never);
+    await openSend(wired.host);
+    const foot = wired.host.querySelector('.nq-cc-sendto-foot') as HTMLElement;
+    expect(foot.hidden).toBe(false);
+    expect(foot.querySelector('.nq-cc-unavailable')?.textContent).toBe('Address unavailable?');
+    expect(foot.querySelector('.nq-cc-scan-open')).toBeTruthy();
+  });
+
+  // The wallet's field sits unfocused. Ours opened wearing a blue ring across
+  // the whole card, and on a phone the focus throws the keyboard over the
+  // sheet before anybody has decided to type.
+  test('the address field is not focused on open', async () => {
+    const src = await Bun.file(new URL('./corner-control.ts', import.meta.url)).text();
+    expect(src).not.toMatch(/show-sendto'\);\s*\n\s*recipientInput\.focus\(\)/);
+  });
+
+  // Two rules for one class is how a stale background hides: the v0.20 chip
+  // rules were still supplying a grey pill and 4px/12px of padding under the
+  // new face, which left ~24px for a name in the column and printed "Mu...".
+  test('the v0.20 chip rules are gone, not merely overridden', async () => {
+    const src = await Bun.file(new URL('./corner-control.ts', import.meta.url)).text();
+    expect(src).not.toContain('.nq-cc-contact { max-width:100%; min-height:36px;');
+    expect(src.match(/\n\.nq-cc-contact \{/g)?.length ?? 0).toBe(1);
+  });
+});

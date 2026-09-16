@@ -29,6 +29,8 @@ export default {
   "shell.sendTransaction": "लेनदेन भेजें",
   "shell.enterAddress": "पता दर्ज करें",
   "shell.publicMessage": "सार्वजनिक संदेश जोड़ें...",
+  "shell.contacts": "संपर्क",
+  "shell.addressUnavailable": "पता उपलब्ध नहीं?",
   "shell.send": "भेजें",
   "shell.cancel": "रद्द करें",
   "shell.retry": "फिर कोशिश करें",

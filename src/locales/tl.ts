@@ -32,6 +32,8 @@ export default {
   "shell.sendTransaction": "Magpadala ng transaksyon",
   "shell.enterAddress": "Ilagay ang adres",
   "shell.publicMessage": "Magdagdag ng pampublikong mensahe...",
+  "shell.contacts": "Mga kontak",
+  "shell.addressUnavailable": "Walang adres?",
   "shell.send": "Ipadala",
   "shell.cancel": "Ikansela",
   "shell.retry": "Subukang muli",

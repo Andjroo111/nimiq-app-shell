@@ -669,9 +669,39 @@ data field and really does go on chain.
 A length trim would let 30 emoji through and the node would reject the
 transaction after somebody had already been asked to sign it.
 
-Still not matched on step one: `Address unavailable?` / `Create a Cashlink` and
-the scanner glyph. Cashlink is already an opt-in row in the main menu, and the
-scanner is the host's `scan` seam.
+##### Step one's shape (v0.27.0)
+
+The split was right and step one still read as a different sheet, because the
+pieces were the wrong SHAPE:
+
+| | Was | Now |
+| --- | --- | --- |
+| Saved recipients | grey text chips | the **book**, a hairline, then up to 3 **faces with names** |
+| Address label | `Enter address`, sentence case | a short grey **uppercase eyebrow** |
+| Footer | nothing, the sheet just ended | `Address unavailable?`, the cashlink pill, the scanner glyph |
+| On open | the field autofocused | nothing focused |
+
+A row of faces reads as people; a row of grey pills reads as filter tags, and
+the shape is the thing being recognised. Three recents, like the wallet: a
+fourth either shrinks the faces past recognising or pushes the band wider than
+the card. The footer only appears when the host wired `createCashlink` or
+`scan`, because an "Address unavailable?" that offers nothing is worse than no
+footer.
+
+⚠ **The field is deliberately not focused.** The wallet's sits unfocused with
+its grey border; ours opened wearing a blue ring across the whole card, and on
+a phone the focus throws the keyboard over the sheet before anybody has decided
+to type. The amount field IS focused on advance, because by then they have.
+
+⚠ **Two rules for one class is how a stale background hides.** The v0.20 chip
+rules were still supplying a grey pill and 4px/12px of padding under the new
+face, which left about 24px for a name in a 54px column and printed "Mu...".
+They are deleted now, not overridden, and a test pins that `.nq-cc-contact` has
+exactly one rule.
+
+The send grid runs at **14px in a 204px box (75%)** against the wallet's 58%.
+Full parity needs 11px, and this is the field where a wrong character costs
+money.
 
 #### The scale was the real gap (v0.23.0)
 

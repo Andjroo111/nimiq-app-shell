@@ -28,6 +28,8 @@ export default {
   'shell.sendTransaction': 'Send Transaction',
   'shell.enterAddress': 'Enter address',
   'shell.publicMessage': 'Add a public message...',
+  'shell.contacts': 'Contacts',
+  'shell.addressUnavailable': 'Address unavailable?',
   'shell.send': 'Send',
   'shell.cancel': 'Cancel',
   'shell.retry': 'Retry',

@@ -58,6 +58,7 @@ describe('locale values are actually translated', () => {
     'fr:shell.fbType',      // "Type" is French
     'fr:shell.fbBug',       // French UI borrows "bug"
     'fr:shell.fbQuestion',  // "Question" is French
+    'fr:shell.contacts',    // "Contacts" is French, and is what the Hub's own fr.po uses
     'id:shell.fbBug',       // Indonesian borrows "bug"
     'tl:shell.fbBug',       // Filipino borrows "bug"
     // Filipino's tech register borrows these three wholesale, the way the

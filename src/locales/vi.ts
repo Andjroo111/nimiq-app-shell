@@ -29,6 +29,8 @@ export default {
   "shell.sendTransaction": "Gửi giao dịch",
   "shell.enterAddress": "Nhập địa chỉ",
   "shell.publicMessage": "Thêm tin nhắn công khai...",
+  "shell.contacts": "Danh bạ",
+  "shell.addressUnavailable": "Không có địa chỉ?",
   "shell.send": "Gửi",
   "shell.cancel": "Huỷ",
   "shell.retry": "Thử lại",

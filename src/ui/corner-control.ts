@@ -556,7 +556,56 @@ button.nq-cc-name:focus-visible { outline:2px solid var(--nq-cc-accent, #0582ca)
 .nq-cc.nq-cc-show-send .nq-cc-view-main { display:none; }
 .nq-cc.nq-cc-show-send .nq-cc-view-sendto { display:none; }
 .nq-cc.nq-cc-show-send .nq-cc-view-send { display:block; }
-.nq-cc-sendto-body { display:flex; flex-direction:column; gap:10px; padding:16px 8px 8px; }
+.nq-cc-sendto-body { display:flex; flex-direction:column; align-items:center;
+  padding:16px 8px 10px; }
+/* The wallet's contacts BAND: the book on the left, a hairline, then the saved
+   recipients as faces. Text chips were the wrong shape entirely, and the shape
+   is the thing being recognised: a row of faces reads as people, a row of grey
+   pills reads as filter tags. */
+.nq-cc-contacts-band { display:flex; align-items:flex-start; justify-content:center;
+  gap:12px; width:100%; margin-top:14px; }
+.nq-cc-contacts-band[hidden] { display:none; }
+.nq-cc-book { display:flex; flex-direction:column; align-items:center; gap:6px;
+  flex:none; color:var(--nq-cc-menu-muted, rgba(31,35,72,.45)); }
+.nq-cc-book-glyph { display:block; width:38px; height:46px; }
+.nq-cc-book-label { font-size:11px; font-weight:600; }
+/* A fixed height, not align-self:stretch: the rule runs past the name bars on
+   the wallet's sheet, and stretch would end it at whichever column happens to
+   be tallest. */
+.nq-cc-contacts-rule { flex:none; width:1px; height:74px; margin-top:2px;
+  background:color-mix(in srgb, var(--nq-cc-menu-fg, #1f2348) 12%, transparent); }
+.nq-cc-contacts { display:flex; flex-wrap:nowrap; justify-content:flex-start; gap:10px; }
+.nq-cc-contacts[hidden] { display:none; }
+/* A face and a name, which is what a saved recipient IS. */
+.nq-cc-contact { display:flex; flex-direction:column; align-items:center; gap:5px;
+  width:54px; padding:0; border:none; background:none; font-family:inherit; cursor:pointer; }
+.nq-cc-contact-icon { display:block; width:40px; height:40px; }
+.nq-cc-contact-icon > * { display:block; width:100%; height:100%; }
+.nq-cc-contact-name { max-width:100%; font-size:10px; font-weight:600; text-align:center;
+  overflow:hidden; text-overflow:ellipsis; white-space:nowrap;
+  color:var(--nq-cc-menu-muted, rgba(31,35,72,.6)); }
+.nq-cc-contact:hover .nq-cc-contact-name { color:var(--nq-cc-accent, #0582ca); }
+.nq-cc-contact:focus-visible { outline:2px solid var(--nq-cc-accent, #0582ca); outline-offset:2px;
+  border-radius:6px; }
+/* A short GREY uppercase section label, which is the one uppercase nimiq-ui
+   allows (rule 17) and exactly what the wallet ships here. */
+.nq-cc-eyebrow { margin:46px 0 0; font-size:11px; font-weight:700; text-transform:uppercase;
+  letter-spacing:.08em; text-align:center; color:var(--nq-cc-menu-muted, rgba(31,35,72,.45)); }
+/* The wallet's escape hatch: what to do when you have no address to send to. */
+.nq-cc-sendto-foot { position:relative; display:flex; flex-direction:column;
+  align-items:center; gap:8px; width:100%; margin-top:40px; padding-inline:42px;
+  box-sizing:border-box; }
+.nq-cc-sendto-foot[hidden] { display:none; }
+.nq-cc-unavailable { margin:0; font-size:12px; font-weight:600;
+  color:var(--nq-cc-menu-muted, rgba(31,35,72,.5)); }
+.nq-cc-sendto-foot .nq-cc-scan-open { position:absolute; right:0; bottom:2px;
+  display:inline-flex; align-items:center; justify-content:center;
+  width:38px; height:38px; padding:0; border:none; border-radius:8px; background:none;
+  color:var(--nq-cc-menu-muted, rgba(31,35,72,.6)); cursor:pointer; }
+.nq-cc-sendto-foot .nq-cc-scan-open:hover { background:var(--nq-cc-menu-hover, rgba(31,35,72,.06)); }
+.nq-cc-sendto-foot .nq-cc-scan-open:focus-visible { outline:2px solid var(--nq-cc-accent, #0582ca);
+  outline-offset:-2px; }
+.nq-cc-sendto-foot .nq-cc-scan-glyph { display:block; width:22px; height:22px; }
 /* Both parties, faces first, with the wallet's hairline dash between them.
    Sender on the left, recipient on the right, which is the direction the money
    goes and the same order the wallet uses. */
@@ -677,7 +726,7 @@ button.nq-cc-name:focus-visible { outline:2px solid var(--nq-cc-accent, #0582ca)
 
    Inset box-shadow for the border, never border (rule 1). */
 .nq-cc-addr-field { position:relative; border-radius:8px; padding:7px 0;
-  width:100%; max-width:236px; margin-inline:auto; box-sizing:border-box;
+  width:100%; max-width:204px; margin-inline:auto; box-sizing:border-box;
   background:var(--nq-cc-input-bg, var(--nq-cc-card-bg, #fff));
   box-shadow:inset 0 0 0 2px color-mix(in srgb, var(--nq-cc-menu-fg, #1f2348) 12%, transparent);
   transition:box-shadow .15s var(--nimiq-ease, cubic-bezier(.25,0,0,1)); }
@@ -692,7 +741,7 @@ button.nq-cc-name:focus-visible { outline:2px solid var(--nq-cc-accent, #0582ca)
   width:calc(14ch + 2 * var(--nq-cc-addr-gap));
   word-spacing:var(--nq-cc-addr-gap);
   outline:none; resize:none; overflow:hidden; background:transparent;
-  font-family:'Fira Mono',ui-monospace,monospace; font-size:16px; line-height:30px;
+  font-family:'Fira Mono',ui-monospace,monospace; font-size:14px; line-height:28px;
   text-transform:uppercase; text-align:center;
   color:var(--nq-cc-input-fg, var(--nq-cc-menu-fg, #1f2348)); }
 .nq-cc-addr-input::placeholder { opacity:.32; }
@@ -856,18 +905,10 @@ button.nq-cc-name:focus-visible { outline:2px solid var(--nq-cc-accent, #0582ca)
    now clears 36px on its shortest side, which is the floor nq lint enforces and
    the size the Connect button already was. The text stays 11.5px and the fill
    stays a wash: what grew is the target, not the voice. */
-.nq-cc-contacts { display:flex; flex-wrap:wrap; justify-content:center; gap:5px; margin:6px 0 2px; }
-.nq-cc-contacts[hidden] { display:none; }
-.nq-cc-contact { max-width:100%; min-height:36px; display:inline-flex; align-items:center;
-  padding:4px 12px; border:none; border-radius:999px;
-  background:color-mix(in srgb, var(--nq-cc-menu-fg, #1f2348) 6%, transparent);
-  color:var(--nq-cc-menu-fg, #1f2348);
-  font-family:inherit; font-size:11.5px; font-weight:700; line-height:1.3; cursor:pointer;
-  white-space:nowrap; overflow:hidden; text-overflow:ellipsis;
-  transition:background .15s var(--nimiq-ease, cubic-bezier(.25,0,0,1)); }
-.nq-cc-contact:hover { background:color-mix(in srgb, var(--nq-cc-accent, #0582ca) 12%, transparent);
-  color:var(--nq-cc-accent, #0582ca); }
-.nq-cc-contact:focus-visible { outline:2px solid var(--nq-cc-accent, #0582ca); outline-offset:2px; }
+/* The v0.20 chip rules are GONE, not overridden. They were still supplying a
+   grey pill background and 4px/12px of padding under the new face-and-name
+   contact, which is where the "Mu..." came from: the padding left ~24px for a
+   name in a 46px column. Two rules for one class is how that hides. */
 .nq-cc-copy-tooltip { position:absolute; left:50%; bottom:calc(100% + 10px);
   transform:translateX(-50%) translateY(4px); padding:8px 12px; border-radius:4px;
   background-image:var(--nq-cc-send-image,
@@ -1031,6 +1072,12 @@ const ARROW =
 // The Nimiq `qr` glyph, verbatim from assets/icons/nimiq-icons.json. NOT the
 // scanner icon further down this file: that one means "read someone else's
 // code" and this one means "show mine". Never redrawn (nimiq-ui rule 15).
+// The Nimiq `contact-book` glyph, verbatim from assets/icons/nimiq-icons.json.
+const CONTACT_BOOK =
+  '<svg class="nq-cc-book-glyph" viewBox="0 0 10 12" aria-hidden="true">' +
+  '<path fill="currentColor" fill-rule="evenodd" d="M8.75 1.776c0 .117.083.22.201.244a1 1 0 01.798.98v8a1 1 0 01-.999 1H1.501A1.5 1.5 0 010 10.499V1.5A1.5 1.5 0 011.501 0h6.25a1 1 0 011 1zM7.501 9.583a2.505 2.505 0 00-2.505-2.334A2.51 2.51 0 002.5 9.473a.25.25 0 00.25.276h4.592a.157.157 0 00.157-.166zM3.49 5.248a1.506 1.506 0 110 .003zM1.499 1.002a.5.5 0 000 1.001h6.125a.124.124 0 00.125-.125v-.754a.125.125 0 00-.123-.122h-6.13z" clip-rule="evenodd"/>' +
+  '</svg>';
+
 const QR_GLYPH =
   '<svg class="nq-cc-qr-glyph" viewBox="0 0 13 13" aria-hidden="true">' +
   '<g fill="none"><path fill="currentColor" d="M5.796 1.902a.304.304 0 00-.304-.305H1.938a.305.305 0 00-.304.305v3.553c0 .168.136.305.304.305h3.553a.305.305 0 00.305-.305zm-.609 3.249H2.243V2.206h2.944z"/><path stroke="currentColor" stroke-width=".091" d="M5.796 1.902a.304.304 0 00-.304-.305H1.938a.305.305 0 00-.304.305v3.553c0 .168.136.305.304.305h3.553a.305.305 0 00.305-.305zm0 0h-.049m-.56 3.249H2.243V2.206h2.944z"/><path fill="currentColor" stroke="currentColor" stroke-width=".091" d="M3.067 4.632h1.296a.305.305 0 00.305-.305V3.03a.305.305 0 00-.305-.304H3.067a.305.305 0 00-.305.304v1.297c0 .168.137.305.305.305Zm.304-1.297h.688v.688H3.37zM7.509 5.76h3.553a.304.304 0 00.304-.305V1.902a.304.304 0 00-.304-.305H7.509a.305.305 0 00-.305.305v3.553c0 .168.136.305.305.305Zm.304-3.554h2.944v2.945H7.813z"/><path fill="currentColor" stroke="currentColor" stroke-width=".091" d="M9.933 2.726H8.636a.304.304 0 00-.304.304v1.297c0 .168.136.305.304.305h1.297a.305.305 0 00.305-.305V3.03a.305.305 0 00-.305-.304Zm-.305 1.297h-.687v-.688h.687z"/><path fill="currentColor" d="M5.796 7.472a.304.304 0 00-.304-.304H1.938a.304.304 0 00-.304.304v3.553c0 .169.136.305.304.305h3.553a.305.305 0 00.305-.305zm-.609 3.249H2.243V7.777h2.944z"/><path stroke="currentColor" stroke-width=".091" d="M5.796 7.472a.304.304 0 00-.304-.304H1.938a.304.304 0 00-.304.304v3.553c0 .169.136.305.304.305h3.553a.305.305 0 00.305-.305zm0 0h-.049m-.56 3.249H2.243V7.777h2.944z"/><path fill="currentColor" stroke="currentColor" stroke-width=".091" d="M3.067 10.202h1.296a.305.305 0 00.305-.305V8.6a.304.304 0 00-.305-.304H3.067a.304.304 0 00-.305.304v1.297c0 .168.137.305.305.305Zm.304-1.297h.688v.688H3.37zm7.995 2.12V7.472a.304.304 0 00-.304-.304H7.509a.304.304 0 00-.305.304v3.553c0 .169.136.305.305.305h3.553a.305.305 0 00.304-.305Zm-.609-.304H7.813V7.777h2.944z"/><path fill="currentColor" stroke="currentColor" stroke-width=".091" d="M8.637 10.202h1.297a.304.304 0 00.304-.305V8.6a.304.304 0 00-.304-.304H8.637a.304.304 0 00-.304.304v1.297c0 .168.136.305.304.305Zm.305-1.297h.687v.688h-.687zM.353 3.323a.305.305 0 00.305-.304V.658h2.36a.305.305 0 000-.61H.353A.305.305 0 00.05.354V3.02c0 .168.136.304.304.304ZM12.647.049H9.982a.304.304 0 100 .609h2.36v2.361a.305.305 0 10.61 0V.353a.304.304 0 00-.305-.304Zm-.001 9.556a.304.304 0 00-.304.304v2.36h-2.36a.304.304 0 100 .61h2.664a.304.304 0 00.305-.305V9.91a.304.304 0 00-.305-.304ZM3.018 12.27H.658V9.91a.304.304 0 10-.61 0v2.664c0 .169.137.305.305.305h2.665a.305.305 0 100-.61Z"/></g>' +
@@ -1886,7 +1933,7 @@ export function mountMiniWallet(
   // into nonsense. Recognising a face beats reading 36 characters back.
   const recipientHead = el('div', 'nq-cc-field-head', sendToBody);
   const recipientIcon = el('span', 'nq-cc-recipient-icon', recipientHead);
-  const recipientLabel = el('label', 'nq-cc-field-label', recipientHead);
+  const recipientLabel = el('label', 'nq-cc-eyebrow', recipientHead);
   tNode(recipientLabel, 'shell.enterAddress');
 
   // Nine four-char blocks in a 3x3 grid, the wallet's own send-modal field.
@@ -1912,11 +1959,38 @@ export function mountMiniWallet(
   // screen and checkable before confirming. Handing an address straight to the
   // signer because a name was tapped removes the last chance to notice it is
   // the wrong one.
-  const contactsRow = el('div', 'nq-cc-contacts', sendToBody);
+  // The band, above the field where the wallet puts it: a saved recipient is a
+  // way to SKIP the typing, and an offer to skip work belongs before the work.
+  const contactsBand = el('div', 'nq-cc-contacts-band', sendToBody);
+  contactsBand.hidden = true;
+  const book = el('div', 'nq-cc-book', contactsBand);
+  book.insertAdjacentHTML('beforeend', CONTACT_BOOK);
+  const bookLabel = el('span', 'nq-cc-book-label', book);
+  tNode(bookLabel, 'shell.contacts');
+  el('div', 'nq-cc-contacts-rule', contactsBand);
+  const contactsRow = el('div', 'nq-cc-contacts', contactsBand);
   contactsRow.hidden = true;
-  // Above the field, where the wallet puts them: a saved recipient is a way to
-  // SKIP the typing, and an offer to skip work belongs before the work.
-  sendToBody.insertBefore(contactsRow, recipientHead);
+  sendToBody.insertBefore(contactsBand, recipientHead);
+
+  // The footer, which only exists when the host wired something for it. An
+  // "Address unavailable?" that offers nothing is worse than no footer.
+  const sendToFoot = el('div', 'nq-cc-sendto-foot', sendToBody);
+  sendToFoot.hidden = !options.createCashlink && !options.scan;
+  if (options.createCashlink) {
+    const ask = el('p', 'nq-cc-unavailable', sendToFoot);
+    tNode(ask, 'shell.addressUnavailable');
+    const pill = el('button', 'nq-cc-request-open', sendToFoot);
+    pill.type = 'button';
+    tNode(pill, 'shell.createCashlink');
+    pill.addEventListener('click', () => { setOpen(false); options.createCashlink!(); });
+  }
+  if (options.scan) {
+    const scanBtn = el('button', 'nq-cc-scan-open', sendToFoot);
+    scanBtn.type = 'button';
+    scanBtn.setAttribute('aria-label', 'Scan QR code');
+    scanBtn.insertAdjacentHTML('beforeend', SCAN_QR);
+    scanBtn.addEventListener('click', () => { setOpen(false); options.scan!(); });
+  }
 
   /** After a send lands, offer to save a recipient the book does not hold.
    *
@@ -1957,12 +2031,20 @@ export function mountMiniWallet(
     // is what the built-in send view moves.
     const usable = entries.filter((c) => (c.asset ?? 'NIM') === 'NIM');
     contactsRow.textContent = '';
-    contactsRow.hidden = usable.length === 0;
-    for (const contact of usable) {
+    // THREE, like the wallet's row of recents. A fourth would either shrink the
+    // faces past recognising or push the band wider than the card.
+    const shown = usable.slice(0, 3);
+    contactsRow.hidden = shown.length === 0;
+    contactsBand.hidden = shown.length === 0;
+    for (const contact of shown) {
       const chip = el('button', 'nq-cc-contact', contactsRow);
       chip.type = 'button';
-      chip.textContent = contact.label;
       chip.title = contact.address;
+      const face = el('span', 'nq-cc-contact-icon', chip);
+      if (options.identicon) face.appendChild(options.identicon(contact.address, 40));
+      else face.insertAdjacentHTML('beforeend', PLACEHOLDER_HEX);
+      const name = el('span', 'nq-cc-contact-name', chip);
+      name.textContent = contact.label;
       chip.addEventListener('click', () => {
         recipientInput.value = formatAddressBlocks(contact.address);
         validateSend();
@@ -2156,7 +2238,10 @@ export function mountMiniWallet(
     // Step ONE, always. A flow that reopened on the amount sheet would be
     // offering to pay whoever was in the field last time.
     root.classList.add('nq-cc-show-sendto');
-    recipientInput.focus();
+    // Deliberately NOT focused. The wallet's field sits unfocused, ours opened
+    // wearing a blue ring across the whole card, and on a phone the focus
+    // throws the keyboard over the sheet before anybody has decided to type.
+    // The amount field IS focused on advance, because by then they have.
     // Read on open, not at mount: the host's book can change between sends, and
     // a list captured at mount goes stale in a long-lived page.
     void renderContacts();

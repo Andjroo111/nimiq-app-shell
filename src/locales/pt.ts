@@ -27,6 +27,8 @@ export default {
   'shell.sendTransaction': 'Enviar transação',
   'shell.enterAddress': 'Digite o endereço',
   'shell.publicMessage': 'Adicione uma mensagem pública...',
+  'shell.contacts': 'Contatos',
+  'shell.addressUnavailable': 'Endereço indisponível?',
   'shell.send': 'Enviar',
   'shell.cancel': 'Cancelar',
   'shell.retry': 'Tentar novamente',

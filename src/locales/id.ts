@@ -29,6 +29,8 @@ export default {
   "shell.sendTransaction": "Kirim transaksi",
   "shell.enterAddress": "Masukkan alamat",
   "shell.publicMessage": "Tambahkan pesan publik...",
+  "shell.contacts": "Kontak",
+  "shell.addressUnavailable": "Alamat tidak tersedia?",
   "shell.send": "Kirim",
   "shell.cancel": "Batal",
   "shell.retry": "Coba lagi",

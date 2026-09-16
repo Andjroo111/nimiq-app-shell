@@ -29,6 +29,8 @@ export default {
   "shell.sendTransaction": "거래 보내기",
   "shell.enterAddress": "주소 입력",
   "shell.publicMessage": "공개 메시지 추가...",
+  "shell.contacts": "연락처",
+  "shell.addressUnavailable": "주소가 없나요?",
   "shell.send": "보내기",
   "shell.cancel": "취소",
   "shell.retry": "다시 시도",
