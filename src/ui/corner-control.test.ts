@@ -1005,3 +1005,143 @@ describe('send and receive match the wallet sheets', () => {
     expect(src).not.toContain('#0582CA');
   });
 });
+
+// The scale pass. Matching the wallet's copy and colours was not enough: at
+// half its type scale the two sheets still read as different components rather
+// than two sizes of one (Andrew, 9/15, "they still look different"). The
+// numbers below are the registry's own, which is the ported upstream source.
+describe('receive matches the wallet at its own scale', () => {
+  const ADDRESS = 'NQ34 248H 8MB8 8QK2 5RVK EM8Q QJ8N 2Q5R 3XRK';
+
+  /** `withIdenticon` rather than a renderer passed in: the renderer needs the
+   *  Window this helper creates, so a caller cannot build one first. */
+  function mount(withIdenticon = false, opts: Partial<CornerControlOptions> = {}) {
+    const w = new Window();
+    for (const key of ['document', 'HTMLElement', 'navigator', 'localStorage',
+                       'getComputedStyle', 'Event']) {
+      (globalThis as unknown as Record<string, unknown>)[key] =
+        (w as unknown as Record<string, unknown>)[key];
+    }
+    const i18n = createI18n({ locales: mergeLocales(shellLocales), fallback: 'en' });
+    const wallet = {
+      mode: 'hub',
+      account: { address: ADDRESS, label: 'Test' },
+      connect: async () => null,
+      signAndSend: async () => ({ txHash: '' }),
+      pay: async () => ({ txHash: '' }),
+      signMessage: async () => ({ address: '', message: '', publicKeyHex: '', signatureHex: '' }),
+      onAccountChange: () => () => {},
+      disconnect: () => {},
+    } as unknown as Wallet;
+    const identicon = (address: string, size: number) => {
+      const d = w.document.createElement('div');
+      d.dataset.for = address;
+      d.dataset.size = String(size);
+      return d as unknown as HTMLElement;
+    };
+    const host = w.document.createElement('div') as unknown as HTMLElement;
+    mountMiniWallet(host, {
+      wallet, i18n, balance: false,
+      ...(withIdenticon ? { identicon } : {}),
+      ...opts,
+    });
+    return { host };
+  }
+  const settle = () => new Promise((r) => setTimeout(r, 40));
+  function openReceive(host: HTMLElement) {
+    (host.querySelector('.nq-cc-face') as HTMLElement).click();
+    (host.querySelector('.nq-cc-receive') as HTMLElement).click();
+  }
+
+  test('with an identicon wired, the face leads and the QR leaves the view', async () => {
+    const { host } = mount(true);
+    openReceive(host);
+    await settle();
+    const hero = host.querySelector('.nq-cc-receive-hero') as HTMLElement;
+    expect(hero.hidden).toBe(false);
+    expect(hero.firstElementChild?.getAttribute('data-size')).toBe('120');
+    expect((host.querySelector('.nq-cc-view-receive .nq-cc-qr') as HTMLElement).hidden).toBe(true);
+    expect((host.querySelector('.nq-cc-receive-foot') as HTMLElement).hidden).toBe(false);
+  });
+
+  // Nineteen apps ship without an identicon renderer. None of them may lose the
+  // one graphic on this screen a camera can read.
+  test('with none wired, the QR stays put and the glyph stays hidden', async () => {
+    const { host } = mount();
+    openReceive(host);
+    await settle();
+    expect((host.querySelector('.nq-cc-receive-hero') as HTMLElement).hidden).toBe(true);
+    expect((host.querySelector('.nq-cc-view-receive .nq-cc-qr') as HTMLElement).hidden).toBe(false);
+    expect((host.querySelector('.nq-cc-receive-foot') as HTMLElement).hidden).toBe(true);
+  });
+
+  test('the glyph opens the address sheet, and back returns to receive', async () => {
+    const { host } = mount(true);
+    openReceive(host);
+    await settle();
+    const root = host.querySelector('.nq-cc') as HTMLElement;
+    (host.querySelector('.nq-cc-qr-open') as HTMLElement).click();
+    expect(root.classList.contains('nq-cc-show-qr')).toBe(true);
+    expect(host.querySelector('.nq-cc-view-qr .nq-cc-view-title')?.textContent)
+      .toBe('NIM Address');
+
+    (host.querySelector('.nq-cc-view-qr .nq-cc-back') as HTMLElement).click();
+    expect(root.classList.contains('nq-cc-show-qr')).toBe(false);
+    expect(root.classList.contains('nq-cc-show-receive')).toBe(true);
+  });
+
+  // Two blocks a side, not the wallet's three: at 272px three plus the ellipsis
+  // overruns and wraps, and a wrapped elision is worse than a shorter one.
+  test('the sheet elides the address middle, on one line', async () => {
+    const { host } = mount(true);
+    openReceive(host);
+    await settle();
+    (host.querySelector('.nq-cc-qr-open') as HTMLElement).click();
+    const line = host.querySelector('.nq-cc-qr-line')?.textContent ?? '';
+    expect(line).toBe('NQ34 248H ••• 2Q5R 3XRK');
+  });
+
+  test('the QR sheet has its own strings in every shipped locale', () => {
+    for (const [locale, messages] of Object.entries(shellLocales)) {
+      for (const key of ['shell.addressSheet', 'shell.scanToSend', 'shell.showQr']) {
+        expect((messages as Record<string, string>)[key], `${locale}:${key}`).toBeTruthy();
+      }
+    }
+  });
+});
+
+// The scale numbers themselves, pinned at the source. happy-dom does not
+// compute a stylesheet, and these are the values that stop the two sheets
+// reading as different components.
+describe('the type scale is the wallet\'s, not half of it', () => {
+  test('the address grid runs at the registry address-display size', async () => {
+    const src = await Bun.file(new URL('./corner-control.ts', import.meta.url)).text();
+    // address-display ships font-size: 3rem at the legacy 8px root = 24px, with
+    // a 0.875rem = 7px chunk margin.
+    expect(src).toMatch(/\.nq-cc-address \{[^}]*font-size:24px/);
+    expect(src).toMatch(/\.nq-cc-address \{[^}]*gap:7px 0/);
+  });
+
+  test('the primary button carries the nq-button weight', async () => {
+    const src = await Bun.file(new URL('./corner-control.ts', import.meta.url)).text();
+    expect(src).toMatch(/\.nq-cc-send-confirm \{[^}]*height:52px/);
+    expect(src).toMatch(/\.nq-cc-send-confirm \{[^}]*font-size:16px/);
+  });
+
+  // The taller sheet has to be reachable on a short window, and `vh` alone is
+  // the LARGE viewport on mobile Safari, which overshoots by the toolbar.
+  test('the menu scrolls rather than running off the bottom', async () => {
+    const src = await Bun.file(new URL('./corner-control.ts', import.meta.url)).text();
+    expect(src).toContain('max-height:calc(100dvh - 96px)');
+    expect(src).toContain('max-height:calc(100vh - 96px)');
+    expect(src).toMatch(/\.nq-cc-menu \{[\s\S]*?overflow-y:auto/);
+  });
+
+  // Never redrawn: the glyph is the real one from the Nimiq icon set, and it is
+  // the "show mine" QR, not the scanner already in this file.
+  test('the footer glyph is the verbatim Nimiq qr icon', async () => {
+    const src = await Bun.file(new URL('./corner-control.ts', import.meta.url)).text();
+    expect(src).toContain('const QR_GLYPH');
+    expect(src).toContain('M5.796 1.902a.304.304 0 00-.304-.305H1.938');
+  });
+});

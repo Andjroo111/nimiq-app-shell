@@ -612,7 +612,7 @@ dark themed card is unscannable, not just off-brand. Retint it with
 
 ---
 
-### Matching the wallet's own sheets (v0.22.0)
+### Matching the wallet's own sheets (v0.22.0, scale in v0.23.0)
 
 Receive and Send are a **mini version of the wallet's sheets**, not a separate
 design. A side-by-side against the real ones found four places that had drifted,
@@ -638,6 +638,55 @@ sheets (`Send Transaction` then `Set Amount`), the sender-and-recipient identico
 pair, the public message field, and the `Address unavailable?` cashlink footer.
 A 272px card cannot hold a 390px two-step flow, and the cashlink is already an
 opt-in row in the main menu.
+
+#### The scale was the real gap (v0.23.0)
+
+Copy and colour were not enough: at **half** the wallet's type scale the two
+sheets still read as different components rather than two sizes of one. The
+numbers here are the **registry's own**, which is the ported upstream source:
+
+| | Registry / wallet | Was | Now |
+| --- | --- | --- | --- |
+| Address grid | `address-display` 3rem = **24px**, 0.875rem = 7px chunk margin | 12px | **24px** |
+| Primary button | `.nq-button` 7.5rem = 60px at 2rem = **16px** | 36px / 14px | **52px / 16px** |
+| Sheet title | ~24px | 15px | **22px** |
+| Send address grid | | 14px | **16px** |
+| Amount field | | 14px | **18px** |
+
+⚠ **Width was never the constraint.** `address-display` needs **226px** and the
+menu's content box is **244px**: the grid had been running at half size for no
+reason at all. What the bigger scale does cost is HEIGHT, so `.nq-cc-menu` now
+carries `max-height` and `overflow-y:auto`. `dvh` first with `vh` as the
+fallback, because on mobile Safari `vh` is the **large** viewport and overshoots
+the visible area by the toolbar.
+
+#### Receive leads with the identicon, and the QR gets its own sheet (v0.23.0)
+
+The wallet's hierarchy, for the wallet's reason: the face is what tells a sender
+at a glance that they have the right person, and nobody reads 36 characters
+back. The code moves one tap deeper, onto a sheet titled `NIM Address` with the
+address on one elided line, which is what the wallet's own QR sheet does.
+
+```ts
+mountMiniWallet(slot, {
+  wallet, i18n,
+  identicon: (address, size) => Identicons.render(address, size),  // makes it the hero
+});
+```
+
+**Without `identicon` wired, nothing changes**: the QR stays the hero and the
+footer glyph stays hidden. There is no placeholder hexagon, because one would
+claim an identity it cannot show, and no app may silently lose the one graphic
+on this screen a camera can read.
+
+Two blocks a side in the elision, not the wallet's three: three plus the
+ellipsis is 33 characters of Fira Mono, which overruns 272px and wraps, and a
+wrapped elision is worse than a shorter one. The full 3x3 grid is one tap back.
+
+⚠ **A QR that cannot be drawn no longer takes the receive view with it.** The
+draw used to be the last thing `openReceive` did, so a host `qr` renderer that
+threw aborted the function and left the sheet half-built with nothing surfaced.
+The address is the thing being received; the code is the convenience.
 
 ---
 
