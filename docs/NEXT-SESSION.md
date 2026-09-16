@@ -6,16 +6,20 @@ The **mini wallet**: the fleet's one header control. `mountMiniWallet` is the
 canonical export; `mountCornerControl` is kept as an alias because ~25 apps
 import that name.
 
-**Current: v0.20.3**, tagged and on jsDelivr:
+**Current on main: v0.21.2.** **v0.27.1 is on `feat/wallet-parity`, PR #160,
+CI green, NOT merged and NOT tagged.**
+
 `https://cdn.jsdelivr.net/gh/Andjroo111/nimiq-app-shell@v0.20.3/dist/app-shell.js`
 
 **All 19 fleet apps pin v0.20.3.** No split, and the pin is deliberate: see
-"How the fleet takes an update" below before proposing a floating tag.
+"How the fleet takes an update" below before proposing a floating tag. Nothing
+in PR #160 reaches any app until it is merged, tagged, and `bump-fleet` is run.
 
 ## Playground, the way to see any of this
 
 ```bash
-bun run playground     # builds dist/, serves http://localhost:4321
+bun run playground            # builds dist/, serves http://localhost:4321
+PORT=4322 bun run scripts/playground.ts   # any other port
 ```
 
 Blank page, mini wallet in a navy header and a light one, every seam as a live
@@ -26,6 +30,51 @@ slow read, an unpriced asset, and the three send outcomes.
 **Use 127.0.0.1, not localhost**, when driving it with Playwright. The IPv6
 route makes `page.goto` time out while curl works fine, which reads as a broken
 page for a while.
+
+## In flight: PR #160, wallet parity, v0.22.0 to v0.27.1 (2026-09-15/16)
+
+Seven commits. The mini wallet's Receive and Send were compared against the
+**real wallet's own sheets** and rebuilt to match. Reference captures live at
+`~/Projects/nimiq/nimiq-branding-cli/references/screenshots/wallet-app/logged-in/`,
+already on disk. Do not ask Andrew for wallet screenshots.
+
+| Release | What |
+| --- | --- |
+| v0.22.0 | `Receive NIM` plus the wallet's instruction line, the fiat value under the send amount, an X beside every back chevron, the QR to navy |
+| v0.23.0 | matched the wallet's absolute type px. **This made it worse.** See the trap below |
+| v0.24.0 | real request links (`format/request-link.ts`), the copy hint dropped, the X became a filled disc, `Send Amount` |
+| v0.25.0 | **proportions**, matched as a share of each sheet's own width. Send stopped being a form |
+| v0.26.0 | send split into the wallet's **two** sheets, plus the public message on `SendArgs.data` |
+| v0.27.0 | step one's shape: the contact book, a hairline, faces with names, uppercase eyebrow, a real footer |
+| v0.27.1 | the grid reads as a field (`NQ` placeholder, per-row ticks), the QR sheet's address stops floating |
+
+### ⚠ The trap that cost four rounds
+
+**Matching the wallet's absolute pixel sizes is WRONG.** 24px address type is
+6.2% of a 390px sheet and 8.8% of a 272px card, so copying the number makes our
+content relatively BIGGER than the wallet's. Match **shares of the sheet's own
+width** instead. Measure by ink-profiling both screenshots, not by eye:
+`profile.py` pattern is in the PR discussion, and the numbers are in the README
+section "Proportions, not px".
+
+Three more that bit:
+
+- **The address ink is set by the PLATE, not the font.** The chunks centre in
+  `1fr` cells, so the span tracks the plate width: 24px to 16px moved it 209px
+  to 191px. `--nq-cc-addr-plate` (169px) is what lands it.
+- **Two CSS rules for one class is how a stale background hides.** The v0.20
+  chip rules survived under the new face-and-name contact and printed "Mu...".
+  A test now pins that `.nq-cc-contact` has exactly one rule.
+- **"A 272px card cannot hold a 390px two-step flow" was wrong**, and it sat in
+  the README for four versions. It is steps, not width.
+
+### Still not matched, on purpose
+
+| Element | Wallet | Ours | Why |
+| --- | --- | --- | --- |
+| Send address grid | 58% of sheet | 75% | parity needs 11px type, and this is the field where a wrong character costs money |
+| Receive subtitle | 10.4px by share | 12px | legibility floor |
+| Primary CTA | uppercase `SEND NIM` capsule | sentence-case pill | that capsule is legacy `.nq-button`; the shell rides 19 modern-styled hosts |
 
 ## Shipped 2026-09-02
 
