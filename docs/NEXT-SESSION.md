@@ -6,12 +6,20 @@ The **mini wallet**: the fleet's one header control. `mountMiniWallet` is the
 canonical export; `mountCornerControl` is kept as an alias because ~25 apps
 import that name.
 
-**Current on main: v0.21.2.** **v0.27.1 is on `feat/wallet-parity`, PR #160,
-CI green, NOT merged and NOT tagged.**
+**Current on main: v0.28.0, tagged, on jsDelivr.** PR #160 merged 2026-09-16.
+
+**`bump-fleet.ts v0.28.0` opened 20 PRs, 0 failed, NONE merged.** The script never
+merges; the merge button stays Andrew's. The fleet was on **v0.21.2** before this,
+not the v0.20.3 this doc used to claim.
+
+⏭ **NEXT: main-menu spacing.** The two collapsed settings rows (Language, Show
+amounts in) cost 96px of a 360px menu, as much as the whole account block at 98px.
+The account block should dominate. Numbers and the target are in the memory file
+`project_nimiq_app_shell_wallet_parity.md`.
 
 `https://cdn.jsdelivr.net/gh/Andjroo111/nimiq-app-shell@v0.20.3/dist/app-shell.js`
 
-**All 19 fleet apps pin v0.20.3.** No split, and the pin is deliberate: see
+**The 20 fleet apps pinned v0.21.2 before this bump.** No split, and the pin is deliberate: see
 "How the fleet takes an update" below before proposing a floating tag. Nothing
 in PR #160 reaches any app until it is merged, tagged, and `bump-fleet` is run.
 
