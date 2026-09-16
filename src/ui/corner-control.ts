@@ -649,10 +649,10 @@ button.nq-cc-name:focus-visible { outline:2px solid var(--nq-cc-accent, #0582ca)
 /* One line, middle elided, which is the wallet's own treatment on this sheet.
    Repeating the 3x3 grid here would say the two sheets are the same thing at
    two sizes; the grid is the sheet you came from. */
-.nq-cc-qr-line { margin:12px 0 0; font-family:'Fira Mono',ui-monospace,monospace; font-size:13px;
+.nq-cc-qr-line { margin:22px 0 0; font-family:'Fira Mono',ui-monospace,monospace; font-size:13px;
   letter-spacing:.02em; text-align:center; white-space:nowrap;
   color:var(--nq-cc-menu-muted, rgba(31,35,72,.5)); }
-.nq-cc-qr-scan { margin:14px 4px 2px; text-align:center; font-size:13px; font-weight:600;
+.nq-cc-qr-scan { margin:51px 4px 2px; text-align:center; font-size:13px; font-weight:600;
   line-height:1.35; color:var(--nq-cc-accent, #0582ca); }
 /* The identicon hero. 120px, not the wallet's ~150: the same share of a 272px
    card that theirs is of a 390px one. */
@@ -742,7 +742,11 @@ button.nq-cc-name:focus-visible { outline:2px solid var(--nq-cc-accent, #0582ca)
   word-spacing:var(--nq-cc-addr-gap);
   outline:none; resize:none; overflow:hidden; background:transparent;
   font-family:'Fira Mono',ui-monospace,monospace; font-size:14px; line-height:28px;
-  text-transform:uppercase; text-align:center;
+  /* LEFT, not centred. A full address fills the field exactly, so this only
+     moves a partial one and the placeholder, and those are the two states that
+     were wrong: the wallet's "NQ" sits at the start of the first cell and ours
+     floated in the middle of the box. */
+  text-transform:uppercase; text-align:left;
   color:var(--nq-cc-input-fg, var(--nq-cc-menu-fg, #1f2348)); }
 .nq-cc-addr-input::placeholder { opacity:.32; }
 /* The separators, drawn on ONE element behind the text so the textarea keeps a
@@ -762,11 +766,20 @@ button.nq-cc-name:focus-visible { outline:2px solid var(--nq-cc-accent, #0582ca)
      gap centre is 2.5ch + half a gap either side of the line's centre. Derived
      rather than eyeballed, so changing the gap moves the rules with it. */
   --nq-cc-addr-rule-x:calc(2.5ch + var(--nq-cc-addr-gap) / 2);
+  /* Six ticks, two columns by three rows, each one line tall and centred in
+     its row. A full-height rule turns the field into a table with nine cells;
+     the wallet's ticks read as separators inside one field, which is what it
+     is. */
+  --nq-cc-addr-tick:1px 16px;
   background:
-    linear-gradient(var(--nq-cc-addr-rule), var(--nq-cc-addr-rule)) calc(50% - var(--nq-cc-addr-rule-x)) 50%/1px 100% no-repeat,
-    linear-gradient(var(--nq-cc-addr-rule), var(--nq-cc-addr-rule)) calc(50% + var(--nq-cc-addr-rule-x)) 50%/1px 100% no-repeat,
-    linear-gradient(var(--nq-cc-addr-rule), var(--nq-cc-addr-rule)) 50% 33.333%/calc(100% - 20px) 1px no-repeat,
-    linear-gradient(var(--nq-cc-addr-rule), var(--nq-cc-addr-rule)) 50% 66.667%/calc(100% - 20px) 1px no-repeat; }
+    linear-gradient(var(--nq-cc-addr-rule), var(--nq-cc-addr-rule)) calc(50% - var(--nq-cc-addr-rule-x)) 16.667%/var(--nq-cc-addr-tick) no-repeat,
+    linear-gradient(var(--nq-cc-addr-rule), var(--nq-cc-addr-rule)) calc(50% + var(--nq-cc-addr-rule-x)) 16.667%/var(--nq-cc-addr-tick) no-repeat,
+    linear-gradient(var(--nq-cc-addr-rule), var(--nq-cc-addr-rule)) calc(50% - var(--nq-cc-addr-rule-x)) 50%/var(--nq-cc-addr-tick) no-repeat,
+    linear-gradient(var(--nq-cc-addr-rule), var(--nq-cc-addr-rule)) calc(50% + var(--nq-cc-addr-rule-x)) 50%/var(--nq-cc-addr-tick) no-repeat,
+    linear-gradient(var(--nq-cc-addr-rule), var(--nq-cc-addr-rule)) calc(50% - var(--nq-cc-addr-rule-x)) 83.333%/var(--nq-cc-addr-tick) no-repeat,
+    linear-gradient(var(--nq-cc-addr-rule), var(--nq-cc-addr-rule)) calc(50% + var(--nq-cc-addr-rule-x)) 83.333%/var(--nq-cc-addr-tick) no-repeat,
+    linear-gradient(var(--nq-cc-addr-rule), var(--nq-cc-addr-rule)) 50% 33.333%/calc(100% - 12px) 1px no-repeat,
+    linear-gradient(var(--nq-cc-addr-rule), var(--nq-cc-addr-rule)) 50% 66.667%/calc(100% - 12px) 1px no-repeat; }
 /* inputs: inset box-shadow border, never border (rule 1) */
 .nq-cc-input { width:100%; border:none; border-radius:8px; padding:11px 12px; font-family:inherit; font-size:18px;
   font-size:14px; font-weight:600;
@@ -1941,7 +1954,7 @@ export function mountMiniWallet(
   el('span', 'nq-cc-addr-rules', recipientWrap);
   const recipientInput = el('textarea', 'nq-cc-addr-input', recipientWrap);
   recipientInput.rows = 3;
-  recipientInput.placeholder = formatAddressBlocks('NQ00000000000000000000000000000000000');
+  recipientInput.placeholder = 'NQ';
   recipientInput.autocomplete = 'off';
   recipientInput.spellcheck = false;
   recipientInput.setAttribute('aria-label', i18n.t('shell.recipient'));
