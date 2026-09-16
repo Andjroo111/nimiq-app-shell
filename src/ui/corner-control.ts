@@ -98,6 +98,15 @@ export function addressGrid(address: string): { cells: string[]; columns: number
   return { cells, columns: 1 };
 }
 
+/** UTF-8 byte length, which is what Nimiq core counts for transaction data. */
+function utf8Bytes(text: string): number {
+  return typeof TextEncoder === 'function'
+    ? new TextEncoder().encode(text).length
+    // No TextEncoder is old-Safari territory; unescape(encodeURIComponent()) is
+    // the classic shim and is exact for UTF-8.
+    : encodeURIComponent(text).replace(/%[0-9A-F]{2}/g, 'x').length;
+}
+
 /** One saved recipient. The host owns the list and its storage. */
 export interface ShellContact {
   /** What the person is called. This is what the chip shows. */
@@ -532,9 +541,36 @@ button.nq-cc-name:focus-visible { outline:2px solid var(--nq-cc-accent, #0582ca)
 
 /* send view: the mini-wallet send: recipient + amount here, the user's own
    wallet only appears for the approval (Hub checkout / Nimiq Pay confirm) */
+/* TWO sheets, because the wallet has two and the split is what makes each of
+   ours a mini version of one of theirs rather than a mash of both.
+   "Send Transaction" takes the recipient. "Send Amount" takes the amount, and
+   by then the recipient is SETTLED, which is what lets it show both parties as
+   faces the way the wallet's Set Amount does.
+   This was written off as a width constraint for four versions. It is not
+   width: it is steps, and the QR and request sheets already proved the menu
+   stacks sub-views fine. */
+.nq-cc-view-sendto { display:none; }
+.nq-cc.nq-cc-show-sendto .nq-cc-view-main { display:none; }
+.nq-cc.nq-cc-show-sendto .nq-cc-view-sendto { display:block; }
 .nq-cc-view-send { display:none; }
 .nq-cc.nq-cc-show-send .nq-cc-view-main { display:none; }
+.nq-cc.nq-cc-show-send .nq-cc-view-sendto { display:none; }
 .nq-cc.nq-cc-show-send .nq-cc-view-send { display:block; }
+.nq-cc-sendto-body { display:flex; flex-direction:column; gap:10px; padding:16px 8px 8px; }
+/* Both parties, faces first, with the wallet's hairline dash between them.
+   Sender on the left, recipient on the right, which is the direction the money
+   goes and the same order the wallet uses. */
+.nq-cc-parties { display:grid; grid-template-columns:1fr 24px 1fr; align-items:start;
+  gap:4px; width:100%; margin-bottom:6px; }
+.nq-cc-party { display:flex; flex-direction:column; align-items:center; gap:6px; min-width:0; }
+.nq-cc-party-icon { display:block; width:56px; height:56px; }
+.nq-cc-party-icon > * { display:block; width:100%; height:100%; }
+.nq-cc-party-name { max-width:100%; font-size:11px; font-weight:600; text-align:center;
+  overflow:hidden; text-overflow:ellipsis; white-space:nowrap;
+  color:var(--nq-cc-menu-muted, rgba(31,35,72,.6)); }
+.nq-cc-party-name.nq-cc-mono { font-family:'Fira Mono',ui-monospace,monospace; font-size:10px; }
+.nq-cc-party-dash { align-self:center; height:1px; margin-top:-14px;
+  background:color-mix(in srgb, var(--nq-cc-menu-fg, #1f2348) 18%, transparent); }
 
 /* The QR gets its own sheet, the way the wallet's "NIM Address" does. It sits
    UNDER receive rather than beside it: receive is what the corner opens, and
@@ -702,6 +738,14 @@ button.nq-cc-name:focus-visible { outline:2px solid var(--nq-cc-accent, #0582ca)
 /* Centred, because the field it labels is centred. */
 .nq-cc-send-body .nq-cc-field-label, .nq-cc-request-body .nq-cc-field-label { text-align:center; }
 .nq-cc-send-fiat, .nq-cc-request-hint { text-align:center; }
+/* Underlined-by-nothing and bordered by nothing, which is how the wallet draws
+   it: a plain centred line of text that happens to be typeable. A bordered box
+   here would read as a second required field next to the amount. */
+.nq-cc-message { width:100%; margin-top:4px; padding:6px 4px; border:none; background:none;
+  font-family:inherit; font-size:13px; text-align:center; outline:none;
+  color:var(--nq-cc-menu-fg, #1f2348); }
+.nq-cc-message::placeholder { color:color-mix(in srgb, var(--nq-cc-menu-fg, #1f2348) 40%, transparent); }
+.nq-cc-message:focus { box-shadow:inset 0 -1px 0 0 var(--nq-cc-accent, #0582ca); }
 .nq-cc-send-hint { font-size:12px; font-weight:600; color:var(--nq-cc-menu-muted, rgba(31,35,72,.5)); }
 .nq-cc-send-hint:empty { display:none; }
 /* Right-aligned, under the NIM suffix rather than under the digits: it belongs
@@ -1235,6 +1279,7 @@ export function mountMiniWallet(
   const viewReceive = el('div', 'nq-cc-view-receive', menu);
   const viewQr = el('div', 'nq-cc-view-qr', menu);
   const viewRequest = el('div', 'nq-cc-view-request', menu);
+  const viewSendTo = el('div', 'nq-cc-view-sendto', menu);
   const viewSend = el('div', 'nq-cc-view-send', menu);
   const viewMain = el('div', 'nq-cc-view-main', menu);
 
@@ -1661,6 +1706,9 @@ export function mountMiniWallet(
   }
   const backLabels: HTMLElement[] = [];
   const shutLabels: HTMLElement[] = [];
+  // A placeholder is an attribute, so the i18n subscription's tNode pass does
+  // not reach it either.
+  const messageLabels: HTMLInputElement[] = [];
   // Declared up here with its siblings, not next to the sheet it belongs to:
   // the receive footer pushes into it BEFORE that sheet is built, and a const
   // read from its own temporal dead zone throws at mount.
@@ -1830,21 +1878,19 @@ export function mountMiniWallet(
   // ---- send view content ----------------------------------------------------
   // "Send Amount", not "Send": the wallet splits this into Send Transaction
   // then Set Amount, and the half this sheet is standing in for is the second.
-  viewHeader(viewSend, 'shell.sendAmount', () => closeSend());
-  const sendBody = el('div', 'nq-cc-send-body', viewSend);
-  // The label row carries the recipient identicon, because the identicon is the
-   // only thing on this screen that tells you at a GLANCE that you are paying
-   // the person you meant to. Reading 36 characters back is not something people
-   // do; recognising a face they have seen before is. It appears the moment the
-   // address is a real one and goes again if you edit it back into nonsense, so
-   // its presence IS the validity signal.
-  const recipientHead = el('div', 'nq-cc-field-head', sendBody);
+  // ---- step one: who ------------------------------------------------------
+  viewHeader(viewSendTo, 'shell.sendTransaction', () => closeSend());
+  const sendToBody = el('div', 'nq-cc-sendto-body', viewSendTo);
+  // The identicon still rides the label, and still IS the validity signal: it
+  // appears the moment the address is real and goes again if you edit it back
+  // into nonsense. Recognising a face beats reading 36 characters back.
+  const recipientHead = el('div', 'nq-cc-field-head', sendToBody);
   const recipientIcon = el('span', 'nq-cc-recipient-icon', recipientHead);
   const recipientLabel = el('label', 'nq-cc-field-label', recipientHead);
-  tNode(recipientLabel, 'shell.recipient');
+  tNode(recipientLabel, 'shell.enterAddress');
 
   // Nine four-char blocks in a 3x3 grid, the wallet's own send-modal field.
-  const recipientWrap = el('div', 'nq-cc-addr-field', sendBody);
+  const recipientWrap = el('div', 'nq-cc-addr-field', sendToBody);
   el('span', 'nq-cc-addr-rules', recipientWrap);
   const recipientInput = el('textarea', 'nq-cc-addr-input', recipientWrap);
   recipientInput.rows = 3;
@@ -1866,8 +1912,11 @@ export function mountMiniWallet(
   // screen and checkable before confirming. Handing an address straight to the
   // signer because a name was tapped removes the last chance to notice it is
   // the wrong one.
-  const contactsRow = el('div', 'nq-cc-contacts', sendBody);
+  const contactsRow = el('div', 'nq-cc-contacts', sendToBody);
   contactsRow.hidden = true;
+  // Above the field, where the wallet puts them: a saved recipient is a way to
+  // SKIP the typing, and an offer to skip work belongs before the work.
+  sendToBody.insertBefore(contactsRow, recipientHead);
 
   /** After a send lands, offer to save a recipient the book does not hold.
    *
@@ -1923,9 +1972,31 @@ export function mountMiniWallet(
         // is so the field reads from its beginning, which is the half people
         // actually recognise, rather than parking mid-address.
         recipientInput.setSelectionRange(0, 0);
+        advanceToAmount();
       });
     }
   }
+  // ---- step two: how much -------------------------------------------------
+  viewHeader(viewSend, 'shell.sendAmount', () => {
+    // Back goes to the address step, NOT out of the flow: an amount you want
+    // to change is a different correction from a recipient you want to change,
+    // and losing the address to fix a typo in the number is the worst of both.
+    root.classList.remove('nq-cc-show-send');
+    root.classList.add('nq-cc-show-sendto');
+  });
+  const sendBody = el('div', 'nq-cc-send-body', viewSend);
+  // BOTH parties, which is the whole reason the wallet can afford a second
+  // sheet: by here the recipient is settled, so the screen can spend its room
+  // confirming who is paying whom instead of collecting it.
+  const parties = el('div', 'nq-cc-parties', sendBody);
+  const senderParty = el('div', 'nq-cc-party', parties);
+  const senderIcon = el('span', 'nq-cc-party-icon', senderParty);
+  const senderName = el('span', 'nq-cc-party-name', senderParty);
+  el('span', 'nq-cc-party-dash', parties);
+  const recipientParty = el('div', 'nq-cc-party', parties);
+  const recipientPartyIcon = el('span', 'nq-cc-party-icon', recipientParty);
+  const recipientPartyName = el('span', 'nq-cc-party-name nq-cc-mono', recipientParty);
+
   const amountLabel = el('label', 'nq-cc-field-label', sendBody);
   tNode(amountLabel, 'shell.amount');
   const amountRow = el('div', 'nq-cc-amount-row', sendBody);
@@ -1940,6 +2011,24 @@ export function mountMiniWallet(
   // on is the one in their own currency, and a send screen that makes them
   // convert it in their head is a send screen that gets the amount wrong.
   const sendFiat = el('p', 'nq-cc-send-fiat', sendBody);
+  // The wallet's public message, which fits now that the amount has a sheet of
+  // its own. It rides SendArgs.data, so it is the transaction's own data field
+  // and it really does go on chain, which is why the limit below is real.
+  const messageInput = el('input', 'nq-cc-message', sendBody);
+  messageInput.type = 'text';
+  messageInput.autocomplete = 'off';
+  messageInput.placeholder = i18n.t('shell.publicMessage');
+  messageLabels.push(messageInput);
+  // 64 BYTES, not characters: that is Nimiq core's cap in
+  // BasicAccount.verifyIncomingTransaction, and a UTF-8 emoji spends four of
+  // them. Trimming by length would let a message of 30 emoji through and the
+  // node would reject the transaction after the wallet had already asked
+  // somebody to sign it.
+  messageInput.addEventListener('input', () => {
+    while (utf8Bytes(messageInput.value) > 64) {
+      messageInput.value = [...messageInput.value].slice(0, -1).join('');
+    }
+  });
   const availableHint = el('p', 'nq-cc-send-hint', sendBody);
   const sendError = el('p', 'nq-cc-send-error', sendBody);
   const sendConfirm = el('button', 'nq-cc-send-confirm', sendBody);
@@ -2015,10 +2104,46 @@ export function mountMiniWallet(
     const nim = amountNim();
     renderSendFiat(nim);
     const okAmount = nim > 0 && (balanceLuna === null || nim <= lunaToNim(balanceLuna));
+    // The recipient is settled by the time this sheet is up, so the button is
+    // gated on the amount alone. okAddress stays in the condition as a belt: a
+    // step-two with an invalid address should never be reachable, and if it
+    // ever is, it must not be able to pay.
     sendConfirm.disabled = !(okAddress && okAmount);
   }
   recipientInput.addEventListener('input', validateSend);
   amountInput.addEventListener('input', validateSend);
+
+  /** Draw the two faces on the amount sheet. Both, not just the recipient:
+   *  "am I paying the right person" and "from which of my accounts" are two
+   *  questions and this screen is the last place to ask either. */
+  function renderParties(): void {
+    const from = wallet?.account;
+    if (!from) return;
+    senderName.textContent = from.label || formatAddressBlocks(from.address).slice(0, 9);
+    const blocks = compactRecipient().match(/.{1,4}/g) ?? [];
+    recipientPartyName.textContent = blocks.slice(0, 3).join(' ');
+    if (!options.identicon) return;
+    senderIcon.textContent = '';
+    senderIcon.appendChild(options.identicon(from.address, 56));
+    recipientPartyIcon.textContent = '';
+    recipientPartyIcon.appendChild(options.identicon(compactRecipient(), 56));
+  }
+
+  /** Step one to step two, the moment the address is real.
+   *
+   *  No Next button, which is the wallet's behaviour too: the field is a fixed
+   *  36 characters, so "finished typing" is not a guess, and a button whose
+   *  only job is to acknowledge a complete form is a tap for nothing. It fires
+   *  on a paste and on a contact chip the same way. */
+  function advanceToAmount(): void {
+    if (!NIM_ADDRESS_RE.test(compactRecipient())) return;
+    if (root.classList.contains('nq-cc-show-send')) return;
+    renderParties();
+    root.classList.remove('nq-cc-show-sendto');
+    root.classList.add('nq-cc-show-send');
+    amountInput.focus();
+  }
+  recipientInput.addEventListener('input', advanceToAmount);
 
   function openSend(): void {
     if (!wallet?.account) return;
@@ -2028,7 +2153,9 @@ export function mountMiniWallet(
       balanceLuna !== null ? `${i18n.t('shell.available')}: ${fmtNim(balanceLuna)} NIM` : '';
     validateSend();
     void refreshSendRate();
-    root.classList.add('nq-cc-show-send');
+    // Step ONE, always. A flow that reopened on the amount sheet would be
+    // offering to pay whoever was in the field last time.
+    root.classList.add('nq-cc-show-sendto');
     recipientInput.focus();
     // Read on open, not at mount: the host's book can change between sends, and
     // a list captured at mount goes stale in a long-lived page.
@@ -2036,6 +2163,7 @@ export function mountMiniWallet(
   }
   function closeSend(): void {
     root.classList.remove('nq-cc-show-send');
+    root.classList.remove('nq-cc-show-sendto');
   }
 
   sendConfirm.addEventListener('click', async () => {
@@ -2046,9 +2174,11 @@ export function mountMiniWallet(
     sendError.textContent = '';
     sendConfirm.textContent = i18n.t('shell.sending');
     try {
+      const message = messageInput.value.trim();
       const result = await wallet.pay({
         recipient: spaced,
         valueLuna: nimToLuna(amountNim()),
+        ...(message ? { data: message } : {}),
       });
       if (result) {
         viewSend.classList.add('nq-cc-sent');
@@ -2075,6 +2205,7 @@ export function mountMiniWallet(
       }
     } finally {
       sendConfirm.textContent = i18n.t('shell.send');
+      messageInput.value = '';
       validateSend();
     }
   });
@@ -2288,6 +2419,7 @@ export function mountMiniWallet(
       root.classList.remove('nq-cc-show-receive');
       root.classList.remove('nq-cc-show-qr');
       root.classList.remove('nq-cc-show-request');
+      root.classList.remove('nq-cc-show-sendto');
       root.classList.remove('nq-cc-show-send');
       window.removeEventListener('resize', clampMenu);
       document.removeEventListener('click', onDocClick, true);
@@ -2350,6 +2482,7 @@ export function mountMiniWallet(
     for (const btn of backLabels) btn.setAttribute('aria-label', i18n.t('shell.back'));
     for (const btn of shutLabels) btn.setAttribute('aria-label', i18n.t('shell.close'));
     for (const btn of qrLabels) btn.setAttribute('aria-label', i18n.t('shell.showQr'));
+    for (const f of messageLabels) f.placeholder = i18n.t('shell.publicMessage');
     renderLangValue();
     renderFaceFlag();
     renderFace();

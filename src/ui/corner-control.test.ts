@@ -1296,3 +1296,171 @@ describe('receive carries a working request link', () => {
       .toBe('Send Amount');
   });
 });
+
+// Send is TWO sheets now, because the wallet has two and cramming both into
+// one is what made it "totally off" (Andrew, 9/15) however well the
+// proportions matched. Step one takes the recipient; step two takes the
+// amount, and by then the recipient is settled, which is what lets it show
+// both parties as faces the way the wallet's Set Amount does.
+describe('send is the wallet\'s two sheets', () => {
+  const ADDRESS = 'NQ34 248H 8MB8 8QK2 5RVK EM8Q QJ8N 2Q5R 3XRK';
+  const OTHER = 'NQ07 0000 0000 0000 0000 0000 0000 0000 0000';
+
+  function mount(opts: Partial<CornerControlOptions> = {}) {
+    const w = new Window();
+    for (const key of ['document', 'HTMLElement', 'navigator', 'localStorage',
+                       'getComputedStyle', 'Event', 'TextEncoder']) {
+      (globalThis as unknown as Record<string, unknown>)[key] =
+        (w as unknown as Record<string, unknown>)[key] ?? (globalThis as never)[key];
+    }
+    const i18n = createI18n({ locales: mergeLocales(shellLocales), fallback: 'en' });
+    const paid: unknown[] = [];
+    const wallet = {
+      mode: 'hub',
+      account: { address: ADDRESS, label: 'Test' },
+      connect: async () => null,
+      signAndSend: async () => ({ txHash: '' }),
+      pay: async (args: unknown) => { paid.push(args); return { txHash: 'x' }; },
+      signMessage: async () => ({ address: '', message: '', publicKeyHex: '', signatureHex: '' }),
+      onAccountChange: () => () => {},
+      disconnect: () => {},
+    } as unknown as Wallet;
+    const identicon = (address: string, size: number) => {
+      const d = w.document.createElement('div');
+      d.dataset.for = address; d.dataset.size = String(size);
+      return d as unknown as HTMLElement;
+    };
+    const host = w.document.createElement('div') as unknown as HTMLElement;
+    mountMiniWallet(host, { wallet, i18n, balance: false, identicon, ...opts });
+    return { host, paid };
+  }
+  const settle = () => new Promise((r) => setTimeout(r, 40));
+  const root = (host: HTMLElement) => host.querySelector('.nq-cc') as HTMLElement;
+
+  function openSend(host: HTMLElement) {
+    (host.querySelector('.nq-cc-face') as HTMLElement).click();
+    (host.querySelector('.nq-cc-send') as HTMLElement).click();
+  }
+  function type(host: HTMLElement, value: string) {
+    const f = host.querySelector('.nq-cc-addr-input') as HTMLTextAreaElement;
+    f.value = value;
+    f.dispatchEvent(
+      new (globalThis as unknown as { Event: typeof Event }).Event('input', { bubbles: true }));
+  }
+
+  test('send opens on the recipient step, not the amount', async () => {
+    const { host } = mount();
+    openSend(host);
+    await settle();
+    expect(root(host).classList.contains('nq-cc-show-sendto')).toBe(true);
+    expect(root(host).classList.contains('nq-cc-show-send')).toBe(false);
+    expect(host.querySelector('.nq-cc-view-sendto .nq-cc-view-title')?.textContent)
+      .toBe('Send Transaction');
+  });
+
+  // No Next button, which is the wallet's behaviour: the field is a fixed 36
+  // characters, so "finished" is not a guess.
+  test('a complete address advances by itself', async () => {
+    const { host } = mount();
+    openSend(host);
+    await settle();
+    type(host, 'NQ34 248H');
+    expect(root(host).classList.contains('nq-cc-show-send')).toBe(false);
+    type(host, OTHER);
+    expect(root(host).classList.contains('nq-cc-show-send')).toBe(true);
+    expect(host.querySelector('.nq-cc-view-send .nq-cc-view-title')?.textContent)
+      .toBe('Send Amount');
+  });
+
+  test('step two shows both parties as faces', async () => {
+    const { host } = mount();
+    openSend(host);
+    await settle();
+    type(host, OTHER);
+    const icons = host.querySelectorAll('.nq-cc-party-icon > *');
+    expect(icons.length).toBe(2);
+    expect(icons[0]?.getAttribute('data-for')).toBe(ADDRESS);        // sender
+    expect(icons[1]?.getAttribute('data-for')).toBe(OTHER.replace(/\s/g, ''));
+    expect(host.querySelector('.nq-cc-party-name')?.textContent).toBe('Test');
+  });
+
+  // Back from the amount must not cost the address. Losing it to fix a typo in
+  // the number is the worst of both corrections.
+  test('back from the amount returns to the recipient, address intact', async () => {
+    const { host } = mount();
+    openSend(host);
+    await settle();
+    type(host, OTHER);
+    (host.querySelector('.nq-cc-view-send .nq-cc-back') as HTMLElement).click();
+    expect(root(host).classList.contains('nq-cc-show-sendto')).toBe(true);
+    expect((host.querySelector('.nq-cc-addr-input') as HTMLTextAreaElement).value)
+      .toContain('NQ07');
+  });
+
+  // Reopening on the amount sheet would offer to pay whoever was in the field
+  // last time.
+  test('reopening send always lands on the recipient step', async () => {
+    const { host } = mount();
+    openSend(host);
+    await settle();
+    type(host, OTHER);
+    expect(root(host).classList.contains('nq-cc-show-send')).toBe(true);
+    (host.querySelector('.nq-cc-view-send .nq-cc-shut') as HTMLElement).click();
+    openSend(host);
+    await settle();
+    expect(root(host).classList.contains('nq-cc-show-sendto')).toBe(true);
+  });
+
+  // 64 BYTES is Nimiq core's cap, and a UTF-8 emoji spends four of them. A
+  // length trim would let 30 emoji through and the node would reject the
+  // transaction after somebody had already been asked to sign it.
+  test('the public message is capped in bytes, not characters', async () => {
+    const { host } = mount();
+    openSend(host);
+    await settle();
+    type(host, OTHER);
+    const msg = host.querySelector('.nq-cc-message') as HTMLInputElement;
+    msg.value = '\u{1F600}'.repeat(30);            // 120 bytes of emoji
+    msg.dispatchEvent(
+      new (globalThis as unknown as { Event: typeof Event }).Event('input', { bubbles: true }));
+    expect(new TextEncoder().encode(msg.value).length).toBeLessThanOrEqual(64);
+    // Counted in CODE POINTS, not .length: an emoji is two UTF-16 units, so
+    // .length is the wrong unit here for exactly the reason it is the wrong
+    // unit in the trim itself. 30 emoji is 120 bytes; 16 of them fit.
+    expect([...msg.value].length).toBe(16);
+  });
+
+  test('a message rides the transaction data field', async () => {
+    const { host, paid } = mount();
+    openSend(host);
+    await settle();
+    type(host, OTHER);
+    const amount = host.querySelector(
+      '.nq-cc-view-send .nq-cc-amount-row .nq-cc-input') as HTMLInputElement;
+    amount.value = '1';
+    amount.dispatchEvent(
+      new (globalThis as unknown as { Event: typeof Event }).Event('input', { bubbles: true }));
+    const msg = host.querySelector('.nq-cc-message') as HTMLInputElement;
+    msg.value = 'coffee';
+    msg.dispatchEvent(
+      new (globalThis as unknown as { Event: typeof Event }).Event('input', { bubbles: true }));
+    (host.querySelector('.nq-cc-send-confirm') as HTMLElement).click();
+    await settle();
+    expect((paid[0] as { data?: string })?.data).toBe('coffee');
+  });
+
+  test('no message means no data field at all', async () => {
+    const { host, paid } = mount();
+    openSend(host);
+    await settle();
+    type(host, OTHER);
+    const amount = host.querySelector(
+      '.nq-cc-view-send .nq-cc-amount-row .nq-cc-input') as HTMLInputElement;
+    amount.value = '1';
+    amount.dispatchEvent(
+      new (globalThis as unknown as { Event: typeof Event }).Event('input', { bubbles: true }));
+    (host.querySelector('.nq-cc-send-confirm') as HTMLElement).click();
+    await settle();
+    expect(paid[0] as object).not.toHaveProperty('data');
+  });
+});

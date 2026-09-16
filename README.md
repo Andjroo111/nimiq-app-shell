@@ -633,11 +633,45 @@ keystroke, and the read is dropped when the reference currency changes so the
 next open picks up the new one. No `fiat` feed means no line; it never blocks a
 send, because the NIM amount is the authoritative one either way.
 
-Four differences were left alone on purpose, all of them width: the wallet's two
-sheets (`Send Transaction` then `Set Amount`), the sender-and-recipient identicon
-pair, the public message field, and the `Address unavailable?` cashlink footer.
-A 272px card cannot hold a 390px two-step flow, and the cashlink is already an
-opt-in row in the main menu.
+#### Send is the wallet's TWO sheets (v0.26.0)
+
+⚠ **"A 272px card cannot hold a 390px two-step flow" was wrong**, and it stood
+here for four versions. It is not width, it is **steps**, and the QR and request
+sheets had already proved the menu stacks sub-views fine. Cramming both of the
+wallet's sheets into one is what kept send reading as off however well the
+proportions matched: it was TITLED as their step two while holding their step
+one's content.
+
+| | Sheet | Holds |
+| --- | --- | --- |
+| Step 1 | `Send Transaction` | saved contacts, then `Enter address` and the 3x3 grid |
+| Step 2 | `Send Amount` | **both parties as faces**, the amount, its fiat value, a public message |
+
+The split is what pays for the second sheet: by step two the recipient is
+settled, so the screen can spend its room confirming **who is paying whom**
+instead of collecting it. Sender on the left, recipient on the right, the
+wallet's own order and the direction the money goes.
+
+**No Next button**, which is the wallet's behaviour too. The field is a fixed 36
+characters, so "finished typing" is not a guess, and a button whose only job is
+to acknowledge a complete form is a tap for nothing. It advances on a paste and
+on a contact chip the same way. Back from step two keeps the address: an amount
+you want to change is a different correction from a recipient you want to
+change, and losing the address to fix a typo in the number is the worst of both.
+Reopening send always lands on step one, because a flow that reopened on the
+amount would be offering to pay whoever was in the field last time.
+
+**The public message rides `SendArgs.data`**, so it is the transaction's own
+data field and really does go on chain.
+
+⚠ **It is capped at 64 BYTES, not characters.** That is Nimiq core's limit in
+`BasicAccount.verifyIncomingTransaction`, and a UTF-8 emoji spends four of them.
+A length trim would let 30 emoji through and the node would reject the
+transaction after somebody had already been asked to sign it.
+
+Still not matched on step one: `Address unavailable?` / `Create a Cashlink` and
+the scanner glyph. Cashlink is already an opt-in row in the main menu, and the
+scanner is the host's `scan` seam.
 
 #### The scale was the real gap (v0.23.0)
 
