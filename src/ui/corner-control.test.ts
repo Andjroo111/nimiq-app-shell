@@ -28,7 +28,7 @@ describe('corner-control data', () => {
   test('the menu strings exist in every shipped locale', () => {
     const keys = [
       'shell.receive', 'shell.amountsIn', 'shell.openInPay', 'shell.network',
-      'shell.tapToCopy', 'shell.createCashlink', 'shell.newToNimiq',
+      'shell.createCashlink', 'shell.newToNimiq',
     ];
     for (const [locale, messages] of Object.entries(shellLocales)) {
       for (const key of keys) {
@@ -878,5 +878,782 @@ describe('the menu order below the fold', () => {
     const order = rows(mount({ reportBug: false, switchAccount: false }));
     expect(order).not.toContain('switch');
     expect(order).not.toContain('report');
+  });
+});
+
+// v0.22.0 parity pass. The mini wallet is a mini version of the wallet's own
+// Receive and Send sheets, and a comparison against the real ones (Andrew,
+// 9/15) found four places it had quietly stopped being one. Each test below
+// pins the wallet's behaviour, not ours, so a later refactor that drifts back
+// fails here rather than in a screenshot nobody takes.
+describe('send and receive match the wallet sheets', () => {
+  const ADDRESS = 'NQ34 248H 8MB8 8QK2 5RVK EM8Q QJ8N 2Q5R 3XRK';
+
+  function mount(opts: Partial<CornerControlOptions> = {}) {
+    const w = new Window();
+    // 'Event' rides along: happy-dom rejects an Event built by another realm's
+    // constructor, so a test that types into a field has to use the window's.
+    for (const key of ['document', 'HTMLElement', 'navigator', 'localStorage',
+                       'getComputedStyle', 'Event']) {
+      (globalThis as unknown as Record<string, unknown>)[key] =
+        (w as unknown as Record<string, unknown>)[key];
+    }
+    const i18n = createI18n({ locales: mergeLocales(shellLocales), fallback: 'en' });
+    const wallet = {
+      mode: 'hub',
+      account: { address: ADDRESS, label: 'Test' },
+      connect: async () => null,
+      signAndSend: async () => ({ txHash: '' }),
+      pay: async () => ({ txHash: '' }),
+      signMessage: async () => ({ address: '', message: '', publicKeyHex: '', signatureHex: '' }),
+      onAccountChange: () => () => {},
+      disconnect: () => {},
+    } as unknown as Wallet;
+    const host = w.document.createElement('div') as unknown as HTMLElement;
+    mountMiniWallet(host, { wallet, i18n, balance: false, ...opts });
+    return { host, i18n };
+  }
+  const settle = () => new Promise((r) => setTimeout(r, 40));
+  const open = (host: HTMLElement) =>
+    (host.querySelector('.nq-cc-face') as HTMLElement).click();
+
+  // A bare "Receive" over a NIM address is the one case the asset-aware title
+  // used to miss, because no asset was selected. The wallet says "Receive NIM".
+  test('the receive title names NIM when no asset is selected', async () => {
+    const { host } = mount();
+    open(host);
+    (host.querySelector('.nq-cc-receive') as HTMLElement).click();
+    await settle();
+    expect(host.querySelector('.nq-cc-view-title')?.textContent).toBe('Receive NIM');
+  });
+
+  test('receive carries the wallet instruction line', async () => {
+    const { host } = mount();
+    open(host);
+    await settle();
+    expect(host.querySelector('.nq-cc-view-sub')?.textContent)
+      .toBe('Share your address with the sender.');
+  });
+
+  // Two escapes, and they are NOT the same escape. Back steps up a level and
+  // leaves the menu open; the X dismisses the menu outright.
+  test('the X dismisses the whole menu, the chevron only steps back', async () => {
+    const { host } = mount();
+    open(host);
+    (host.querySelector('.nq-cc-receive') as HTMLElement).click();
+    await settle();
+    const menu = host.querySelector('.nq-cc-menu') as HTMLElement;
+    const view = host.querySelector('.nq-cc-view-receive') as HTMLElement;
+
+    (view.querySelector('.nq-cc-back') as HTMLElement).click();
+    expect(menu.hidden).toBe(false);
+
+    (host.querySelector('.nq-cc-receive') as HTMLElement).click();
+    await settle();
+    (view.querySelector('.nq-cc-shut') as HTMLElement).click();
+    expect(menu.hidden).toBe(true);
+  });
+
+  test('every sub-view header carries both escapes', async () => {
+    const { host } = mount();
+    open(host);
+    await settle();
+    for (const head of host.querySelectorAll('.nq-cc-view-head')) {
+      expect(head.querySelector('.nq-cc-back'), head.textContent ?? '').toBeTruthy();
+      expect(head.querySelector('.nq-cc-shut'), head.textContent ?? '').toBeTruthy();
+    }
+  });
+
+  // The wallet shows the fiat value of the amount always, even at zero. It is
+  // the number the person actually decided on; NIM is the denomination.
+  test('the send amount carries its fiat value, and tracks typing', async () => {
+    const { host } = mount({
+      fiat: { currencies: ['USD'], default: 'USD', rate: async () => 0.002 },
+    });
+    open(host);
+    (host.querySelector('.nq-cc-send') as HTMLElement).click();
+    await settle();
+    const fiat = host.querySelector('.nq-cc-send-fiat') as HTMLElement;
+    expect(fiat.hidden).toBe(false);
+    const atZero = fiat.textContent ?? '';
+
+    const amount = host.querySelector(
+      '.nq-cc-view-send .nq-cc-amount-row .nq-cc-input') as HTMLInputElement;
+    amount.value = '1000';
+    amount.dispatchEvent(new (globalThis as unknown as { Event: typeof Event }).Event('input', { bubbles: true }));
+    await settle();
+    expect(fiat.textContent).not.toBe(atZero);
+    expect(fiat.textContent).toContain('2');
+  });
+
+  // No feed is a missing line, never a blocked send: the NIM amount is the
+  // authoritative one with or without a rate.
+  test('no fiat feed leaves the line hidden and the send usable', async () => {
+    const { host } = mount();
+    open(host);
+    (host.querySelector('.nq-cc-send') as HTMLElement).click();
+    await settle();
+    expect((host.querySelector('.nq-cc-send-fiat') as HTMLElement).hidden).toBe(true);
+    expect(host.querySelector('.nq-cc-send-confirm')).toBeTruthy();
+  });
+
+  // The QR follows the live sheet, not the registry component it was ported
+  // from. Pinned at the source because the fill never reaches the DOM.
+  test('the receive QR is navy, the wallet sheet colour', async () => {
+    const src = await Bun.file(new URL('./qr.ts', import.meta.url)).text();
+    expect(src).toContain("const FILL_FROM = '#260133';");
+    expect(src).toContain("const FILL_TO = '#1F2348';");
+    expect(src).not.toContain('#0582CA');
+  });
+});
+
+// The scale pass. Matching the wallet's copy and colours was not enough: at
+// half its type scale the two sheets still read as different components rather
+// than two sizes of one (Andrew, 9/15, "they still look different"). The
+// numbers below are the registry's own, which is the ported upstream source.
+describe('receive matches the wallet at its own scale', () => {
+  const ADDRESS = 'NQ34 248H 8MB8 8QK2 5RVK EM8Q QJ8N 2Q5R 3XRK';
+
+  /** `withIdenticon` rather than a renderer passed in: the renderer needs the
+   *  Window this helper creates, so a caller cannot build one first. */
+  function mount(withIdenticon = false, opts: Partial<CornerControlOptions> = {}) {
+    const w = new Window();
+    for (const key of ['document', 'HTMLElement', 'navigator', 'localStorage',
+                       'getComputedStyle', 'Event']) {
+      (globalThis as unknown as Record<string, unknown>)[key] =
+        (w as unknown as Record<string, unknown>)[key];
+    }
+    const i18n = createI18n({ locales: mergeLocales(shellLocales), fallback: 'en' });
+    const wallet = {
+      mode: 'hub',
+      account: { address: ADDRESS, label: 'Test' },
+      connect: async () => null,
+      signAndSend: async () => ({ txHash: '' }),
+      pay: async () => ({ txHash: '' }),
+      signMessage: async () => ({ address: '', message: '', publicKeyHex: '', signatureHex: '' }),
+      onAccountChange: () => () => {},
+      disconnect: () => {},
+    } as unknown as Wallet;
+    const identicon = (address: string, size: number) => {
+      const d = w.document.createElement('div');
+      d.dataset.for = address;
+      d.dataset.size = String(size);
+      return d as unknown as HTMLElement;
+    };
+    const host = w.document.createElement('div') as unknown as HTMLElement;
+    mountMiniWallet(host, {
+      wallet, i18n, balance: false,
+      ...(withIdenticon ? { identicon } : {}),
+      ...opts,
+    });
+    return { host };
+  }
+  const settle = () => new Promise((r) => setTimeout(r, 40));
+  function openReceive(host: HTMLElement) {
+    (host.querySelector('.nq-cc-face') as HTMLElement).click();
+    (host.querySelector('.nq-cc-receive') as HTMLElement).click();
+  }
+
+  test('with an identicon wired, the face leads and the QR leaves the view', async () => {
+    const { host } = mount(true);
+    openReceive(host);
+    await settle();
+    const hero = host.querySelector('.nq-cc-receive-hero') as HTMLElement;
+    expect(hero.hidden).toBe(false);
+    expect(hero.firstElementChild?.getAttribute('data-size')).toBe('100');
+    expect((host.querySelector('.nq-cc-view-receive .nq-cc-qr') as HTMLElement).hidden).toBe(true);
+    expect((host.querySelector('.nq-cc-receive-foot') as HTMLElement).hidden).toBe(false);
+  });
+
+  // Nineteen apps ship without an identicon renderer. None of them may lose the
+  // one graphic on this screen a camera can read.
+  test('with none wired, the QR stays put and the glyph stays hidden', async () => {
+    const { host } = mount();
+    openReceive(host);
+    await settle();
+    expect((host.querySelector('.nq-cc-receive-hero') as HTMLElement).hidden).toBe(true);
+    expect((host.querySelector('.nq-cc-view-receive .nq-cc-qr') as HTMLElement).hidden).toBe(false);
+    expect((host.querySelector('.nq-cc-receive-foot') as HTMLElement).hidden).toBe(true);
+  });
+
+  test('the glyph opens the address sheet, and back returns to receive', async () => {
+    const { host } = mount(true);
+    openReceive(host);
+    await settle();
+    const root = host.querySelector('.nq-cc') as HTMLElement;
+    (host.querySelector('.nq-cc-qr-open') as HTMLElement).click();
+    expect(root.classList.contains('nq-cc-show-qr')).toBe(true);
+    expect(host.querySelector('.nq-cc-view-qr .nq-cc-view-title')?.textContent)
+      .toBe('NIM Address');
+
+    (host.querySelector('.nq-cc-view-qr .nq-cc-back') as HTMLElement).click();
+    expect(root.classList.contains('nq-cc-show-qr')).toBe(false);
+    expect(root.classList.contains('nq-cc-show-receive')).toBe(true);
+  });
+
+  // Two blocks a side, not the wallet's three: at 272px three plus the ellipsis
+  // overruns and wraps, and a wrapped elision is worse than a shorter one.
+  test('the sheet elides the address middle, on one line', async () => {
+    const { host } = mount(true);
+    openReceive(host);
+    await settle();
+    (host.querySelector('.nq-cc-qr-open') as HTMLElement).click();
+    const line = host.querySelector('.nq-cc-qr-line')?.textContent ?? '';
+    expect(line).toBe('NQ34 248H ••• 2Q5R 3XRK');
+  });
+
+  test('the QR sheet has its own strings in every shipped locale', () => {
+    for (const [locale, messages] of Object.entries(shellLocales)) {
+      for (const key of ['shell.addressSheet', 'shell.scanToSend', 'shell.showQr']) {
+        expect((messages as Record<string, string>)[key], `${locale}:${key}`).toBeTruthy();
+      }
+    }
+  });
+});
+
+// The scale numbers themselves, pinned at the source. happy-dom does not
+// compute a stylesheet, and these are the values that stop the two sheets
+// reading as different components.
+describe('the type scale is the wallet\'s, not half of it', () => {
+  // The PLATE is what sets the address ink, not the font: the chunks centre in
+  // `1fr` cells, so the span tracks the plate's width and barely moves with
+  // type size. The wallet's plate is 242 of 390 (62%), which is 169px on a
+  // 272px card, and that lands the ink at 51.8% against the wallet's 52.7%.
+  //
+  // Absolute px are deliberately NOT pinned here. v0.23.0 pinned them and that
+  // was the bug: 24px is 6.2% of the wallet's sheet and 8.8% of our card, so
+  // copying the number made our content relatively bigger than theirs.
+  test('the address plate holds the wallet share of the card, not its px', async () => {
+    const src = await Bun.file(new URL('./corner-control.ts', import.meta.url)).text();
+    expect(src).toMatch(/\.nq-cc-address \{[\s\S]*?max-width:var\(--nq-cc-addr-plate, 169px\)/);
+    expect(src).toMatch(/\.nq-cc-address \{[\s\S]*?margin-inline:auto/);
+  });
+
+  test('the primary button carries the nq-button weight', async () => {
+    const src = await Bun.file(new URL('./corner-control.ts', import.meta.url)).text();
+    // The rule is shared with the request sheet's copy button, so the selector
+    // is a group, not a single class.
+    expect(src).toMatch(/\.nq-cc-send-confirm[^{]*\{[^}]*height:52px/);
+    expect(src).toMatch(/\.nq-cc-send-confirm[^{]*\{[^}]*font-size:16px/);
+  });
+
+  // The taller sheet has to be reachable on a short window, and `vh` alone is
+  // the LARGE viewport on mobile Safari, which overshoots by the toolbar.
+  test('the menu scrolls rather than running off the bottom', async () => {
+    const src = await Bun.file(new URL('./corner-control.ts', import.meta.url)).text();
+    expect(src).toContain('max-height:calc(100dvh - 96px)');
+    expect(src).toContain('max-height:calc(100vh - 96px)');
+    expect(src).toMatch(/\.nq-cc-menu \{[\s\S]*?overflow-y:auto/);
+  });
+
+  // Never redrawn: the glyph is the real one from the Nimiq icon set, and it is
+  // the "show mine" QR, not the scanner already in this file.
+  test('the footer glyph is the verbatim Nimiq qr icon', async () => {
+    const src = await Bun.file(new URL('./corner-control.ts', import.meta.url)).text();
+    expect(src).toContain('const QR_GLYPH');
+    expect(src).toContain('M5.796 1.902a.304.304 0 00-.304-.305H1.938');
+  });
+});
+
+// The request-link sheet, plus the footer it hangs off. "Needs to work just
+// like the wallet" (Andrew, 9/15), so the link format is the wallet's own and
+// pinned in format/request-link.test.ts; this covers the sheet around it.
+describe('receive carries a working request link', () => {
+  const ADDRESS = 'NQ34 248H 8MB8 8QK2 5RVK EM8Q QJ8N 2Q5R 3XRK';
+  const COMPACT = 'NQ34248H8MB88QK25RVKEM8QQJ8N2Q5R3XRK';
+
+  function mount(opts: Partial<CornerControlOptions> = {}) {
+    const w = new Window();
+    for (const key of ['document', 'HTMLElement', 'navigator', 'localStorage',
+                       'getComputedStyle', 'Event']) {
+      (globalThis as unknown as Record<string, unknown>)[key] =
+        (w as unknown as Record<string, unknown>)[key];
+    }
+    const i18n = createI18n({ locales: mergeLocales(shellLocales), fallback: 'en' });
+    const wallet = {
+      mode: 'hub',
+      account: { address: ADDRESS, label: 'Test' },
+      connect: async () => null,
+      signAndSend: async () => ({ txHash: '' }),
+      pay: async () => ({ txHash: '' }),
+      signMessage: async () => ({ address: '', message: '', publicKeyHex: '', signatureHex: '' }),
+      onAccountChange: () => () => {},
+      disconnect: () => {},
+    } as unknown as Wallet;
+    const identicon = (address: string, size: number) => {
+      const d = w.document.createElement('div');
+      d.dataset.for = address; d.dataset.size = String(size);
+      return d as unknown as HTMLElement;
+    };
+    const host = w.document.createElement('div') as unknown as HTMLElement;
+    mountMiniWallet(host, { wallet, i18n, balance: false, identicon, ...opts });
+    return { host, w };
+  }
+  const settle = () => new Promise((r) => setTimeout(r, 40));
+  async function openRequest(host: HTMLElement) {
+    (host.querySelector('.nq-cc-face') as HTMLElement).click();
+    (host.querySelector('.nq-cc-receive') as HTMLElement).click();
+    await settle();
+    (host.querySelector('.nq-cc-request-open') as HTMLElement).click();
+  }
+
+  test('the pill opens a sheet titled for the asset', async () => {
+    const { host } = mount();
+    await openRequest(host);
+    expect((host.querySelector('.nq-cc') as HTMLElement).classList
+      .contains('nq-cc-show-request')).toBe(true);
+    expect(host.querySelector('.nq-cc-view-request .nq-cc-view-title')?.textContent)
+      .toBe('Request NIM');
+  });
+
+  // An empty amount is a request for ANY amount, not an unfinished form, so the
+  // link is valid and copyable the moment the sheet opens.
+  test('an untouched sheet already holds a valid link', async () => {
+    const { host } = mount();
+    await openRequest(host);
+    expect(host.querySelector('.nq-cc-request-link')?.textContent)
+      .toBe(`https://wallet.nimiq.com/#_request/${COMPACT}_`);
+  });
+
+  test('typing an amount rewrites the link, in NIM', async () => {
+    const { host } = mount();
+    await openRequest(host);
+    const amount = host.querySelector(
+      '.nq-cc-view-request .nq-cc-input') as HTMLInputElement;
+    amount.value = '125.5';
+    amount.dispatchEvent(
+      new (globalThis as unknown as { Event: typeof Event }).Event('input', { bubbles: true }));
+    expect(host.querySelector('.nq-cc-request-link')?.textContent)
+      .toBe(`https://wallet.nimiq.com/#_request/${COMPACT}/125.5_`);
+  });
+
+  // What is SHOWN has to be what gets COPIED, or the sheet is lying about the
+  // thing a person is about to paste into a chat.
+  test('the link on screen is the link on the clipboard', async () => {
+    let copied = '';
+    const { host, w } = mount();
+    // defineProperty, not assignment: happy-dom's navigator.clipboard is a
+    // readonly accessor.
+    Object.defineProperty((w as unknown as { navigator: object }).navigator, 'clipboard', {
+      configurable: true,
+      value: { writeText: (t: string) => { copied = t; return Promise.resolve(); } },
+    });
+    await openRequest(host);
+    const shown = host.querySelector('.nq-cc-request-link')?.textContent ?? '';
+    (host.querySelector('.nq-cc-request-copy') as HTMLElement).click();
+    expect(copied).toBe(shown);
+    expect(copied).not.toBe('');
+  });
+
+  // A Nimiq request link over a Polygon address is a link to nothing.
+  test('the pill is hidden for a non-NIM asset', async () => {
+    const { host } = mount({
+      assets: [
+        { ticker: 'NIM', name: 'Nimiq', network: 'Nimiq', decimals: 5,
+          address: ADDRESS, balance: async () => 1n },
+        { ticker: 'USDT', name: 'Tether USD', network: 'Polygon', decimals: 6,
+          address: '0x71C7656EC7ab88b098defB751B7401B5f6d8976F', balance: async () => 1n },
+      ],
+    } as never);
+    (host.querySelector('.nq-cc-face') as HTMLElement).click();
+    await settle();
+    (host.querySelectorAll('.nq-al-row')[1] as HTMLElement).click();
+    await settle();
+    expect((host.querySelector('.nq-cc-request-open') as HTMLElement).hidden).toBe(true);
+  });
+
+  // The wallet has no such line, and the Copied tooltip already confirms the
+  // tap, so it explained a thing the interface says for itself.
+  test('the tap-to-copy hint is gone, from the DOM and the locales', async () => {
+    const { host } = mount();
+    (host.querySelector('.nq-cc-face') as HTMLElement).click();
+    (host.querySelector('.nq-cc-receive') as HTMLElement).click();
+    await settle();
+    expect(host.querySelector('.nq-cc-receive-hint')).toBeNull();
+    for (const [locale, messages] of Object.entries(shellLocales)) {
+      expect((messages as Record<string, string>)['shell.tapToCopy'], locale).toBeUndefined();
+    }
+  });
+
+  // The disc is what makes the X read as a button; the back chevron is
+  // deliberately NOT one, in the wallet either.
+  test('the X wears the wallet disc and the chevron does not', async () => {
+    const { host } = mount();
+    (host.querySelector('.nq-cc-face') as HTMLElement).click();
+    await settle();
+    for (const head of host.querySelectorAll('.nq-cc-view-head')) {
+      expect(head.querySelector('.nq-cc-shut .nq-cc-shut-disc')).toBeTruthy();
+      expect(head.querySelector('.nq-cc-back .nq-cc-shut-disc')).toBeNull();
+    }
+  });
+
+  test('the send sheet is titled for the step it stands in for', async () => {
+    const { host } = mount();
+    (host.querySelector('.nq-cc-face') as HTMLElement).click();
+    (host.querySelector('.nq-cc-send') as HTMLElement).click();
+    await settle();
+    expect(host.querySelector('.nq-cc-view-send .nq-cc-view-title')?.textContent)
+      .toBe('Send Amount');
+  });
+});
+
+// Send is TWO sheets now, because the wallet has two and cramming both into
+// one is what made it "totally off" (Andrew, 9/15) however well the
+// proportions matched. Step one takes the recipient; step two takes the
+// amount, and by then the recipient is settled, which is what lets it show
+// both parties as faces the way the wallet's Set Amount does.
+describe('send is the wallet\'s two sheets', () => {
+  const ADDRESS = 'NQ34 248H 8MB8 8QK2 5RVK EM8Q QJ8N 2Q5R 3XRK';
+  const OTHER = 'NQ07 0000 0000 0000 0000 0000 0000 0000 0000';
+
+  function mount(opts: Partial<CornerControlOptions> = {}) {
+    const w = new Window();
+    for (const key of ['document', 'HTMLElement', 'navigator', 'localStorage',
+                       'getComputedStyle', 'Event', 'TextEncoder']) {
+      (globalThis as unknown as Record<string, unknown>)[key] =
+        (w as unknown as Record<string, unknown>)[key] ?? (globalThis as never)[key];
+    }
+    const i18n = createI18n({ locales: mergeLocales(shellLocales), fallback: 'en' });
+    const paid: unknown[] = [];
+    const wallet = {
+      mode: 'hub',
+      account: { address: ADDRESS, label: 'Test' },
+      connect: async () => null,
+      signAndSend: async () => ({ txHash: '' }),
+      pay: async (args: unknown) => { paid.push(args); return { txHash: 'x' }; },
+      signMessage: async () => ({ address: '', message: '', publicKeyHex: '', signatureHex: '' }),
+      onAccountChange: () => () => {},
+      disconnect: () => {},
+    } as unknown as Wallet;
+    const identicon = (address: string, size: number) => {
+      const d = w.document.createElement('div');
+      d.dataset.for = address; d.dataset.size = String(size);
+      return d as unknown as HTMLElement;
+    };
+    const host = w.document.createElement('div') as unknown as HTMLElement;
+    mountMiniWallet(host, { wallet, i18n, balance: false, identicon, ...opts });
+    return { host, paid };
+  }
+  const settle = () => new Promise((r) => setTimeout(r, 40));
+  const root = (host: HTMLElement) => host.querySelector('.nq-cc') as HTMLElement;
+
+  function openSend(host: HTMLElement) {
+    (host.querySelector('.nq-cc-face') as HTMLElement).click();
+    (host.querySelector('.nq-cc-send') as HTMLElement).click();
+  }
+  function type(host: HTMLElement, value: string) {
+    const f = host.querySelector('.nq-cc-addr-input') as HTMLTextAreaElement;
+    f.value = value;
+    f.dispatchEvent(
+      new (globalThis as unknown as { Event: typeof Event }).Event('input', { bubbles: true }));
+  }
+
+  test('send opens on the recipient step, not the amount', async () => {
+    const { host } = mount();
+    openSend(host);
+    await settle();
+    expect(root(host).classList.contains('nq-cc-show-sendto')).toBe(true);
+    expect(root(host).classList.contains('nq-cc-show-send')).toBe(false);
+    expect(host.querySelector('.nq-cc-view-sendto .nq-cc-view-title')?.textContent)
+      .toBe('Send Transaction');
+  });
+
+  // No Next button, which is the wallet's behaviour: the field is a fixed 36
+  // characters, so "finished" is not a guess.
+  test('a complete address advances by itself', async () => {
+    const { host } = mount();
+    openSend(host);
+    await settle();
+    type(host, 'NQ34 248H');
+    expect(root(host).classList.contains('nq-cc-show-send')).toBe(false);
+    type(host, OTHER);
+    expect(root(host).classList.contains('nq-cc-show-send')).toBe(true);
+    expect(host.querySelector('.nq-cc-view-send .nq-cc-view-title')?.textContent)
+      .toBe('Send Amount');
+  });
+
+  test('step two shows both parties as faces', async () => {
+    const { host } = mount();
+    openSend(host);
+    await settle();
+    type(host, OTHER);
+    const icons = host.querySelectorAll('.nq-cc-party-icon > *');
+    expect(icons.length).toBe(2);
+    expect(icons[0]?.getAttribute('data-for')).toBe(ADDRESS);        // sender
+    expect(icons[1]?.getAttribute('data-for')).toBe(OTHER.replace(/\s/g, ''));
+    expect(host.querySelector('.nq-cc-party-name')?.textContent).toBe('Test');
+  });
+
+  // Back from the amount must not cost the address. Losing it to fix a typo in
+  // the number is the worst of both corrections.
+  test('back from the amount returns to the recipient, address intact', async () => {
+    const { host } = mount();
+    openSend(host);
+    await settle();
+    type(host, OTHER);
+    (host.querySelector('.nq-cc-view-send .nq-cc-back') as HTMLElement).click();
+    expect(root(host).classList.contains('nq-cc-show-sendto')).toBe(true);
+    expect((host.querySelector('.nq-cc-addr-input') as HTMLTextAreaElement).value)
+      .toContain('NQ07');
+  });
+
+  // Reopening on the amount sheet would offer to pay whoever was in the field
+  // last time.
+  test('reopening send always lands on the recipient step', async () => {
+    const { host } = mount();
+    openSend(host);
+    await settle();
+    type(host, OTHER);
+    expect(root(host).classList.contains('nq-cc-show-send')).toBe(true);
+    (host.querySelector('.nq-cc-view-send .nq-cc-shut') as HTMLElement).click();
+    openSend(host);
+    await settle();
+    expect(root(host).classList.contains('nq-cc-show-sendto')).toBe(true);
+  });
+
+  // 64 BYTES is Nimiq core's cap, and a UTF-8 emoji spends four of them. A
+  // length trim would let 30 emoji through and the node would reject the
+  // transaction after somebody had already been asked to sign it.
+  test('the public message is capped in bytes, not characters', async () => {
+    const { host } = mount();
+    openSend(host);
+    await settle();
+    type(host, OTHER);
+    const msg = host.querySelector('.nq-cc-message') as HTMLInputElement;
+    msg.value = '\u{1F600}'.repeat(30);            // 120 bytes of emoji
+    msg.dispatchEvent(
+      new (globalThis as unknown as { Event: typeof Event }).Event('input', { bubbles: true }));
+    expect(new TextEncoder().encode(msg.value).length).toBeLessThanOrEqual(64);
+    // Counted in CODE POINTS, not .length: an emoji is two UTF-16 units, so
+    // .length is the wrong unit here for exactly the reason it is the wrong
+    // unit in the trim itself. 30 emoji is 120 bytes; 16 of them fit.
+    expect([...msg.value].length).toBe(16);
+  });
+
+  test('a message rides the transaction data field', async () => {
+    const { host, paid } = mount();
+    openSend(host);
+    await settle();
+    type(host, OTHER);
+    const amount = host.querySelector(
+      '.nq-cc-view-send .nq-cc-amount-row .nq-cc-input') as HTMLInputElement;
+    amount.value = '1';
+    amount.dispatchEvent(
+      new (globalThis as unknown as { Event: typeof Event }).Event('input', { bubbles: true }));
+    const msg = host.querySelector('.nq-cc-message') as HTMLInputElement;
+    msg.value = 'coffee';
+    msg.dispatchEvent(
+      new (globalThis as unknown as { Event: typeof Event }).Event('input', { bubbles: true }));
+    (host.querySelector('.nq-cc-send-confirm') as HTMLElement).click();
+    await settle();
+    expect((paid[0] as { data?: string })?.data).toBe('coffee');
+  });
+
+  test('no message means no data field at all', async () => {
+    const { host, paid } = mount();
+    openSend(host);
+    await settle();
+    type(host, OTHER);
+    const amount = host.querySelector(
+      '.nq-cc-view-send .nq-cc-amount-row .nq-cc-input') as HTMLInputElement;
+    amount.value = '1';
+    amount.dispatchEvent(
+      new (globalThis as unknown as { Event: typeof Event }).Event('input', { bubbles: true }));
+    (host.querySelector('.nq-cc-send-confirm') as HTMLElement).click();
+    await settle();
+    expect(paid[0] as object).not.toHaveProperty('data');
+  });
+});
+
+// Step one's SHAPE, which was the thing still wrong after the split ("looks
+// completely different"). Text chips were the wrong shape for what a saved
+// recipient is, the label was sentence case where the wallet ships a grey
+// uppercase eyebrow, and the sheet simply ended where the wallet offers a way
+// out.
+describe('step one is the wallet\'s Send Transaction sheet', () => {
+  const ADDRESS = 'NQ34 248H 8MB8 8QK2 5RVK EM8Q QJ8N 2Q5R 3XRK';
+  const CONTACTS = [
+    { label: 'Mum', address: 'NQ07 0000 0000 0000 0000 0000 0000 0000 0000' },
+    { label: 'Savings', address: 'NQ21 1111 1111 1111 1111 1111 1111 1111 1111' },
+    { label: 'Rent', address: 'NQ32 2222 2222 2222 2222 2222 2222 2222 2222' },
+    { label: 'Fourth', address: 'NQ43 3333 3333 3333 3333 3333 3333 3333 3333' },
+  ];
+
+  function mount(opts: Partial<CornerControlOptions> = {}) {
+    const w = new Window();
+    for (const key of ['document', 'HTMLElement', 'navigator', 'localStorage',
+                       'getComputedStyle', 'Event']) {
+      (globalThis as unknown as Record<string, unknown>)[key] =
+        (w as unknown as Record<string, unknown>)[key];
+    }
+    const i18n = createI18n({ locales: mergeLocales(shellLocales), fallback: 'en' });
+    const wallet = {
+      mode: 'hub',
+      account: { address: ADDRESS, label: 'Test' },
+      connect: async () => null,
+      signAndSend: async () => ({ txHash: '' }),
+      pay: async () => ({ txHash: 'x' }),
+      signMessage: async () => ({ address: '', message: '', publicKeyHex: '', signatureHex: '' }),
+      onAccountChange: () => () => {},
+      disconnect: () => {},
+    } as unknown as Wallet;
+    const identicon = (address: string, size: number) => {
+      const d = w.document.createElement('div');
+      d.dataset.for = address; d.dataset.size = String(size);
+      return d as unknown as HTMLElement;
+    };
+    const host = w.document.createElement('div') as unknown as HTMLElement;
+    mountMiniWallet(host, {
+      wallet, i18n, balance: false, identicon,
+      contacts: { list: async () => CONTACTS },
+      ...opts,
+    } as never);
+    return { host };
+  }
+  const settle = () => new Promise((r) => setTimeout(r, 60));
+  async function openSend(host: HTMLElement) {
+    (host.querySelector('.nq-cc-face') as HTMLElement).click();
+    (host.querySelector('.nq-cc-send') as HTMLElement).click();
+    await settle();
+  }
+
+  // A row of faces reads as people; a row of grey pills reads as filter tags.
+  test('a saved recipient is a face and a name, not a text chip', async () => {
+    const { host } = mount();
+    await openSend(host);
+    const first = host.querySelector('.nq-cc-contact') as HTMLElement;
+    expect(first.querySelector('.nq-cc-contact-icon > *')?.getAttribute('data-for'))
+      .toBe('NQ07 0000 0000 0000 0000 0000 0000 0000 0000');
+    expect(first.querySelector('.nq-cc-contact-name')?.textContent).toBe('Mum');
+  });
+
+  // THREE, like the wallet's row of recents: a fourth either shrinks the faces
+  // past recognising or pushes the band wider than the card.
+  test('at most three recents are shown', async () => {
+    const { host } = mount();
+    await openSend(host);
+    expect(host.querySelectorAll('.nq-cc-contact').length).toBe(3);
+  });
+
+  test('the band carries the book and its hairline', async () => {
+    const { host } = mount();
+    await openSend(host);
+    const band = host.querySelector('.nq-cc-contacts-band') as HTMLElement;
+    expect(band.hidden).toBe(false);
+    expect(band.querySelector('.nq-cc-book-glyph')).toBeTruthy();
+    expect(band.querySelector('.nq-cc-book-label')?.textContent).toBe('Contacts');
+    expect(band.querySelector('.nq-cc-contacts-rule')).toBeTruthy();
+  });
+
+  test('no contacts wired leaves the band out entirely', async () => {
+    const { host } = mount({ contacts: undefined });
+    await openSend(host);
+    expect((host.querySelector('.nq-cc-contacts-band') as HTMLElement).hidden).toBe(true);
+  });
+
+  // The one uppercase nimiq-ui allows (rule 17, a short grey section label) and
+  // exactly what the wallet ships here.
+  test('the address label is the grey uppercase eyebrow', async () => {
+    const { host } = mount();
+    await openSend(host);
+    expect(host.querySelector('.nq-cc-view-sendto .nq-cc-eyebrow')?.textContent)
+      .toBe('Enter address');
+    const src = await Bun.file(new URL('./corner-control.ts', import.meta.url)).text();
+    expect(src).toMatch(/\.nq-cc-eyebrow \{[^}]*text-transform:uppercase/);
+  });
+
+  // An "Address unavailable?" that offers nothing is worse than no footer.
+  test('the footer appears only when the host wired a way out', async () => {
+    const bare = mount();
+    await openSend(bare.host);
+    expect((bare.host.querySelector('.nq-cc-sendto-foot') as HTMLElement).hidden).toBe(true);
+
+    const wired = mount({ createCashlink: () => {}, scan: () => {} } as never);
+    await openSend(wired.host);
+    const foot = wired.host.querySelector('.nq-cc-sendto-foot') as HTMLElement;
+    expect(foot.hidden).toBe(false);
+    expect(foot.querySelector('.nq-cc-unavailable')?.textContent).toBe('Address unavailable?');
+    expect(foot.querySelector('.nq-cc-scan-open')).toBeTruthy();
+  });
+
+  // The wallet's field sits unfocused. Ours opened wearing a blue ring across
+  // the whole card, and on a phone the focus throws the keyboard over the
+  // sheet before anybody has decided to type.
+  test('the address field is not focused on open', async () => {
+    const src = await Bun.file(new URL('./corner-control.ts', import.meta.url)).text();
+    expect(src).not.toMatch(/show-sendto'\);\s*\n\s*recipientInput\.focus\(\)/);
+  });
+
+  // Two rules for one class is how a stale background hides: the v0.20 chip
+  // rules were still supplying a grey pill and 4px/12px of padding under the
+  // new face, which left ~24px for a name in the column and printed "Mu...".
+  test('the v0.20 chip rules are gone, not merely overridden', async () => {
+    const src = await Bun.file(new URL('./corner-control.ts', import.meta.url)).text();
+    expect(src).not.toContain('.nq-cc-contact { max-width:100%; min-height:36px;');
+    expect(src.match(/\n\.nq-cc-contact \{/g)?.length ?? 0).toBe(1);
+  });
+});
+
+// ONE door to the cashlink, not two (Andrew, 2026-09-16). It lives under the
+// send field where the wallet has it, beneath "Address unavailable?", which is
+// the question a cashlink answers.
+describe('the cashlink has exactly one home', () => {
+  const ADDRESS = 'NQ34 248H 8MB8 8QK2 5RVK EM8Q QJ8N 2Q5R 3XRK';
+
+  function mount() {
+    const w = new Window();
+    for (const key of ['document', 'HTMLElement', 'navigator', 'localStorage',
+                       'getComputedStyle', 'Event']) {
+      (globalThis as unknown as Record<string, unknown>)[key] =
+        (w as unknown as Record<string, unknown>)[key];
+    }
+    const i18n = createI18n({ locales: mergeLocales(shellLocales), fallback: 'en' });
+    const wallet = {
+      mode: 'hub',
+      account: { address: ADDRESS, label: 'Test' },
+      connect: async () => null,
+      signAndSend: async () => ({ txHash: '' }),
+      pay: async () => ({ txHash: 'x' }),
+      signMessage: async () => ({ address: '', message: '', publicKeyHex: '', signatureHex: '' }),
+      onAccountChange: () => () => {},
+      disconnect: () => {},
+    } as unknown as Wallet;
+    let fired = 0;
+    const host = w.document.createElement('div') as unknown as HTMLElement;
+    mountMiniWallet(host, {
+      wallet, i18n, balance: false, createCashlink: () => { fired += 1; },
+    } as never);
+    return { host, fired: () => fired };
+  }
+  const settle = () => new Promise((r) => setTimeout(r, 40));
+
+  test('the main menu no longer carries a cashlink row', async () => {
+    const { host } = mount();
+    (host.querySelector('.nq-cc-face') as HTMLElement).click();
+    await settle();
+    const labels = [...host.querySelectorAll('.nq-cc-view-main .nq-cc-row')]
+      .map((r) => r.textContent ?? '');
+    expect(labels.some((t) => t.includes('Cashlink'))).toBe(false);
+  });
+
+  test('it is on the send footer, and it fires', async () => {
+    const { host, fired } = mount();
+    (host.querySelector('.nq-cc-face') as HTMLElement).click();
+    (host.querySelector('.nq-cc-send') as HTMLElement).click();
+    await settle();
+    const pill = [...host.querySelectorAll('.nq-cc-sendto-foot button')]
+      .find((b) => (b.textContent ?? '').includes('Cashlink')) as HTMLElement;
+    expect(pill).toBeTruthy();
+    pill.click();
+    expect(fired()).toBe(1);
+  });
+
+  test('exactly one control in the whole menu offers it', async () => {
+    const { host } = mount();
+    (host.querySelector('.nq-cc-face') as HTMLElement).click();
+    await settle();
+    const offers = [...host.querySelectorAll('button')]
+      .filter((b) => (b.textContent ?? '').includes('Cashlink'));
+    expect(offers.length).toBe(1);
   });
 });

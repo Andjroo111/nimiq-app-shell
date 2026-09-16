@@ -217,9 +217,8 @@ mountMiniWallet(document.querySelector('#corner')!, { wallet, i18n });
 The face shows wallet state: outline **Connect wallet ▾**, then identicon +
 short label once connected. Everything else lives one click away in a single
 menu. That menu holds the balance block, a Receive / Send action bar, the
-address behind Receive, Language and **Show amounts in** as collapsed rows, an
-opt-in cashlink row, a network row on testnet only, Report a bug, and a quiet
-Disconnect.
+address behind Receive, Language and **Show amounts in** as collapsed rows, a
+network row on testnet only, Report a bug, and a quiet Disconnect.
 
 Inside Nimiq Pay (`wallet.mode === 'miniapp'`) the wallet is ambient, so the
 face collapses to the current-language flag and the menu keeps language alone.
@@ -588,8 +587,14 @@ is deliberately no placeholder hexagon, because a placeholder there would say
 "identity confirmed" while showing no identity.
 
 **The receive QR is now built in** (registry `qr-code`: rounded modules, the
-light-blue radial). `qr` stays a seam and still overrides it, but an app that
+Nimiq **navy** radial). `qr` stays a seam and still overrides it, but an app that
 passes nothing gets the wallet's QR instead of no QR.
+
+⚠ **Navy, not the registry component's light-blue, and the two disagree on
+purpose.** `qr-code` is a verbatim port of the wallet's `QrCode.vue`, but the
+sheet the wallet actually renders behind Receive ships navy modules. This menu
+is a mini version of that sheet, so where the component and the live app
+diverge, the app wins (v0.22.0).
 
 ```ts
 mountMiniWallet(slot, {
@@ -600,9 +605,245 @@ mountMiniWallet(slot, {
 ```
 
 The QR sits on a white plate (`--nq-cc-qr-plate`). That is not decoration: a
-reader needs dark modules on a light field, so a blue QR drawn straight onto a
+reader needs dark modules on a light field, so a navy QR drawn straight onto a
 dark themed card is unscannable, not just off-brand. Retint it with
 `--nq-cc-qr-from` / `--nq-cc-qr-to` only if you have checked it still scans.
+
+---
+
+### Matching the wallet's own sheets (v0.22.0, scale in v0.23.0)
+
+Receive and Send are a **mini version of the wallet's sheets**, not a separate
+design. A side-by-side against the real ones found four places that had drifted,
+all fixed here:
+
+| What | Was | Now |
+| --- | --- | --- |
+| Receive title | bare `Receive` with no asset selected | `Receive NIM`, the wallet's own wording |
+| Receive subtitle | none | `Share your address with the sender.` |
+| Send amount | NIM only | the fiat value under the field, always, even at zero |
+| Sub-view header | back chevron only | back **and** an X, which are not the same escape |
+
+Back steps up one level and leaves the menu open. The X dismisses the menu
+outright, which is what the wallet's X does.
+
+The fiat line reads its rate **once per open** of the send view, not per
+keystroke, and the read is dropped when the reference currency changes so the
+next open picks up the new one. No `fiat` feed means no line; it never blocks a
+send, because the NIM amount is the authoritative one either way.
+
+#### Send is the wallet's TWO sheets (v0.26.0)
+
+⚠ **"A 272px card cannot hold a 390px two-step flow" was wrong**, and it stood
+here for four versions. It is not width, it is **steps**, and the QR and request
+sheets had already proved the menu stacks sub-views fine. Cramming both of the
+wallet's sheets into one is what kept send reading as off however well the
+proportions matched: it was TITLED as their step two while holding their step
+one's content.
+
+| | Sheet | Holds |
+| --- | --- | --- |
+| Step 1 | `Send Transaction` | saved contacts, then `Enter address` and the 3x3 grid |
+| Step 2 | `Send Amount` | **both parties as faces**, the amount, its fiat value, a public message |
+
+The split is what pays for the second sheet: by step two the recipient is
+settled, so the screen can spend its room confirming **who is paying whom**
+instead of collecting it. Sender on the left, recipient on the right, the
+wallet's own order and the direction the money goes.
+
+**No Next button**, which is the wallet's behaviour too. The field is a fixed 36
+characters, so "finished typing" is not a guess, and a button whose only job is
+to acknowledge a complete form is a tap for nothing. It advances on a paste and
+on a contact chip the same way. Back from step two keeps the address: an amount
+you want to change is a different correction from a recipient you want to
+change, and losing the address to fix a typo in the number is the worst of both.
+Reopening send always lands on step one, because a flow that reopened on the
+amount would be offering to pay whoever was in the field last time.
+
+**The public message rides `SendArgs.data`**, so it is the transaction's own
+data field and really does go on chain.
+
+⚠ **It is capped at 64 BYTES, not characters.** That is Nimiq core's limit in
+`BasicAccount.verifyIncomingTransaction`, and a UTF-8 emoji spends four of them.
+A length trim would let 30 emoji through and the node would reject the
+transaction after somebody had already been asked to sign it.
+
+##### Step one's shape (v0.27.0)
+
+The split was right and step one still read as a different sheet, because the
+pieces were the wrong SHAPE:
+
+| | Was | Now |
+| --- | --- | --- |
+| Saved recipients | grey text chips | the **book**, a hairline, then up to 3 **faces with names** |
+| Address label | `Enter address`, sentence case | a short grey **uppercase eyebrow** |
+| Footer | nothing, the sheet just ended | `Address unavailable?`, the cashlink pill, the scanner glyph |
+| On open | the field autofocused | nothing focused |
+
+A row of faces reads as people; a row of grey pills reads as filter tags, and
+the shape is the thing being recognised. Three recents, like the wallet: a
+fourth either shrinks the faces past recognising or pushes the band wider than
+the card. The footer only appears when the host wired `createCashlink` or
+`scan`, because an "Address unavailable?" that offers nothing is worse than no
+footer.
+
+⚠ **The field is deliberately not focused.** The wallet's sits unfocused with
+its grey border; ours opened wearing a blue ring across the whole card, and on
+a phone the focus throws the keyboard over the sheet before anybody has decided
+to type. The amount field IS focused on advance, because by then they have.
+
+⚠ **Two rules for one class is how a stale background hides.** The v0.20 chip
+rules were still supplying a grey pill and 4px/12px of padding under the new
+face, which left about 24px for a name in a 54px column and printed "Mu...".
+They are deleted now, not overridden, and a test pins that `.nq-cc-contact` has
+exactly one rule.
+
+The send grid runs at **14px in a 204px box (75%)** against the wallet's 58%.
+Full parity needs 11px, and this is the field where a wrong character costs
+money.
+
+#### The scale was the real gap (v0.23.0)
+
+Copy and colour were not enough: at **half** the wallet's type scale the two
+sheets still read as different components rather than two sizes of one. The
+numbers here are the **registry's own**, which is the ported upstream source:
+
+| | Registry / wallet | Was | Now |
+| --- | --- | --- | --- |
+| Address grid | `address-display` 3rem = **24px**, 0.875rem = 7px chunk margin | 12px | **24px** |
+| Primary button | `.nq-button` 7.5rem = 60px at 2rem = **16px** | 36px / 14px | **52px / 16px** |
+| Sheet title | ~24px | 15px | **22px** |
+| Send address grid | | 14px | **16px** |
+| Amount field | | 14px | **18px** |
+
+⚠ **Width was never the constraint.** `address-display` needs **226px** and the
+menu's content box is **244px**: the grid had been running at half size for no
+reason at all. What the bigger scale does cost is HEIGHT, so `.nq-cc-menu` now
+carries `max-height` and `overflow-y:auto`. `dvh` first with `vh` as the
+fallback, because on mobile Safari `vh` is the **large** viewport and overshoots
+the visible area by the toolbar.
+
+#### Receive leads with the identicon, and the QR gets its own sheet (v0.23.0)
+
+The wallet's hierarchy, for the wallet's reason: the face is what tells a sender
+at a glance that they have the right person, and nobody reads 36 characters
+back. The code moves one tap deeper, onto a sheet titled `NIM Address` with the
+address on one elided line, which is what the wallet's own QR sheet does.
+
+```ts
+mountMiniWallet(slot, {
+  wallet, i18n,
+  identicon: (address, size) => Identicons.render(address, size),  // makes it the hero
+});
+```
+
+**Without `identicon` wired, nothing changes**: the QR stays the hero and the
+footer glyph stays hidden. There is no placeholder hexagon, because one would
+claim an identity it cannot show, and no app may silently lose the one graphic
+on this screen a camera can read.
+
+Two blocks a side in the elision, not the wallet's three: three plus the
+ellipsis is 33 characters of Fira Mono, which overruns 272px and wraps, and a
+wrapped elision is worse than a shorter one. The full 3x3 grid is one tap back.
+
+#### Proportions, not px (v0.25.0)
+
+v0.23.0 matched the wallet's absolute type sizes and made this **worse**, which
+is why the sheets still read as different components three passes in. 24px
+address type is **6.2%** of a 390px sheet and **8.8%** of a 272px card, so
+copying the number made our content relatively BIGGER than the wallet's, in
+half its whitespace. A mini version needs the wallet's shares, not its pixels.
+
+Measured off the real screenshots by ink-profiling both sheets, as a share of
+each one's own width:
+
+| element | wallet | before | now |
+| --- | --- | --- | --- |
+| Title | 59.5% | 65.1% | 61.9% |
+| Identicon | 36.8% | 43.9% | **36.6%** |
+| Address rows | 52.7% | 76.8% | **51.8%** |
+| Footer | 58.6% | 80.7% | 64.7% |
+
+And the gaps, which were the other half of it:
+
+| gap | wallet | scaled target | before | now |
+| --- | --- | --- | --- | --- |
+| above identicon | 60px | 42 | 27.5 | 43 |
+| above address | 68px | 47 | 35 | 50 |
+| above footer | 78.5px | 55 | 38.5 | 54.5 |
+
+⚠ **The address ink is set by the PLATE, not the font.** The chunks centre in
+`1fr` cells, so the span tracks the plate's width and barely moves with type
+size: dropping 24px to 16px moved the ink from 209px to 191px, and only
+capping the plate at **169px** (the wallet's 62% of its sheet) landed it.
+`--nq-cc-addr-plate` moves it.
+
+Three structural fixes came out of the same measurement:
+
+- **Send stopped being a form.** The wallet's amount is a small centred box at
+  30.4% of its sheet with the ticker beside it; ours was a full-bleed input at
+  89.7% with the ticker tucked inside. Labels, fiat line and contacts centre now
+  too.
+- **The title rule is gone** from receive, the QR sheet and the request sheet.
+  The wallet has no rule there, and ours both drew a line it has not got and
+  pushed the subtitle 32px down where the wallet leaves 12. The main menu keeps
+  its dividers, which separate sections rather than a title.
+- **The footer pill centres**, with the glyph riding the right corner. The
+  glyph's width is reserved on both sides so the pill's centre is the card's
+  centre and the two cannot collide.
+
+Two places a proportion loses on purpose, both to a legibility floor:
+
+| element | the share says | ships at | why |
+| --- | --- | --- | --- |
+| Subtitle | 10.4px | **12px** | below 12 it stops being comfortable to read |
+| Send address grid | 11px / 158px | **16px / 236px** | this is the field where a wrong character costs money |
+
+#### The receive footer, the X, and the request link (v0.24.0)
+
+| What | Was | Now |
+| --- | --- | --- |
+| Receive footer | the QR glyph alone | **Create request link** pill, glyph to its right |
+| Under the address | "Tap the address to copy" | gone |
+| The X | a bare stroke glyph | the wallet's **filled disc** |
+| Send title | `Send` | `Send Amount` |
+
+The copy hint went because the wallet has no such line and the **Copied**
+tooltip already confirms the tap: it explained a thing the interface says for
+itself, and left a stranded grey sentence under the plate doing it.
+
+The X wears a disc and the back chevron deliberately does not, which is the
+wallet's arrangement too: one dismisses and one steps, so giving both the same
+weight would say they are the same control. The button keeps a 34px hit area
+and the disc is 26px inside it.
+
+**Request links are the real thing**, `format/request-link.ts`:
+
+```
+https://wallet.nimiq.com/#_request/{recipient}/{amount}/{message}_
+```
+
+Ported from `@nimiq/utils` `RequestLinkEncoding`, not imported, the same call
+`format/nim.ts` makes about `FormattableNumber`: that package is a transitive
+dependency here and promoting it to a direct one to reach two string templates
+would put its whole surface in every fleet app's bundle.
+
+⚠ **The upstream default would mint dead links from a fleet app.**
+`createNimiqRequestLink` defaults `basePath` to `window.location.host`, which is
+right inside the wallet and wrong everywhere else: from nimiq.cool it produces
+`nimiq.cool/#_request/…`, a page with no idea what that means. Ours defaults to
+the wallet and takes `requestLinkBase` for hosts that run their own handler.
+
+An **empty amount is a request for any amount**, not an unfinished form, so the
+link is valid and copyable the moment the sheet opens. The link is shown as well
+as copied, because people paste these into a chat and a link you cannot read
+before sending is one you have to trust. The pill is hidden for a non-NIM asset:
+a Nimiq request link over a Polygon address is a link to nothing.
+
+⚠ **A QR that cannot be drawn no longer takes the receive view with it.** The
+draw used to be the last thing `openReceive` did, so a host `qr` renderer that
+threw aborted the function and left the sheet half-built with nothing surfaced.
+The address is the thing being received; the code is the convenience.
 
 ---
 
@@ -795,3 +1036,16 @@ type test cannot reach, and did ship a bug there once.
 ## License
 
 MIT
+
+### One home for the cashlink (v0.28.0)
+
+`createCashlink` used to render **twice**: an opt-in main-menu row and the send
+footer pill. Same action, two doors to one room. The menu row is **gone**; it
+lives under the send field, beneath `Address unavailable?`, which is where the
+wallet has it and for the wallet's reason: a cashlink is what you make when you
+have no address to send to.
+
+The **option is unchanged**, so no app has to edit anything. An app that wired
+`createCashlink` keeps it, in one place instead of two. A test pins that exactly
+one control in the whole menu offers it.
+

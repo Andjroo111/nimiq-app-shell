@@ -27,6 +27,7 @@ import type { Wallet } from '../wallet';
 import { FEATURED_LANGUAGES, type ShellLanguage } from '../locales';
 import { buildFlagHex } from './flag-hex';
 import { fmtNim, fmtFiat, lunaToNim, nimToLuna } from '../format/nim';
+import { nimiqRequestLink } from '../format/request-link';
 import { BUG_ICON, openReportBugSheet, defaultReportBugRepo, type ReportBugOptions } from './report-bug';
 import { installReportCapture } from './report-capture';
 import { mountAssetList, type AssetListHandle, type ShellAsset } from './asset-list';
@@ -97,6 +98,15 @@ export function addressGrid(address: string): { cells: string[]; columns: number
   return { cells, columns: 1 };
 }
 
+/** UTF-8 byte length, which is what Nimiq core counts for transaction data. */
+function utf8Bytes(text: string): number {
+  return typeof TextEncoder === 'function'
+    ? new TextEncoder().encode(text).length
+    // No TextEncoder is old-Safari territory; unescape(encodeURIComponent()) is
+    // the classic shim and is exact for UTF-8.
+    : encodeURIComponent(text).replace(/%[0-9A-F]{2}/g, 'x').length;
+}
+
 /** One saved recipient. The host owns the list and its storage. */
 export interface ShellContact {
   /** What the person is called. This is what the chip shows. */
@@ -128,10 +138,21 @@ export interface CornerControlOptions {
    *  these 11, so the pick is real even where the shell's own strings fall back
    *  to English. */
   languages?: ShellLanguage[];
-  /** Identicon renderer for the face + wallet block (self-sized element). */
+  /** Identicon renderer for the face + wallet block (self-sized element).
+   *
+   *  It also decides the RECEIVE view's shape: with one wired, the identicon is
+   *  the hero and the QR moves to its own sheet, which is the wallet's
+   *  hierarchy. Without one the QR stays the hero, because a placeholder
+   *  hexagon would claim an identity it cannot show. */
   identicon?: (address: string, sizePx: number) => HTMLElement;
+  /** Where a request link points. Defaults to the wallet, which is the page
+   *  that can open a Safe-style `#_request/` link; pass your own only if you
+   *  host a handler for them. NEVER defaulted to the current page: upstream
+   *  does that and it mints links to a host app that cannot open them. */
+  requestLinkBase?: string;
   /** OVERRIDE the receive QR. Without it the mini wallet draws the wallet's own
-   *  (registry `qr-code`: rounded modules, the light-blue radial), so this is a
+   *  (registry `qr-code` rounded modules, in the navy of the wallet's own
+   *  address sheet rather than the component's light-blue), so this is a
    *  seam rather than a requirement. It was host-only until v0.20.0, which had
    *  nineteen apps about to hand-roll the one graphic here a camera must read. */
   qr?: (text: string, sizePx: number) => HTMLElement;
@@ -148,7 +169,9 @@ export interface CornerControlOptions {
   send?: () => void;
   /** Wire the QR-scan button. Hidden when absent. */
   scan?: () => void;
-  /** Wire the opt-in "Create a Cashlink" row (HubApi.createCashlink). Hidden when absent. */
+  /** Wire "Create a Cashlink" (HubApi.createCashlink). It appears under the send
+   *  step-one field, beneath "Address unavailable?", which is where the wallet
+   *  puts it. Absent leaves that footer out. Was a main-menu row until v0.28.0. */
   createCashlink?: () => void;
   /** Wire the signed-out "New to Nimiq? Create a wallet" line. Hidden when absent.
    *
@@ -425,8 +448,15 @@ function ensureStyles(): void {
 /* stays a compact card hanging off the corner on EVERY viewport (Andjroo,
    mobile review 7/23: full-width phone sheet rejected, "it should just come
    out of the corner"); max-width only guards sub-300px screens */
+/* The menu SCROLLS now. At the wallet's type scale the receive sheet is ~550px
+   tall instead of 379px, and a dropdown hanging off a header has nowhere to put
+   that on a short window: it used to run off the bottom with nothing to reach
+   it with. dvh first, vh as the fallback, because on mobile Safari vh is the
+   LARGE viewport and overshoots the visible area by the toolbar's height. */
 .nq-cc-menu { position:absolute; top:calc(100% + 8px); right:var(--nq-cc-menu-shift, 0px); z-index:60; width:272px;
   max-width:calc(100vw - 24px); padding:6px;
+  max-height:calc(100vh - 96px); max-height:calc(100dvh - 96px);
+  overflow-y:auto; overscroll-behavior:contain;
   background:var(--nq-cc-menu-bg, #fff); border:var(--nq-cc-menu-border, none); border-radius:10px;
   box-shadow:var(--nq-cc-menu-shadow, 0 4px 28px rgba(0,0,0,.16));
   color:var(--nq-cc-menu-fg, #1f2348); text-align:left; }
@@ -513,17 +543,163 @@ button.nq-cc-name:focus-visible { outline:2px solid var(--nq-cc-accent, #0582ca)
 
 /* send view: the mini-wallet send: recipient + amount here, the user's own
    wallet only appears for the approval (Hub checkout / Nimiq Pay confirm) */
+/* TWO sheets, because the wallet has two and the split is what makes each of
+   ours a mini version of one of theirs rather than a mash of both.
+   "Send Transaction" takes the recipient. "Send Amount" takes the amount, and
+   by then the recipient is SETTLED, which is what lets it show both parties as
+   faces the way the wallet's Set Amount does.
+   This was written off as a width constraint for four versions. It is not
+   width: it is steps, and the QR and request sheets already proved the menu
+   stacks sub-views fine. */
+.nq-cc-view-sendto { display:none; }
+.nq-cc.nq-cc-show-sendto .nq-cc-view-main { display:none; }
+.nq-cc.nq-cc-show-sendto .nq-cc-view-sendto { display:block; }
 .nq-cc-view-send { display:none; }
 .nq-cc.nq-cc-show-send .nq-cc-view-main { display:none; }
+.nq-cc.nq-cc-show-send .nq-cc-view-sendto { display:none; }
 .nq-cc.nq-cc-show-send .nq-cc-view-send { display:block; }
-.nq-cc-send-body { display:flex; flex-direction:column; gap:8px; padding:10px 8px 8px; }
+.nq-cc-sendto-body { display:flex; flex-direction:column; align-items:center;
+  padding:16px 8px 10px; }
+/* The wallet's contacts BAND: the book on the left, a hairline, then the saved
+   recipients as faces. Text chips were the wrong shape entirely, and the shape
+   is the thing being recognised: a row of faces reads as people, a row of grey
+   pills reads as filter tags. */
+.nq-cc-contacts-band { display:flex; align-items:flex-start; justify-content:center;
+  gap:12px; width:100%; margin-top:14px; }
+.nq-cc-contacts-band[hidden] { display:none; }
+.nq-cc-book { display:flex; flex-direction:column; align-items:center; gap:6px;
+  flex:none; color:var(--nq-cc-menu-muted, rgba(31,35,72,.45)); }
+.nq-cc-book-glyph { display:block; width:38px; height:46px; }
+.nq-cc-book-label { font-size:11px; font-weight:600; }
+/* A fixed height, not align-self:stretch: the rule runs past the name bars on
+   the wallet's sheet, and stretch would end it at whichever column happens to
+   be tallest. */
+.nq-cc-contacts-rule { flex:none; width:1px; height:74px; margin-top:2px;
+  background:color-mix(in srgb, var(--nq-cc-menu-fg, #1f2348) 12%, transparent); }
+.nq-cc-contacts { display:flex; flex-wrap:nowrap; justify-content:flex-start; gap:10px; }
+.nq-cc-contacts[hidden] { display:none; }
+/* A face and a name, which is what a saved recipient IS. */
+.nq-cc-contact { display:flex; flex-direction:column; align-items:center; gap:5px;
+  width:54px; padding:0; border:none; background:none; font-family:inherit; cursor:pointer; }
+.nq-cc-contact-icon { display:block; width:40px; height:40px; }
+.nq-cc-contact-icon > * { display:block; width:100%; height:100%; }
+.nq-cc-contact-name { max-width:100%; font-size:10px; font-weight:600; text-align:center;
+  overflow:hidden; text-overflow:ellipsis; white-space:nowrap;
+  color:var(--nq-cc-menu-muted, rgba(31,35,72,.6)); }
+.nq-cc-contact:hover .nq-cc-contact-name { color:var(--nq-cc-accent, #0582ca); }
+.nq-cc-contact:focus-visible { outline:2px solid var(--nq-cc-accent, #0582ca); outline-offset:2px;
+  border-radius:6px; }
+/* A short GREY uppercase section label, which is the one uppercase nimiq-ui
+   allows (rule 17) and exactly what the wallet ships here. */
+.nq-cc-eyebrow { margin:46px 0 0; font-size:11px; font-weight:700; text-transform:uppercase;
+  letter-spacing:.08em; text-align:center; color:var(--nq-cc-menu-muted, rgba(31,35,72,.45)); }
+/* The wallet's escape hatch: what to do when you have no address to send to. */
+.nq-cc-sendto-foot { position:relative; display:flex; flex-direction:column;
+  align-items:center; gap:8px; width:100%; margin-top:40px; padding-inline:42px;
+  box-sizing:border-box; }
+.nq-cc-sendto-foot[hidden] { display:none; }
+.nq-cc-unavailable { margin:0; font-size:12px; font-weight:600;
+  color:var(--nq-cc-menu-muted, rgba(31,35,72,.5)); }
+.nq-cc-sendto-foot .nq-cc-scan-open { position:absolute; right:0; bottom:2px;
+  display:inline-flex; align-items:center; justify-content:center;
+  width:38px; height:38px; padding:0; border:none; border-radius:8px; background:none;
+  color:var(--nq-cc-menu-muted, rgba(31,35,72,.6)); cursor:pointer; }
+.nq-cc-sendto-foot .nq-cc-scan-open:hover { background:var(--nq-cc-menu-hover, rgba(31,35,72,.06)); }
+.nq-cc-sendto-foot .nq-cc-scan-open:focus-visible { outline:2px solid var(--nq-cc-accent, #0582ca);
+  outline-offset:-2px; }
+.nq-cc-sendto-foot .nq-cc-scan-glyph { display:block; width:22px; height:22px; }
+/* Both parties, faces first, with the wallet's hairline dash between them.
+   Sender on the left, recipient on the right, which is the direction the money
+   goes and the same order the wallet uses. */
+.nq-cc-parties { display:grid; grid-template-columns:1fr 24px 1fr; align-items:start;
+  gap:4px; width:100%; margin-bottom:6px; }
+.nq-cc-party { display:flex; flex-direction:column; align-items:center; gap:6px; min-width:0; }
+.nq-cc-party-icon { display:block; width:56px; height:56px; }
+.nq-cc-party-icon > * { display:block; width:100%; height:100%; }
+.nq-cc-party-name { max-width:100%; font-size:11px; font-weight:600; text-align:center;
+  overflow:hidden; text-overflow:ellipsis; white-space:nowrap;
+  color:var(--nq-cc-menu-muted, rgba(31,35,72,.6)); }
+.nq-cc-party-name.nq-cc-mono { font-family:'Fira Mono',ui-monospace,monospace; font-size:10px; }
+.nq-cc-party-dash { align-self:center; height:1px; margin-top:-14px;
+  background:color-mix(in srgb, var(--nq-cc-menu-fg, #1f2348) 18%, transparent); }
+
+/* The QR gets its own sheet, the way the wallet's "NIM Address" does. It sits
+   UNDER receive rather than beside it: receive is what the corner opens, and
+   the code is one tap further in, for the moment somebody is actually pointing
+   a camera at it. It hides the receive view as well as the main one. */
+.nq-cc-view-qr { display:none; }
+.nq-cc.nq-cc-show-qr .nq-cc-view-main { display:none; }
+.nq-cc.nq-cc-show-qr .nq-cc-view-receive { display:none; }
+.nq-cc.nq-cc-show-qr .nq-cc-view-qr { display:block; }
+
+/* The request-link sheet, one level under receive like the QR sheet. */
+.nq-cc-view-request { display:none; }
+.nq-cc.nq-cc-show-request .nq-cc-view-main { display:none; }
+.nq-cc.nq-cc-show-request .nq-cc-view-receive { display:none; }
+.nq-cc.nq-cc-show-request .nq-cc-view-request { display:block; }
+.nq-cc-request-body { display:flex; flex-direction:column; gap:10px; padding:16px 8px 8px; }
+/* The link itself, shown rather than merely copied: people paste these into a
+   chat and a link you cannot see before you send it is a link you have to
+   trust. Wraps, because an address is 36 characters and this is 272px. */
+.nq-cc-request-link { margin:2px 0 0; padding:9px 10px; border-radius:6px;
+  background:color-mix(in srgb, var(--nq-cc-menu-fg, #1f2348) 4%, transparent);
+  font-family:'Fira Mono',ui-monospace,monospace; font-size:11px; line-height:1.45;
+  overflow-wrap:anywhere; color:var(--nq-cc-menu-muted, rgba(31,35,72,.6)); }
+.nq-cc-request-hint { margin:0; font-size:12px; font-weight:600;
+  color:var(--nq-cc-menu-muted, rgba(31,35,72,.45)); }
+.nq-cc-qr-body { display:flex; flex-direction:column; align-items:center; padding:12px 8px 8px; }
+/* One line, middle elided, which is the wallet's own treatment on this sheet.
+   Repeating the 3x3 grid here would say the two sheets are the same thing at
+   two sizes; the grid is the sheet you came from. */
+.nq-cc-qr-line { margin:22px 0 0; font-family:'Fira Mono',ui-monospace,monospace; font-size:13px;
+  letter-spacing:.02em; text-align:center; white-space:nowrap;
+  color:var(--nq-cc-menu-muted, rgba(31,35,72,.5)); }
+.nq-cc-qr-scan { margin:51px 4px 2px; text-align:center; font-size:13px; font-weight:600;
+  line-height:1.35; color:var(--nq-cc-accent, #0582ca); }
+/* The identicon hero. 120px, not the wallet's ~150: the same share of a 272px
+   card that theirs is of a 390px one. */
+.nq-cc-receive-hero { display:block; width:100px; height:100px; margin:34px 0 0; }
+.nq-cc-receive-hero > * { display:block; width:100%; height:100%; }
+.nq-cc-receive-hero[hidden] { display:none; }
+/* The pill CENTRES and the glyph rides the right corner, which is the wallet's
+   arrangement. space-between pushed the pill to the left edge and spread the
+   footer to 80.7% of the card against the wallet's 58.6%. */
+.nq-cc-receive-foot { position:relative; display:flex; align-items:center;
+  justify-content:center; width:100%; margin-top:30px;
+  padding-inline:42px; box-sizing:border-box; }
+.nq-cc-receive-foot .nq-cc-qr-open { position:absolute; right:0; top:50%;
+  transform:translateY(-50%); }
+/* The glyph's width is reserved on BOTH sides, so the pill's centre is the
+   card's centre and the two can never collide at 272px. */
+.nq-cc-receive-foot .nq-cc-request-open { max-width:100%; padding:0 12px;
+  overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.nq-cc-receive-foot[hidden] { display:none; }
+.nq-cc-qr-open { display:inline-flex; align-items:center; justify-content:center;
+  width:38px; height:38px; padding:0; border:none; border-radius:8px; background:none;
+  color:var(--nq-cc-menu-muted, rgba(31,35,72,.6)); cursor:pointer;
+  transition:background .15s var(--nimiq-ease, cubic-bezier(.25,0,0,1)); }
+.nq-cc-qr-open:hover { background:var(--nq-cc-menu-hover, rgba(31,35,72,.06)); }
+.nq-cc-qr-open:focus-visible { outline:2px solid var(--nq-cc-accent, #0582ca); outline-offset:-2px; }
+.nq-cc-qr-glyph { display:block; width:22px; height:22px; }
+/* The wallet's secondary pill: a grey capsule, never a coloured one. The one
+   coloured button in this menu is Send, and a second would make neither read
+   as the primary. */
+.nq-cc-request-open { min-height:38px; padding:0 16px; border:none; border-radius:500px;
+  font-family:inherit; font-size:14px; font-weight:700; cursor:pointer;
+  color:var(--nq-cc-menu-fg, #1f2348);
+  background:color-mix(in srgb, var(--nq-cc-menu-fg, #1f2348) 6%, transparent);
+  transition:background .15s var(--nimiq-ease, cubic-bezier(.25,0,0,1)); }
+.nq-cc-request-open:hover {
+  background:color-mix(in srgb, var(--nq-cc-menu-fg, #1f2348) 11%, transparent); }
+.nq-cc-request-open:focus-visible { outline:2px solid var(--nq-cc-accent, #0582ca); outline-offset:2px; }
+.nq-cc-send-body { display:flex; flex-direction:column; gap:10px; padding:16px 8px 8px; }
 /* display is DECLARED, not inherited from the host. A page with a global
    label{display:flex} (the playground had exactly that, for its own control
    rows) turns this into a flex container, and then text-align does nothing
    because flex packs its children to the start instead. The component cannot
    assume anything about a bare element selector on the page it is dropped
    into. */
-.nq-cc-field-label { display:block; font-size:12px; font-weight:600;
+.nq-cc-field-label { display:block; font-size:13px; font-weight:600;
   color:var(--nq-cc-menu-muted, rgba(31,35,72,.5)); }
 /* The identicon sits LEFT and the label centres on the card, independently.
    Same three-column grid as the view header above it, and for the same reason:
@@ -552,6 +728,7 @@ button.nq-cc-name:focus-visible { outline:2px solid var(--nq-cc-accent, #0582ca)
 
    Inset box-shadow for the border, never border (rule 1). */
 .nq-cc-addr-field { position:relative; border-radius:8px; padding:7px 0;
+  width:100%; max-width:204px; margin-inline:auto; box-sizing:border-box;
   background:var(--nq-cc-input-bg, var(--nq-cc-card-bg, #fff));
   box-shadow:inset 0 0 0 2px color-mix(in srgb, var(--nq-cc-menu-fg, #1f2348) 12%, transparent);
   transition:box-shadow .15s var(--nimiq-ease, cubic-bezier(.25,0,0,1)); }
@@ -566,8 +743,12 @@ button.nq-cc-name:focus-visible { outline:2px solid var(--nq-cc-accent, #0582ca)
   width:calc(14ch + 2 * var(--nq-cc-addr-gap));
   word-spacing:var(--nq-cc-addr-gap);
   outline:none; resize:none; overflow:hidden; background:transparent;
-  font-family:'Fira Mono',ui-monospace,monospace; font-size:14px; line-height:26px;
-  text-transform:uppercase; text-align:center;
+  font-family:'Fira Mono',ui-monospace,monospace; font-size:14px; line-height:28px;
+  /* LEFT, not centred. A full address fills the field exactly, so this only
+     moves a partial one and the placeholder, and those are the two states that
+     were wrong: the wallet's "NQ" sits at the start of the first cell and ours
+     floated in the middle of the box. */
+  text-transform:uppercase; text-align:left;
   color:var(--nq-cc-input-fg, var(--nq-cc-menu-fg, #1f2348)); }
 .nq-cc-addr-input::placeholder { opacity:.32; }
 /* The separators, drawn on ONE element behind the text so the textarea keeps a
@@ -587,13 +768,22 @@ button.nq-cc-name:focus-visible { outline:2px solid var(--nq-cc-accent, #0582ca)
      gap centre is 2.5ch + half a gap either side of the line's centre. Derived
      rather than eyeballed, so changing the gap moves the rules with it. */
   --nq-cc-addr-rule-x:calc(2.5ch + var(--nq-cc-addr-gap) / 2);
+  /* Six ticks, two columns by three rows, each one line tall and centred in
+     its row. A full-height rule turns the field into a table with nine cells;
+     the wallet's ticks read as separators inside one field, which is what it
+     is. */
+  --nq-cc-addr-tick:1px 16px;
   background:
-    linear-gradient(var(--nq-cc-addr-rule), var(--nq-cc-addr-rule)) calc(50% - var(--nq-cc-addr-rule-x)) 50%/1px 100% no-repeat,
-    linear-gradient(var(--nq-cc-addr-rule), var(--nq-cc-addr-rule)) calc(50% + var(--nq-cc-addr-rule-x)) 50%/1px 100% no-repeat,
-    linear-gradient(var(--nq-cc-addr-rule), var(--nq-cc-addr-rule)) 50% 33.333%/calc(100% - 20px) 1px no-repeat,
-    linear-gradient(var(--nq-cc-addr-rule), var(--nq-cc-addr-rule)) 50% 66.667%/calc(100% - 20px) 1px no-repeat; }
+    linear-gradient(var(--nq-cc-addr-rule), var(--nq-cc-addr-rule)) calc(50% - var(--nq-cc-addr-rule-x)) 16.667%/var(--nq-cc-addr-tick) no-repeat,
+    linear-gradient(var(--nq-cc-addr-rule), var(--nq-cc-addr-rule)) calc(50% + var(--nq-cc-addr-rule-x)) 16.667%/var(--nq-cc-addr-tick) no-repeat,
+    linear-gradient(var(--nq-cc-addr-rule), var(--nq-cc-addr-rule)) calc(50% - var(--nq-cc-addr-rule-x)) 50%/var(--nq-cc-addr-tick) no-repeat,
+    linear-gradient(var(--nq-cc-addr-rule), var(--nq-cc-addr-rule)) calc(50% + var(--nq-cc-addr-rule-x)) 50%/var(--nq-cc-addr-tick) no-repeat,
+    linear-gradient(var(--nq-cc-addr-rule), var(--nq-cc-addr-rule)) calc(50% - var(--nq-cc-addr-rule-x)) 83.333%/var(--nq-cc-addr-tick) no-repeat,
+    linear-gradient(var(--nq-cc-addr-rule), var(--nq-cc-addr-rule)) calc(50% + var(--nq-cc-addr-rule-x)) 83.333%/var(--nq-cc-addr-tick) no-repeat,
+    linear-gradient(var(--nq-cc-addr-rule), var(--nq-cc-addr-rule)) 50% 33.333%/calc(100% - 12px) 1px no-repeat,
+    linear-gradient(var(--nq-cc-addr-rule), var(--nq-cc-addr-rule)) 50% 66.667%/calc(100% - 12px) 1px no-repeat; }
 /* inputs: inset box-shadow border, never border (rule 1) */
-.nq-cc-input { width:100%; border:none; border-radius:8px; padding:9px 10px; font-family:inherit;
+.nq-cc-input { width:100%; border:none; border-radius:8px; padding:11px 12px; font-family:inherit; font-size:18px;
   font-size:14px; font-weight:600;
   color:var(--nq-cc-input-fg, var(--nq-cc-menu-fg, #1f2348));
   background:var(--nq-cc-input-bg, var(--nq-cc-card-bg, #fff));
@@ -601,21 +791,41 @@ button.nq-cc-name:focus-visible { outline:2px solid var(--nq-cc-accent, #0582ca)
 .nq-cc-input:focus { outline:none; box-shadow:inset 0 0 0 2px var(--nq-cc-accent, #0582ca); }
 .nq-cc-input::placeholder { font-weight:600;
   color:color-mix(in srgb, var(--nq-cc-menu-fg, #1f2348) 30%, transparent); }
-.nq-cc-amount-row { position:relative; }
-.nq-cc-amount-row .nq-cc-input { padding-right:44px; }
-.nq-cc-amount-suffix { position:absolute; right:11px; top:50%; transform:translateY(-50%);
-  font-size:13px; font-weight:700; pointer-events:none;
+/* The amount is a small centred box with the ticker BESIDE it, which is the
+   wallet's arrangement (its box is 30.4% of the sheet). A full-bleed input
+   with the ticker inside it is what a settings form looks like. */
+.nq-cc-amount-row { display:flex; align-items:center; justify-content:center; gap:8px; }
+.nq-cc-amount-row .nq-cc-input { width:auto; max-width:112px; padding:9px 10px;
+  text-align:center; }
+.nq-cc-amount-suffix { flex:none; font-size:16px; font-weight:700; pointer-events:none;
   color:color-mix(in srgb, var(--nq-cc-menu-fg, #1f2348) 45%, transparent); }
+/* Centred, because the field it labels is centred. */
+.nq-cc-send-body .nq-cc-field-label, .nq-cc-request-body .nq-cc-field-label { text-align:center; }
+.nq-cc-send-fiat, .nq-cc-request-hint { text-align:center; }
+/* Underlined-by-nothing and bordered by nothing, which is how the wallet draws
+   it: a plain centred line of text that happens to be typeable. A bordered box
+   here would read as a second required field next to the amount. */
+.nq-cc-message { width:100%; margin-top:4px; padding:6px 4px; border:none; background:none;
+  font-family:inherit; font-size:13px; text-align:center; outline:none;
+  color:var(--nq-cc-menu-fg, #1f2348); }
+.nq-cc-message::placeholder { color:color-mix(in srgb, var(--nq-cc-menu-fg, #1f2348) 40%, transparent); }
+.nq-cc-message:focus { box-shadow:inset 0 -1px 0 0 var(--nq-cc-accent, #0582ca); }
 .nq-cc-send-hint { font-size:12px; font-weight:600; color:var(--nq-cc-menu-muted, rgba(31,35,72,.5)); }
 .nq-cc-send-hint:empty { display:none; }
-.nq-cc-send-confirm { width:100%; height:36px; border:none; border-radius:500px; margin-top:2px;
-  font-family:inherit; font-size:14px; font-weight:700; cursor:pointer;
+/* Right-aligned, under the NIM suffix rather than under the digits: it belongs
+   to the field's unit, and the field is the one thing on this view the user is
+   typing into. */
+.nq-cc-send-fiat { margin:0; font-size:13px; font-weight:600;
+  color:var(--nq-cc-menu-muted, rgba(31,35,72,.5)); }
+.nq-cc-send-confirm, .nq-cc-request-copy { width:100%; height:52px; border:none; border-radius:500px; margin-top:4px;
+  font-family:inherit; font-size:16px; font-weight:700; cursor:pointer;
   color:var(--nq-cc-send-fg, #fff); background-color:var(--nq-cc-send-bg, #0582ca);
   background-image:var(--nq-cc-send-image,
     radial-gradient(100% 100% at 100% 100%, #265dd7, #0582ca)); }
-.nq-cc-send-confirm:hover:not(:disabled) { background-image:var(--nq-cc-send-image-hover,
+.nq-cc-send-confirm:hover:not(:disabled), .nq-cc-request-copy:hover { background-image:var(--nq-cc-send-image-hover,
   radial-gradient(100% 100% at 100% 100%, #1f4fbc, #0473b3)); }
-.nq-cc-send-confirm:focus-visible { outline:2px solid var(--nq-cc-accent, #0582ca); outline-offset:3px; }
+.nq-cc-send-confirm:focus-visible, .nq-cc-request-copy:focus-visible {
+  outline:2px solid var(--nq-cc-accent, #0582ca); outline-offset:3px; }
 .nq-cc-send-confirm:disabled { opacity:.4; cursor:default; }
 .nq-cc-send-error { font-size:12px; font-weight:600; text-align:center;
   color:var(--nq-cc-danger, #d94432); }
@@ -630,29 +840,57 @@ button.nq-cc-name:focus-visible { outline:2px solid var(--nq-cc-accent, #0582ca)
    chevron's width again, holding the symmetry. */
 .nq-cc-view-head { display:grid; grid-template-columns:34px 1fr 34px; align-items:center;
   padding:2px 2px 0; }
-.nq-cc-view-title { grid-column:2; text-align:center; font-size:15px; font-weight:600;
-  color:var(--nq-cc-menu-fg, #1f2348); }
-.nq-cc-back { grid-column:1; display:inline-flex; align-items:center; justify-content:center;
+/* PROPORTIONS, not absolute sizes. v0.23.0 matched the wallet's own px and
+   made this worse: 24px address type is 6.2% of a 390px sheet and 8.8% of a
+   272px card, so copying the number made our content RELATIVELY bigger than
+   the wallet's, and the card read as cramped rather than small.
+   Every size below is the wallet's share of its own sheet, measured off the
+   real screenshots and applied to 272px. Scale is 272/390 = 0.697. */
+.nq-cc-view-title { grid-column:2; min-width:0; text-align:center; font-size:19px; font-weight:700;
+  line-height:1.2; text-wrap:balance; color:var(--nq-cc-menu-fg, #1f2348); }
+.nq-cc-view-sub { margin:2px 12px 0; text-align:center; font-size:12px; font-weight:600;
+  line-height:1.35; color:var(--nq-cc-menu-muted, rgba(31,35,72,.5)); }
+.nq-cc-back, .nq-cc-shut { grid-column:1; display:inline-flex; align-items:center; justify-content:center;
   width:34px; height:34px; padding:0; border:none; border-radius:50%; background:none;
   font-family:inherit; color:var(--nq-cc-menu-muted, rgba(31,35,72,.6)); cursor:pointer;
   transition:background .15s var(--nimiq-ease, cubic-bezier(.25,0,0,1)); }
 .nq-cc-back:hover { background:var(--nq-cc-menu-hover, rgba(31,35,72,.06)); }
-.nq-cc-back:focus-visible { outline:2px solid var(--nq-cc-accent, #0582ca); outline-offset:-2px; }
+.nq-cc-back:focus-visible, .nq-cc-shut:focus-visible { outline:2px solid var(--nq-cc-accent, #0582ca); outline-offset:-2px; }
+/* The X is a FILLED DISC, which is what the wallet ships and what a bare
+   stroke glyph on a white card was not: the disc is what makes it read as a
+   button at all. 26px inside the 34px hit area, so the target stays a finger's
+   worth while the mark stays small. The back chevron is deliberately NOT a
+   disc, in the wallet either: one dismisses, one steps, and giving both the
+   same weight says they are the same control. */
+.nq-cc-shut { width:34px; height:34px; }
+.nq-cc-shut-disc { display:inline-flex; align-items:center; justify-content:center;
+  width:26px; height:26px; border-radius:50%;
+  background:color-mix(in srgb, var(--nq-cc-menu-fg, #1f2348) 10%, transparent);
+  color:var(--nq-cc-card-bg, #fff);
+  transition:background .15s var(--nimiq-ease, cubic-bezier(.25,0,0,1)); }
+.nq-cc-shut:hover .nq-cc-shut-disc {
+  background:color-mix(in srgb, var(--nq-cc-menu-fg, #1f2348) 18%, transparent); }
 .nq-cc-chevron { display:block; width:8px; height:13px; }
-.nq-cc-receive-body { display:flex; flex-direction:column; align-items:center; padding:10px 8px 8px; }
+/* The X shares every pixel of the chevron button but its column, so it shares
+   the rule too rather than restating it and drifting from it. */
+.nq-cc-shut { grid-column:3; }
+.nq-cc-cross { display:block; width:11px; height:11px; }
+.nq-cc-receive-body { display:flex; flex-direction:column; align-items:center; padding:0 8px 8px; }
 .nq-cc-qr { display:block; padding:10px; border-radius:8px;
   background:var(--nq-cc-qr-plate, #fff); }
 .nq-cc-qr:empty { display:none; padding:0; }
 .nq-cc-qr > * { display:block; width:164px; height:164px; }
-.nq-cc-receive-hint { font-size:12px; font-weight:600; color:var(--nq-cc-menu-muted, rgba(31,35,72,.45)); margin:8px 0 2px; }
+.nq-cc-receive-hint { font-size:13px; font-weight:600; color:var(--nq-cc-menu-muted, rgba(31,35,72,.45)); margin:10px 0 2px; }
 
 /* tap-to-copy address: upstream Copyable verbatim: light-blue tooltip, tinted
    field, and the blue HOLDS after copy until focus leaves */
-.nq-cc-copy-wrap { position:relative; display:block; margin-top:10px; width:100%; }
-.nq-cc-address { display:grid; grid-template-columns:repeat(var(--nq-cc-addr-cols, 3), 1fr); gap:3px 0; justify-items:center;
-  width:100%; padding:8px 6px; border:none; border-radius:6px; cursor:pointer;
+.nq-cc-copy-wrap { position:relative; display:block; margin-top:28px; width:100%;
+  text-align:center; }
+.nq-cc-address { display:grid; grid-template-columns:repeat(var(--nq-cc-addr-cols, 3), 1fr); gap:10px 0; justify-items:center;
+  width:100%; max-width:var(--nq-cc-addr-plate, 169px); margin-inline:auto; padding:14px 6px; border:none; border-radius:6px; cursor:pointer;
   background:color-mix(in srgb, var(--nq-cc-menu-fg, #1f2348) 4%, transparent);
-  font-family:'Fira Mono',ui-monospace,monospace; font-size:12px; color:var(--nq-cc-menu-muted, rgba(31,35,72,.7));
+  font-family:'Fira Mono',ui-monospace,monospace; font-size:16px; line-height:1.11;
+  color:var(--nq-cc-menu-muted, rgba(31,35,72,.7));
   transition:background .15s var(--nimiq-ease, cubic-bezier(.25,0,0,1)), color .15s var(--nimiq-ease, cubic-bezier(.25,0,0,1)); }
 .nq-cc-address:hover, .nq-cc-address:focus,
 .nq-cc-copy-wrap.nq-cc-copied .nq-cc-address, .nq-cc-copy-wrap.nq-cc-copied-hold .nq-cc-address {
@@ -682,18 +920,10 @@ button.nq-cc-name:focus-visible { outline:2px solid var(--nq-cc-accent, #0582ca)
    now clears 36px on its shortest side, which is the floor nq lint enforces and
    the size the Connect button already was. The text stays 11.5px and the fill
    stays a wash: what grew is the target, not the voice. */
-.nq-cc-contacts { display:flex; flex-wrap:wrap; gap:5px; margin:6px 0 2px; }
-.nq-cc-contacts[hidden] { display:none; }
-.nq-cc-contact { max-width:100%; min-height:36px; display:inline-flex; align-items:center;
-  padding:4px 12px; border:none; border-radius:999px;
-  background:color-mix(in srgb, var(--nq-cc-menu-fg, #1f2348) 6%, transparent);
-  color:var(--nq-cc-menu-fg, #1f2348);
-  font-family:inherit; font-size:11.5px; font-weight:700; line-height:1.3; cursor:pointer;
-  white-space:nowrap; overflow:hidden; text-overflow:ellipsis;
-  transition:background .15s var(--nimiq-ease, cubic-bezier(.25,0,0,1)); }
-.nq-cc-contact:hover { background:color-mix(in srgb, var(--nq-cc-accent, #0582ca) 12%, transparent);
-  color:var(--nq-cc-accent, #0582ca); }
-.nq-cc-contact:focus-visible { outline:2px solid var(--nq-cc-accent, #0582ca); outline-offset:2px; }
+/* The v0.20 chip rules are GONE, not overridden. They were still supplying a
+   grey pill background and 4px/12px of padding under the new face-and-name
+   contact, which is where the "Mu..." came from: the padding left ~24px for a
+   name in a 46px column. Two rules for one class is how that hides. */
 .nq-cc-copy-tooltip { position:absolute; left:50%; bottom:calc(100% + 10px);
   transform:translateX(-50%) translateY(4px); padding:8px 12px; border-radius:4px;
   background-image:var(--nq-cc-send-image,
@@ -823,6 +1053,10 @@ button.nq-cc-name:focus-visible { outline:2px solid var(--nq-cc-accent, #0582ca)
 
 /** Back chevron. Same stroke weight and linecaps as the caret it sits beside,
  *  so the two read as one family rather than two icon sets. */
+const CROSS =
+  '<svg class="nq-cc-cross" viewBox="0 0 10 10" aria-hidden="true">' +
+  '<path d="M1 1l8 8M9 1l-8 8" fill="none" stroke="currentColor" stroke-width="1.3" ' +
+  'stroke-linecap="round"/></svg>';
 const CHEVRON_LEFT =
   '<svg class="nq-cc-chevron" viewBox="0 0 6 10" aria-hidden="true">' +
   '<path d="M5 1L1 5l4 4" fill="none" stroke="currentColor" stroke-width="1.15" ' +
@@ -850,6 +1084,20 @@ const ARROW =
   '<line x1="14" y1="6" x2="1" y2="6" stroke="currentColor" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>';
 
 // wallet-verbatim ScanQrCodeIcon (upstream nimiq-style scan-qr-code.svg)
+// The Nimiq `qr` glyph, verbatim from assets/icons/nimiq-icons.json. NOT the
+// scanner icon further down this file: that one means "read someone else's
+// code" and this one means "show mine". Never redrawn (nimiq-ui rule 15).
+// The Nimiq `contact-book` glyph, verbatim from assets/icons/nimiq-icons.json.
+const CONTACT_BOOK =
+  '<svg class="nq-cc-book-glyph" viewBox="0 0 10 12" aria-hidden="true">' +
+  '<path fill="currentColor" fill-rule="evenodd" d="M8.75 1.776c0 .117.083.22.201.244a1 1 0 01.798.98v8a1 1 0 01-.999 1H1.501A1.5 1.5 0 010 10.499V1.5A1.5 1.5 0 011.501 0h6.25a1 1 0 011 1zM7.501 9.583a2.505 2.505 0 00-2.505-2.334A2.51 2.51 0 002.5 9.473a.25.25 0 00.25.276h4.592a.157.157 0 00.157-.166zM3.49 5.248a1.506 1.506 0 110 .003zM1.499 1.002a.5.5 0 000 1.001h6.125a.124.124 0 00.125-.125v-.754a.125.125 0 00-.123-.122h-6.13z" clip-rule="evenodd"/>' +
+  '</svg>';
+
+const QR_GLYPH =
+  '<svg class="nq-cc-qr-glyph" viewBox="0 0 13 13" aria-hidden="true">' +
+  '<g fill="none"><path fill="currentColor" d="M5.796 1.902a.304.304 0 00-.304-.305H1.938a.305.305 0 00-.304.305v3.553c0 .168.136.305.304.305h3.553a.305.305 0 00.305-.305zm-.609 3.249H2.243V2.206h2.944z"/><path stroke="currentColor" stroke-width=".091" d="M5.796 1.902a.304.304 0 00-.304-.305H1.938a.305.305 0 00-.304.305v3.553c0 .168.136.305.304.305h3.553a.305.305 0 00.305-.305zm0 0h-.049m-.56 3.249H2.243V2.206h2.944z"/><path fill="currentColor" stroke="currentColor" stroke-width=".091" d="M3.067 4.632h1.296a.305.305 0 00.305-.305V3.03a.305.305 0 00-.305-.304H3.067a.305.305 0 00-.305.304v1.297c0 .168.137.305.305.305Zm.304-1.297h.688v.688H3.37zM7.509 5.76h3.553a.304.304 0 00.304-.305V1.902a.304.304 0 00-.304-.305H7.509a.305.305 0 00-.305.305v3.553c0 .168.136.305.305.305Zm.304-3.554h2.944v2.945H7.813z"/><path fill="currentColor" stroke="currentColor" stroke-width=".091" d="M9.933 2.726H8.636a.304.304 0 00-.304.304v1.297c0 .168.136.305.304.305h1.297a.305.305 0 00.305-.305V3.03a.305.305 0 00-.305-.304Zm-.305 1.297h-.687v-.688h.687z"/><path fill="currentColor" d="M5.796 7.472a.304.304 0 00-.304-.304H1.938a.304.304 0 00-.304.304v3.553c0 .169.136.305.304.305h3.553a.305.305 0 00.305-.305zm-.609 3.249H2.243V7.777h2.944z"/><path stroke="currentColor" stroke-width=".091" d="M5.796 7.472a.304.304 0 00-.304-.304H1.938a.304.304 0 00-.304.304v3.553c0 .169.136.305.304.305h3.553a.305.305 0 00.305-.305zm0 0h-.049m-.56 3.249H2.243V7.777h2.944z"/><path fill="currentColor" stroke="currentColor" stroke-width=".091" d="M3.067 10.202h1.296a.305.305 0 00.305-.305V8.6a.304.304 0 00-.305-.304H3.067a.304.304 0 00-.305.304v1.297c0 .168.137.305.305.305Zm.304-1.297h.688v.688H3.37zm7.995 2.12V7.472a.304.304 0 00-.304-.304H7.509a.304.304 0 00-.305.304v3.553c0 .169.136.305.305.305h3.553a.305.305 0 00.304-.305Zm-.609-.304H7.813V7.777h2.944z"/><path fill="currentColor" stroke="currentColor" stroke-width=".091" d="M8.637 10.202h1.297a.304.304 0 00.304-.305V8.6a.304.304 0 00-.304-.304H8.637a.304.304 0 00-.304.304v1.297c0 .168.136.305.304.305Zm.305-1.297h.687v.688h-.687zM.353 3.323a.305.305 0 00.305-.304V.658h2.36a.305.305 0 000-.61H.353A.305.305 0 00.05.354V3.02c0 .168.136.304.304.304ZM12.647.049H9.982a.304.304 0 100 .609h2.36v2.361a.305.305 0 10.61 0V.353a.304.304 0 00-.305-.304Zm-.001 9.556a.304.304 0 00-.304.304v2.36h-2.36a.304.304 0 100 .61h2.664a.304.304 0 00.305-.305V9.91a.304.304 0 00-.305-.304ZM3.018 12.27H.658V9.91a.304.304 0 10-.61 0v2.664c0 .169.137.305.305.305h2.665a.305.305 0 100-.61Z"/></g>' +
+  '</svg>';
+
 const SCAN_QR =
   '<svg class="nq-cc-scan-glyph" viewBox="0 0 40 40" xmlns="http://www.w3.org/2000/svg" aria-hidden="true"><g fill="currentColor"><path d="M1.21 7.06c.67 0 1.21-.54 1.21-1.21l-.04-3.12a.3.3 0 0 1 .3-.3H5.7a1.21 1.21 0 1 0 0-2.43H2.37A2.4 2.4 0 0 0 0 2.42v3.43c0 .67.54 1.21 1.21 1.21zM5.69 37.58H2.73a.3.3 0 0 1-.3-.3v-3.13a1.21 1.21 0 1 0-2.43 0v3.43A2.4 2.4 0 0 0 2.37 40H5.7a1.21 1.21 0 0 0 0-2.42zM38.79 32.94c-.67 0-1.21.54-1.21 1.21l.04 3.12a.3.3 0 0 1-.3.3H34.3a1.21 1.21 0 1 0 0 2.43h3.32A2.4 2.4 0 0 0 40 37.58v-3.43c0-.67-.54-1.21-1.21-1.21zM37.63 0H34.3a1.21 1.21 0 1 0 0 2.42h2.96c.17 0 .3.14.3.3v3.13a1.21 1.21 0 0 0 2.43 0V2.42A2.4 2.4 0 0 0 37.63 0z"/><path fill-rule="evenodd" clip-rule="evenodd" d="M13.94 15.15H6.67c-.67 0-1.22-.54-1.22-1.21V6.67c0-.67.55-1.21 1.22-1.21h7.27c.67 0 1.21.54 1.21 1.2v7.28c0 .67-.54 1.21-1.21 1.21zM8.18 7.88a.3.3 0 0 0-.3.3v4.24c0 .17.13.3.3.3h4.24a.3.3 0 0 0 .3-.3V8.18a.3.3 0 0 0-.3-.3H8.18zM6.67 24.85h7.27c.67 0 1.21.54 1.21 1.21v7.27c0 .67-.54 1.22-1.21 1.22H6.67c-.67 0-1.22-.55-1.22-1.22v-7.27c0-.67.55-1.21 1.22-1.21zm5.75 7.27a.3.3 0 0 0 .3-.3v-4.24a.3.3 0 0 0-.3-.3H8.18a.3.3 0 0 0-.3.3v4.24c0 .17.13.3.3.3h4.24zM26.06 5.45h7.27c.67 0 1.21.55 1.21 1.22v7.27c0 .67-.54 1.21-1.2 1.21h-7.28c-.67 0-1.21-.54-1.21-1.21V6.67c0-.67.54-1.22 1.21-1.22zm5.76 7.28a.3.3 0 0 0 .3-.3V8.17a.3.3 0 0 0-.3-.3h-4.24a.3.3 0 0 0-.3.3v4.24c0 .17.13.3.3.3h4.24z"/><path d="M17.58 10.6h1.2a.9.9 0 1 0 0-1.81.3.3 0 0 1-.3-.3V6.66a.9.9 0 1 0-1.81 0V9.7c0 .5.4.9.9.9zM21.21 7.58c.17 0 .3.13.3.3v6.66a.9.9 0 1 0 1.82 0V6.67c0-.5-.4-.91-.9-.91H21.2a.9.9 0 1 0 0 1.82zM12.42 18.18c0 .5.41.91.91.91h4.25c.5 0 .9-.4.9-.9v-4.86a.9.9 0 1 0-1.81 0v3.64a.3.3 0 0 1-.3.3h-3.04c-.5 0-.9.4-.9.91z"/><path d="M9.09 17.27c-.5 0-.9.4-.9.91v3.03a.3.3 0 0 1-.31.3H6.67a.9.9 0 1 0 0 1.82h15.75c.5 0 .91-.4.91-.9v-3.64a.9.9 0 0 0-1.82 0v2.42a.3.3 0 0 1-.3.3h-10.9a.3.3 0 0 1-.31-.3v-3.03c0-.5-.4-.9-.91-.9zM22.12 26.06c0-.5-.4-.9-.9-.9h-3.64c-.5 0-.91.4-.91.9v4.85a.9.9 0 1 0 1.81 0v-3.64c0-.16.14-.3.3-.3h2.43c.5 0 .91-.4.91-.9zM33.33 32.42h-10.3a.3.3 0 0 1-.3-.3V29.7a.9.9 0 1 0-1.82 0v3.63c0 .5.4.91.9.91h11.52a.9.9 0 0 0 0-1.82z"/><path fill-rule="evenodd" clip-rule="evenodd" d="M29.1 30h-3.65a.9.9 0 0 1-.9-.91v-3.64c0-.5.4-.9.9-.9h3.64c.5 0 .91.4.91.9v3.64c0 .5-.4.91-.9.91zm-2.43-3.64a.3.3 0 0 0-.3.3v1.22c0 .17.13.3.3.3h1.2a.3.3 0 0 0 .31-.3v-1.21a.3.3 0 0 0-.3-.3h-1.21z"/><path d="M32.73 20.9c-.5 0-.91.42-.91.92v7.88a.9.9 0 0 0 1.82 0v-7.88c0-.5-.41-.91-.91-.91zM33.64 17.58c0-.5-.41-.91-.91-.91h-6.67c-.5 0-.9.4-.9.9v3.64a.9.9 0 0 0 1.8 0V18.8c0-.17.15-.3.31-.3h5.46c.5 0 .9-.41.9-.91z"/></g></svg>';
 
@@ -899,10 +1147,6 @@ const SWITCH_ICON =
   '<path d="M16.603 6.779l-2.987-5.306a1.37 1.37 0 00-1.189-.702H5.57c-.489 0-.941.267-1.186.703L1.396 6.779"/>' +
   '<path d="M1.396 9.752l2.988 5.304a1.36 1.36 0 001.186.703h6.858a1.36 1.36 0 001.186-.703l2.988-5.304"/>' +
   '<path d="M3.24 5.773L1.396 6.779L1.3 4.681M14.758 10.757L16.602 9.752L16.697 11.85"/></g></svg>';
-
-// wallet-verbatim cashlink glyph (upstream nimiq-style cashlink.svg)
-const CASHLINK_ICON =
-  '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" aria-hidden="true"><g fill="none" stroke="currentColor" stroke-linecap="round" stroke-width="2.5px" stroke-linejoin="round"><path d="M40.25,23.25v-.5a6.5,6.5,0,0,0-6.5-6.5h-3.5a6.5,6.5,0,0,0-6.5,6.5v6.5a6.5,6.5,0,0,0,6.5,6.5h2"/><path d="M23.75,40.75v.5a6.5,6.5,0,0,0,6.5,6.5h3.5a6.5,6.5,0,0,0,6.5-6.5v-6.5a6.5,6.5,0,0,0-6.5-6.5h-2"/><line x1="32" y1="11.25" x2="32" y2="15.25"/><line x1="32" y1="48.75" x2="32" y2="52.75"/></g></svg>';
 
 /** The gold brand hexagon for the "Open in Nimiq Pay" row. The gradient id is
  *  minted per instance (rule 3: never reuse a gradient id on one page). */
@@ -1091,6 +1335,9 @@ export function mountMiniWallet(
 
   // receive + send views (each behind its action button, like the wallet)
   const viewReceive = el('div', 'nq-cc-view-receive', menu);
+  const viewQr = el('div', 'nq-cc-view-qr', menu);
+  const viewRequest = el('div', 'nq-cc-view-request', menu);
+  const viewSendTo = el('div', 'nq-cc-view-sendto', menu);
   const viewSend = el('div', 'nq-cc-view-send', menu);
   const viewMain = el('div', 'nq-cc-view-main', menu);
 
@@ -1240,17 +1487,15 @@ export function mountMiniWallet(
   }
   el('div', 'nq-cc-divider nq-cc-when-connected nq-cc-when-hub', viewMain);
 
-  // ---- cashlink row (opt-in, hub + connected) ------------------------------
-  if (options.createCashlink) {
-    const row = el('button', 'nq-cc-row nq-cc-when-connected nq-cc-when-hub', viewMain);
-    row.type = 'button';
-    const slot = el('span', 'nq-cc-cashlink-slot', row);
-    slot.innerHTML = CASHLINK_ICON;
-    const label = el('span', 'nq-cc-strong', row);
-    tNode(label, 'shell.createCashlink');
-    row.addEventListener('click', () => { setOpen(false); options.createCashlink!(); });
-    el('div', 'nq-cc-divider nq-cc-when-connected nq-cc-when-hub', viewMain);
-  }
+  // ---- no cashlink row here any more ---------------------------------------
+  // It lives in ONE place, the send step-one footer, which is where the wallet
+  // has it and for the wallet's reason: a cashlink is what you make when you
+  // have no address to send to, which is exactly the question that footer asks
+  // ("Address unavailable?"). The same action on a main-menu row AND under the
+  // send field was two doors to one room (Andrew, 2026-09-16: "we could just
+  // have that cash link creation in one place").
+  //
+  // `createCashlink` is unchanged as an option, so no app has to edit anything.
 
   // ---- language accordion ---------------------------------------------------
   const langSection = el('div', 'nq-cc-section', viewMain);
@@ -1338,6 +1583,10 @@ export function mountMiniWallet(
         try { localStorage.setItem(FIAT_STORE_KEY, ticker); } catch { /* ignore */ }
         renderFiatValue();
         if (hasBalance) void refreshBalance(true);
+        // The send view's rate is now for the wrong currency. Dropping it is
+        // enough: openSend refetches, and the picker is only reachable from the
+        // main view, so nothing is on screen to restate.
+        sendRate = null;
         options.fiat!.onChange?.(ticker);
         window.setTimeout(() => collapse(acc, body), 260);
       });
@@ -1496,9 +1745,30 @@ export function mountMiniWallet(
     // The i18n subscription retranslates tNode content, but an aria-label is an
     // attribute and is not one of those nodes.
     backLabels.push(btn);
+    // The third grid column was reserved for symmetry and held nothing. The
+    // wallet gives its sheets both escapes because they are not the same one:
+    // back steps up a level, the X dismisses the menu outright. Leaving a view
+    // you opened by mistake took two taps before this.
+    const shut = el('button', 'nq-cc-shut', head);
+    shut.type = 'button';
+    shut.setAttribute('aria-label', i18n.t('shell.close'));
+    // The glyph lives inside a disc span rather than straight in the button:
+    // the button owns the 34px hit area and the disc owns the 26px mark.
+    const disc = el('span', 'nq-cc-shut-disc', shut);
+    disc.insertAdjacentHTML('beforeend', CROSS);
+    shut.addEventListener('click', () => setOpen(false));
+    shutLabels.push(shut);
     return title;
   }
   const backLabels: HTMLElement[] = [];
+  const shutLabels: HTMLElement[] = [];
+  // A placeholder is an attribute, so the i18n subscription's tNode pass does
+  // not reach it either.
+  const messageLabels: HTMLInputElement[] = [];
+  // Declared up here with its siblings, not next to the sheet it belongs to:
+  // the receive footer pushes into it BEFORE that sheet is built, and a const
+  // read from its own temporal dead zone throws at mount.
+  const qrLabels: HTMLElement[] = [];
 
   // ---- receive view content -------------------------------------------------
   // The title carries the asset when one is being received, so repaintReceive
@@ -1506,8 +1776,27 @@ export function mountMiniWallet(
   const receiveTitle = viewHeader(
     viewReceive, 'shell.receive', () => root.classList.remove('nq-cc-show-receive'),
   );
-  el('div', 'nq-cc-divider', viewReceive);
+  // No divider under the title on this sheet, or the QR and request ones: the
+  // wallet's sheets have no rule there, and ours both drew a line it does not
+  // have and pushed the subtitle 32px down where the wallet leaves 12.
+  // The main menu keeps its dividers; those separate SECTIONS, not a title.
+  //
+  // The wallet's own one-line instruction. Receive is the one view where the
+  // user's job is not on the screen: everything here is READ and handed to
+  // someone else, so the line that says so is not decoration.
+  const receiveSub = el('p', 'nq-cc-view-sub', viewReceive);
+  tNode(receiveSub, 'shell.receiveSub');
   const receiveBody = el('div', 'nq-cc-receive-body', viewReceive);
+  // The hero is the IDENTICON, which is the wallet's own hierarchy and the
+  // right one: the face is what tells the sender at a glance that they have the
+  // correct person, and 36 characters is not something anybody reads back.
+  //
+  // It needs `identicon` wired. Without one, the QR stays the hero exactly as
+  // before, because the alternative is a placeholder hexagon that claims an
+  // identity it cannot show, and because nineteen apps must not silently lose
+  // the one graphic on this screen a camera can read.
+  const receiveHero = el('div', 'nq-cc-receive-hero', receiveBody);
+  receiveHero.hidden = true;
   const qrSlot = el('div', 'nq-cc-qr', receiveBody);
   const copyWrap = el('span', 'nq-cc-copy-wrap', receiveBody);
   const addressBtn = el('button', 'nq-cc-address', copyWrap);
@@ -1516,14 +1805,115 @@ export function mountMiniWallet(
   const copyTip = el('span', 'nq-cc-copy-tooltip', copyWrap);
   copyTip.setAttribute('aria-hidden', 'true');
   tNode(copyTip, 'shell.copied');
-  const hint = el('p', 'nq-cc-receive-hint', receiveBody);
-  tNode(hint, 'shell.tapToCopy');
+  // No "Tap the address to copy". The wallet does not carry one, and the
+  // Copied tooltip already confirms the tap, so the line explained a thing the
+  // interface says for itself and left a stranded grey sentence under the
+  // plate doing it.
+  //
+  // The footer is the wallet's: a Create request link pill, with the QR glyph
+  // to its right.
+  const receiveFoot = el('div', 'nq-cc-receive-foot', receiveBody);
+  receiveFoot.hidden = true;
+  const requestOpen = el('button', 'nq-cc-request-open', receiveFoot);
+  requestOpen.type = 'button';
+  tNode(requestOpen, 'shell.requestLink');
+  requestOpen.addEventListener('click', () => openRequest());
+  const qrOpen = el('button', 'nq-cc-qr-open', receiveFoot);
+  qrOpen.type = 'button';
+  qrOpen.setAttribute('aria-label', i18n.t('shell.showQr'));
+  qrOpen.insertAdjacentHTML('beforeend', QR_GLYPH);
+  qrOpen.addEventListener('click', () => root.classList.add('nq-cc-show-qr'));
+  qrLabels.push(qrOpen);
   // The wrong-chain guard. Below the address rather than above it, because it
   // is the last thing read before the address is copied, and it is only ever
   // filled for a specific asset (the account's own NIM address needs no
   // warning, and a warning on every screen is a warning nobody reads).
   const netWarn = el('p', 'nq-cc-net-warn', receiveBody);
   netWarn.hidden = true;
+
+  // ---- the QR sheet -------------------------------------------------------
+  // Its own view, titled for the asset, the way the wallet's "NIM Address"
+  // sheet is. Back returns to receive rather than dismissing outright, which is
+  // one better than the wallet: its sheet offers only the X.
+  const qrTitle = viewHeader(
+    viewQr, 'shell.addressSheet', () => root.classList.remove('nq-cc-show-qr'),
+  );
+
+  const qrBody = el('div', 'nq-cc-qr-body', viewQr);
+  const qrBig = el('div', 'nq-cc-qr', qrBody);
+  const qrLine = el('p', 'nq-cc-qr-line', qrBody);
+  const qrScan = el('p', 'nq-cc-qr-scan', qrBody);
+
+  /** First three blocks, an ellipsis, last three. The wallet elides the middle
+   *  rather than the tail: the ends are the halves a person recognises as their
+   *  own, and a trailing "..." hides exactly the part that differs between two
+   *  addresses starting the same way. */
+  function elideAddress(compact: string): string {
+    const blocks = compact.toUpperCase().match(/.{1,4}/g) ?? [compact];
+    if (blocks.length <= 4) return blocks.join(' ');
+    return `${blocks.slice(0, 2).join(' ')} \u2022\u2022\u2022 ${blocks.slice(-2).join(' ')}`;
+  }
+
+  // ---- the request-link sheet ---------------------------------------------
+  const requestTitle = viewHeader(
+    viewRequest, 'shell.requestTitle', () => root.classList.remove('nq-cc-show-request'),
+  );
+
+  const requestBody = el('div', 'nq-cc-request-body', viewRequest);
+  const requestAmountLabel = el('label', 'nq-cc-field-label', requestBody);
+  tNode(requestAmountLabel, 'shell.amount');
+  const requestAmountRow = el('div', 'nq-cc-amount-row', requestBody);
+  const requestAmount = el('input', 'nq-cc-input', requestAmountRow);
+  requestAmount.placeholder = '0';
+  requestAmount.inputMode = 'decimal';
+  requestAmount.autocomplete = 'off';
+  const requestSuffix = el('span', 'nq-cc-amount-suffix', requestAmountRow);
+  requestSuffix.textContent = 'NIM';
+  // An empty amount is not an incomplete form, it is a request for any amount,
+  // which is how you say "pay me" without naming a price. Said out loud so the
+  // empty field does not read as something waiting to be filled.
+  const requestHint = el('p', 'nq-cc-request-hint', requestBody);
+  tNode(requestHint, 'shell.anyAmount');
+  const requestLinkOut = el('p', 'nq-cc-request-link', requestBody);
+  const requestCopyWrap = el('span', 'nq-cc-copy-wrap', requestBody);
+  const requestCopy = el('button', 'nq-cc-request-copy', requestCopyWrap);
+  requestCopy.type = 'button';
+  tNode(requestCopy, 'shell.copyLink');
+  const requestCopyTip = el('span', 'nq-cc-copy-tooltip', requestCopyWrap);
+  requestCopyTip.setAttribute('aria-hidden', 'true');
+  tNode(requestCopyTip, 'shell.copied');
+
+  /** The link the Copy button will put on the clipboard. Recomputed as the
+   *  amount is typed, so what is shown is always what gets copied. */
+  function renderRequestLink(): void {
+    const address = receiveAddress ?? wallet?.account?.address;
+    if (!address) return;
+    const nim = Number(requestAmount.value.replace(',', '.'));
+    const luna = Number.isFinite(nim) && nim > 0 ? nimToLuna(nim) : 0n;
+    requestLinkOut.textContent = nimiqRequestLink(address, {
+      amountLuna: luna,
+      basePath: options.requestLinkBase,
+    });
+  }
+  requestAmount.addEventListener('input', renderRequestLink);
+
+  function openRequest(): void {
+    if (!wallet?.account) return;
+    requestAmount.value = '';
+    renderRequestLink();
+    requestTitle.textContent = i18n.t('shell.requestTitle', { ticker: 'NIM' });
+    root.classList.add('nq-cc-show-request');
+  }
+
+  let requestCopyTimer: ReturnType<typeof setTimeout> | undefined;
+  requestCopy.addEventListener('click', () => {
+    const link = requestLinkOut.textContent;
+    if (!link) return;
+    try { void navigator.clipboard.writeText(link); } catch { /* clipboard unavailable */ }
+    requestCopyWrap.classList.add('nq-cc-copied');
+    clearTimeout(requestCopyTimer);
+    requestCopyTimer = setTimeout(() => requestCopyWrap.classList.remove('nq-cc-copied'), 1200);
+  });
 
   /** Whichever address the receive view is currently showing. Defaults to the
    *  account, and is repointed per asset by openReceive. Copy must read THIS,
@@ -1542,26 +1932,25 @@ export function mountMiniWallet(
   addressBtn.addEventListener('blur', () => copyWrap.classList.remove('nq-cc-copied-hold'));
 
   // ---- send view content ----------------------------------------------------
-  viewHeader(viewSend, 'shell.send', () => closeSend());
-  el('div', 'nq-cc-divider', viewSend);
-  const sendBody = el('div', 'nq-cc-send-body', viewSend);
-  // The label row carries the recipient identicon, because the identicon is the
-   // only thing on this screen that tells you at a GLANCE that you are paying
-   // the person you meant to. Reading 36 characters back is not something people
-   // do; recognising a face they have seen before is. It appears the moment the
-   // address is a real one and goes again if you edit it back into nonsense, so
-   // its presence IS the validity signal.
-  const recipientHead = el('div', 'nq-cc-field-head', sendBody);
+  // "Send Amount", not "Send": the wallet splits this into Send Transaction
+  // then Set Amount, and the half this sheet is standing in for is the second.
+  // ---- step one: who ------------------------------------------------------
+  viewHeader(viewSendTo, 'shell.sendTransaction', () => closeSend());
+  const sendToBody = el('div', 'nq-cc-sendto-body', viewSendTo);
+  // The identicon still rides the label, and still IS the validity signal: it
+  // appears the moment the address is real and goes again if you edit it back
+  // into nonsense. Recognising a face beats reading 36 characters back.
+  const recipientHead = el('div', 'nq-cc-field-head', sendToBody);
   const recipientIcon = el('span', 'nq-cc-recipient-icon', recipientHead);
-  const recipientLabel = el('label', 'nq-cc-field-label', recipientHead);
-  tNode(recipientLabel, 'shell.recipient');
+  const recipientLabel = el('label', 'nq-cc-eyebrow', recipientHead);
+  tNode(recipientLabel, 'shell.enterAddress');
 
   // Nine four-char blocks in a 3x3 grid, the wallet's own send-modal field.
-  const recipientWrap = el('div', 'nq-cc-addr-field', sendBody);
+  const recipientWrap = el('div', 'nq-cc-addr-field', sendToBody);
   el('span', 'nq-cc-addr-rules', recipientWrap);
   const recipientInput = el('textarea', 'nq-cc-addr-input', recipientWrap);
   recipientInput.rows = 3;
-  recipientInput.placeholder = formatAddressBlocks('NQ00000000000000000000000000000000000');
+  recipientInput.placeholder = 'NQ';
   recipientInput.autocomplete = 'off';
   recipientInput.spellcheck = false;
   recipientInput.setAttribute('aria-label', i18n.t('shell.recipient'));
@@ -1579,8 +1968,38 @@ export function mountMiniWallet(
   // screen and checkable before confirming. Handing an address straight to the
   // signer because a name was tapped removes the last chance to notice it is
   // the wrong one.
-  const contactsRow = el('div', 'nq-cc-contacts', sendBody);
+  // The band, above the field where the wallet puts it: a saved recipient is a
+  // way to SKIP the typing, and an offer to skip work belongs before the work.
+  const contactsBand = el('div', 'nq-cc-contacts-band', sendToBody);
+  contactsBand.hidden = true;
+  const book = el('div', 'nq-cc-book', contactsBand);
+  book.insertAdjacentHTML('beforeend', CONTACT_BOOK);
+  const bookLabel = el('span', 'nq-cc-book-label', book);
+  tNode(bookLabel, 'shell.contacts');
+  el('div', 'nq-cc-contacts-rule', contactsBand);
+  const contactsRow = el('div', 'nq-cc-contacts', contactsBand);
   contactsRow.hidden = true;
+  sendToBody.insertBefore(contactsBand, recipientHead);
+
+  // The footer, which only exists when the host wired something for it. An
+  // "Address unavailable?" that offers nothing is worse than no footer.
+  const sendToFoot = el('div', 'nq-cc-sendto-foot', sendToBody);
+  sendToFoot.hidden = !options.createCashlink && !options.scan;
+  if (options.createCashlink) {
+    const ask = el('p', 'nq-cc-unavailable', sendToFoot);
+    tNode(ask, 'shell.addressUnavailable');
+    const pill = el('button', 'nq-cc-request-open', sendToFoot);
+    pill.type = 'button';
+    tNode(pill, 'shell.createCashlink');
+    pill.addEventListener('click', () => { setOpen(false); options.createCashlink!(); });
+  }
+  if (options.scan) {
+    const scanBtn = el('button', 'nq-cc-scan-open', sendToFoot);
+    scanBtn.type = 'button';
+    scanBtn.setAttribute('aria-label', 'Scan QR code');
+    scanBtn.insertAdjacentHTML('beforeend', SCAN_QR);
+    scanBtn.addEventListener('click', () => { setOpen(false); options.scan!(); });
+  }
 
   /** After a send lands, offer to save a recipient the book does not hold.
    *
@@ -1621,12 +2040,20 @@ export function mountMiniWallet(
     // is what the built-in send view moves.
     const usable = entries.filter((c) => (c.asset ?? 'NIM') === 'NIM');
     contactsRow.textContent = '';
-    contactsRow.hidden = usable.length === 0;
-    for (const contact of usable) {
+    // THREE, like the wallet's row of recents. A fourth would either shrink the
+    // faces past recognising or push the band wider than the card.
+    const shown = usable.slice(0, 3);
+    contactsRow.hidden = shown.length === 0;
+    contactsBand.hidden = shown.length === 0;
+    for (const contact of shown) {
       const chip = el('button', 'nq-cc-contact', contactsRow);
       chip.type = 'button';
-      chip.textContent = contact.label;
       chip.title = contact.address;
+      const face = el('span', 'nq-cc-contact-icon', chip);
+      if (options.identicon) face.appendChild(options.identicon(contact.address, 40));
+      else face.insertAdjacentHTML('beforeend', PLACEHOLDER_HEX);
+      const name = el('span', 'nq-cc-contact-name', chip);
+      name.textContent = contact.label;
       chip.addEventListener('click', () => {
         recipientInput.value = formatAddressBlocks(contact.address);
         validateSend();
@@ -1636,9 +2063,31 @@ export function mountMiniWallet(
         // is so the field reads from its beginning, which is the half people
         // actually recognise, rather than parking mid-address.
         recipientInput.setSelectionRange(0, 0);
+        advanceToAmount();
       });
     }
   }
+  // ---- step two: how much -------------------------------------------------
+  viewHeader(viewSend, 'shell.sendAmount', () => {
+    // Back goes to the address step, NOT out of the flow: an amount you want
+    // to change is a different correction from a recipient you want to change,
+    // and losing the address to fix a typo in the number is the worst of both.
+    root.classList.remove('nq-cc-show-send');
+    root.classList.add('nq-cc-show-sendto');
+  });
+  const sendBody = el('div', 'nq-cc-send-body', viewSend);
+  // BOTH parties, which is the whole reason the wallet can afford a second
+  // sheet: by here the recipient is settled, so the screen can spend its room
+  // confirming who is paying whom instead of collecting it.
+  const parties = el('div', 'nq-cc-parties', sendBody);
+  const senderParty = el('div', 'nq-cc-party', parties);
+  const senderIcon = el('span', 'nq-cc-party-icon', senderParty);
+  const senderName = el('span', 'nq-cc-party-name', senderParty);
+  el('span', 'nq-cc-party-dash', parties);
+  const recipientParty = el('div', 'nq-cc-party', parties);
+  const recipientPartyIcon = el('span', 'nq-cc-party-icon', recipientParty);
+  const recipientPartyName = el('span', 'nq-cc-party-name nq-cc-mono', recipientParty);
+
   const amountLabel = el('label', 'nq-cc-field-label', sendBody);
   tNode(amountLabel, 'shell.amount');
   const amountRow = el('div', 'nq-cc-amount-row', sendBody);
@@ -1648,6 +2097,29 @@ export function mountMiniWallet(
   amountInput.autocomplete = 'off';
   const amountSuffix = el('span', 'nq-cc-amount-suffix', amountRow);
   amountSuffix.textContent = 'NIM';
+  // The fiat value of what is about to leave, which the wallet shows always,
+  // even at zero. NIM is the denomination; the number a person actually decided
+  // on is the one in their own currency, and a send screen that makes them
+  // convert it in their head is a send screen that gets the amount wrong.
+  const sendFiat = el('p', 'nq-cc-send-fiat', sendBody);
+  // The wallet's public message, which fits now that the amount has a sheet of
+  // its own. It rides SendArgs.data, so it is the transaction's own data field
+  // and it really does go on chain, which is why the limit below is real.
+  const messageInput = el('input', 'nq-cc-message', sendBody);
+  messageInput.type = 'text';
+  messageInput.autocomplete = 'off';
+  messageInput.placeholder = i18n.t('shell.publicMessage');
+  messageLabels.push(messageInput);
+  // 64 BYTES, not characters: that is Nimiq core's cap in
+  // BasicAccount.verifyIncomingTransaction, and a UTF-8 emoji spends four of
+  // them. Trimming by length would let a message of 30 emoji through and the
+  // node would reject the transaction after the wallet had already asked
+  // somebody to sign it.
+  messageInput.addEventListener('input', () => {
+    while (utf8Bytes(messageInput.value) > 64) {
+      messageInput.value = [...messageInput.value].slice(0, -1).join('');
+    }
+  });
   const availableHint = el('p', 'nq-cc-send-hint', sendBody);
   const sendError = el('p', 'nq-cc-send-error', sendBody);
   const sendConfirm = el('button', 'nq-cc-send-confirm', sendBody);
@@ -1690,15 +2162,79 @@ export function mountMiniWallet(
     const n = Number(amountInput.value.replace(',', '.'));
     return Number.isFinite(n) ? n : 0;
   };
+  /** The rate behind the fiat line, read once per open of the send view.
+   *
+   *  Not per keystroke: that is a request per character typed. And not live
+   *  either, because a rate that moves mid-form changes the number under the
+   *  field while someone is reading it, which is worse than a number that is a
+   *  minute old. Cleared when the reference currency changes, so the next open
+   *  reads the new one. */
+  let sendRate: number | null = null;
+
+  function renderSendFiat(nim: number): void {
+    if (!hasFiat || sendRate === null) { sendFiat.hidden = true; return; }
+    sendFiat.hidden = false;
+    sendFiat.textContent = fmtFiat(nim * sendRate, fiatTicker);
+  }
+
+  async function refreshSendRate(): Promise<void> {
+    if (!hasFiat) { renderSendFiat(0); return; }
+    try {
+      sendRate = await options.fiat!.rate(fiatTicker);
+    } catch {
+      // No rate is a missing line, never a blocked send. The amount in NIM is
+      // the authoritative one either way.
+      sendRate = null;
+    }
+    renderSendFiat(amountNim());
+  }
+
   function validateSend(): void {
     const okAddress = NIM_ADDRESS_RE.test(compactRecipient());
     renderRecipientIcon(okAddress ? compactRecipient() : null);
     const nim = amountNim();
+    renderSendFiat(nim);
     const okAmount = nim > 0 && (balanceLuna === null || nim <= lunaToNim(balanceLuna));
+    // The recipient is settled by the time this sheet is up, so the button is
+    // gated on the amount alone. okAddress stays in the condition as a belt: a
+    // step-two with an invalid address should never be reachable, and if it
+    // ever is, it must not be able to pay.
     sendConfirm.disabled = !(okAddress && okAmount);
   }
   recipientInput.addEventListener('input', validateSend);
   amountInput.addEventListener('input', validateSend);
+
+  /** Draw the two faces on the amount sheet. Both, not just the recipient:
+   *  "am I paying the right person" and "from which of my accounts" are two
+   *  questions and this screen is the last place to ask either. */
+  function renderParties(): void {
+    const from = wallet?.account;
+    if (!from) return;
+    senderName.textContent = from.label || formatAddressBlocks(from.address).slice(0, 9);
+    const blocks = compactRecipient().match(/.{1,4}/g) ?? [];
+    recipientPartyName.textContent = blocks.slice(0, 3).join(' ');
+    if (!options.identicon) return;
+    senderIcon.textContent = '';
+    senderIcon.appendChild(options.identicon(from.address, 56));
+    recipientPartyIcon.textContent = '';
+    recipientPartyIcon.appendChild(options.identicon(compactRecipient(), 56));
+  }
+
+  /** Step one to step two, the moment the address is real.
+   *
+   *  No Next button, which is the wallet's behaviour too: the field is a fixed
+   *  36 characters, so "finished typing" is not a guess, and a button whose
+   *  only job is to acknowledge a complete form is a tap for nothing. It fires
+   *  on a paste and on a contact chip the same way. */
+  function advanceToAmount(): void {
+    if (!NIM_ADDRESS_RE.test(compactRecipient())) return;
+    if (root.classList.contains('nq-cc-show-send')) return;
+    renderParties();
+    root.classList.remove('nq-cc-show-sendto');
+    root.classList.add('nq-cc-show-send');
+    amountInput.focus();
+  }
+  recipientInput.addEventListener('input', advanceToAmount);
 
   function openSend(): void {
     if (!wallet?.account) return;
@@ -1707,14 +2243,21 @@ export function mountMiniWallet(
     availableHint.textContent =
       balanceLuna !== null ? `${i18n.t('shell.available')}: ${fmtNim(balanceLuna)} NIM` : '';
     validateSend();
-    root.classList.add('nq-cc-show-send');
-    recipientInput.focus();
+    void refreshSendRate();
+    // Step ONE, always. A flow that reopened on the amount sheet would be
+    // offering to pay whoever was in the field last time.
+    root.classList.add('nq-cc-show-sendto');
+    // Deliberately NOT focused. The wallet's field sits unfocused, ours opened
+    // wearing a blue ring across the whole card, and on a phone the focus
+    // throws the keyboard over the sheet before anybody has decided to type.
+    // The amount field IS focused on advance, because by then they have.
     // Read on open, not at mount: the host's book can change between sends, and
     // a list captured at mount goes stale in a long-lived page.
     void renderContacts();
   }
   function closeSend(): void {
     root.classList.remove('nq-cc-show-send');
+    root.classList.remove('nq-cc-show-sendto');
   }
 
   sendConfirm.addEventListener('click', async () => {
@@ -1725,9 +2268,11 @@ export function mountMiniWallet(
     sendError.textContent = '';
     sendConfirm.textContent = i18n.t('shell.sending');
     try {
+      const message = messageInput.value.trim();
       const result = await wallet.pay({
         recipient: spaced,
         valueLuna: nimToLuna(amountNim()),
+        ...(message ? { data: message } : {}),
       });
       if (result) {
         viewSend.classList.add('nq-cc-sent');
@@ -1754,6 +2299,7 @@ export function mountMiniWallet(
       }
     } finally {
       sendConfirm.textContent = i18n.t('shell.send');
+      messageInput.value = '';
       validateSend();
     }
   });
@@ -1764,9 +2310,13 @@ export function mountMiniWallet(
    *  address. Held so a language switch can restate the label and warning. */
   let receiveAsset: ShellAsset | null = null;
   repaintReceive = (): void => {
-    receiveTitle.textContent = receiveAsset
-      ? `${i18n.t('shell.receive')} ${receiveAsset.ticker}`
-      : i18n.t('shell.receive');
+    // The bare "Receive" is gone. With no asset this view IS the account's own
+    // NIM address, and the wallet's sheet names the coin ("Receive NIM"), which
+    // is also the last place to notice you opened the wrong asset.
+    const ticker = receiveAsset ? receiveAsset.ticker : 'NIM';
+    receiveTitle.textContent = `${i18n.t('shell.receive')} ${ticker}`;
+    qrTitle.textContent = i18n.t('shell.addressSheet', { ticker });
+    qrScan.textContent = i18n.t('shell.scanToSend', { ticker });
     netWarn.hidden = !receiveAsset;
     netWarn.textContent = receiveAsset
       ? i18n.t('shell.networkOnly', {
@@ -1811,13 +2361,48 @@ export function mountMiniWallet(
     // `nimiq:` is correct for NIM and wrong for every other chain, so it is only
     // applied to the account address. An asset says what it wants via `uri`, and
     // the default is the bare address, which every scanner understands.
+    // Hero mode: an identicon leads and the code lives on its own sheet, which
+    // is the wallet's hierarchy. Without an `identicon` renderer there is no
+    // hero to lead with, so the QR stays where it was.
+    const hero = !!options.identicon;
+    receiveHero.hidden = !hero;
+    receiveFoot.hidden = !hero;
+    // A Nimiq request link over a Polygon address is a link to nothing, the
+    // same hazard the `nimiq:` QR payload is already guarded against.
+    requestOpen.hidden = !!asset;
+    qrSlot.hidden = hero;
+    if (hero) {
+      receiveHero.textContent = '';
+      receiveHero.appendChild(options.identicon!(address, 100));
+    }
+
+    // BEFORE the QR, because it does not depend on it. See the catch below.
+    qrLine.textContent = elideAddress(compact);
+
     const payload = asset ? (asset.uri?.(compact) ?? compact) : `nimiq:${compact}`;
     if (qrFor !== payload) {
-      qrSlot.textContent = '';
       // The host's renderer wins; without one this is the wallet's own QR
       // rather than nothing, which is what it used to be.
-      qrSlot.appendChild(options.qr ? options.qr(payload, 164) : nimiqQr(payload, 164, qrSlot));
-      qrFor = payload;
+      //
+      // Bigger on the sheet than inline: the sheet is a whole screen whose only
+      // job is being scanned, and a phone held at arm's length is the case it
+      // has to work for.
+      const slot = hero ? qrBig : qrSlot;
+      const size = hero ? 200 : 164;
+      try {
+        slot.textContent = '';
+        slot.appendChild(options.qr ? options.qr(payload, size) : nimiqQr(payload, size, slot));
+        qrFor = payload;
+      } catch {
+        // A QR that cannot be drawn must not take the receive view with it, and
+        // it used to: the draw was the LAST thing openReceive did, so a host
+        // renderer that threw aborted the function and left the sheet
+        // half-built with no error surfaced anywhere. The ADDRESS is the thing
+        // being received and it is already on screen; the code is the
+        // convenience. Found by a test, on a canvas-less DOM.
+        slot.textContent = '';
+        qrFor = '';
+      }
     }
   }
 
@@ -1926,6 +2511,9 @@ export function mountMiniWallet(
       void refreshBalance();
     } else {
       root.classList.remove('nq-cc-show-receive');
+      root.classList.remove('nq-cc-show-qr');
+      root.classList.remove('nq-cc-show-request');
+      root.classList.remove('nq-cc-show-sendto');
       root.classList.remove('nq-cc-show-send');
       window.removeEventListener('resize', clampMenu);
       document.removeEventListener('click', onDocClick, true);
@@ -1986,6 +2574,9 @@ export function mountMiniWallet(
   const unsubLang = i18n.onChange(() => {
     applyLang();
     for (const btn of backLabels) btn.setAttribute('aria-label', i18n.t('shell.back'));
+    for (const btn of shutLabels) btn.setAttribute('aria-label', i18n.t('shell.close'));
+    for (const btn of qrLabels) btn.setAttribute('aria-label', i18n.t('shell.showQr'));
+    for (const f of messageLabels) f.placeholder = i18n.t('shell.publicMessage');
     renderLangValue();
     renderFaceFlag();
     renderFace();

@@ -1,6 +1,6 @@
 // The receive QR, ported from the registry's qr-code component (which is the
-// wallet's own QrCode.vue): rounded modules filled with the Nimiq light-blue
-// radial, on a transparent background.
+// wallet's own QrCode.vue): rounded modules filled with the Nimiq navy radial,
+// on a transparent background.
 //
 // It ships as a DEFAULT rather than staying a pure seam. `qr` was host-only for
 // eleven versions, and the result was nineteen apps each about to hand-roll the
@@ -17,9 +17,16 @@
 // scanning, so it is not something the theme tokens do for you.
 import QrCreator from 'qr-creator';
 
-/** Nimiq light-blue radial, the `--nimiq-light-blue-bg` pair. */
-const FILL_FROM = '#265DD7';
-const FILL_TO = '#0582CA';
+/** Nimiq navy radial, the `--nimiq-blue-bg` pair.
+ *
+ *  NAVY, not the registry component's light-blue, and the two disagree on
+ *  purpose. `qr-code` is a verbatim port of the wallet's `QrCode.vue`, but the
+ *  sheet the wallet actually renders behind Receive ships navy modules. This
+ *  menu is a mini version of that sheet, so where the component and the live
+ *  app diverge, the app wins. Navy is also the darker read against the plate
+ *  below, which is what a camera wants. */
+const FILL_FROM = '#260133';
+const FILL_TO = '#1F2348';
 
 function cssVar(el: Element | null, name: string, fallback: string): string {
   if (!el || typeof getComputedStyle !== 'function') return fallback;
