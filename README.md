@@ -683,6 +683,47 @@ Two blocks a side in the elision, not the wallet's three: three plus the
 ellipsis is 33 characters of Fira Mono, which overruns 272px and wraps, and a
 wrapped elision is worse than a shorter one. The full 3x3 grid is one tap back.
 
+#### The receive footer, the X, and the request link (v0.24.0)
+
+| What | Was | Now |
+| --- | --- | --- |
+| Receive footer | the QR glyph alone | **Create request link** pill, glyph to its right |
+| Under the address | "Tap the address to copy" | gone |
+| The X | a bare stroke glyph | the wallet's **filled disc** |
+| Send title | `Send` | `Send Amount` |
+
+The copy hint went because the wallet has no such line and the **Copied**
+tooltip already confirms the tap: it explained a thing the interface says for
+itself, and left a stranded grey sentence under the plate doing it.
+
+The X wears a disc and the back chevron deliberately does not, which is the
+wallet's arrangement too: one dismisses and one steps, so giving both the same
+weight would say they are the same control. The button keeps a 34px hit area
+and the disc is 26px inside it.
+
+**Request links are the real thing**, `format/request-link.ts`:
+
+```
+https://wallet.nimiq.com/#_request/{recipient}/{amount}/{message}_
+```
+
+Ported from `@nimiq/utils` `RequestLinkEncoding`, not imported, the same call
+`format/nim.ts` makes about `FormattableNumber`: that package is a transitive
+dependency here and promoting it to a direct one to reach two string templates
+would put its whole surface in every fleet app's bundle.
+
+⚠ **The upstream default would mint dead links from a fleet app.**
+`createNimiqRequestLink` defaults `basePath` to `window.location.host`, which is
+right inside the wallet and wrong everywhere else: from nimiq.cool it produces
+`nimiq.cool/#_request/…`, a page with no idea what that means. Ours defaults to
+the wallet and takes `requestLinkBase` for hosts that run their own handler.
+
+An **empty amount is a request for any amount**, not an unfinished form, so the
+link is valid and copyable the moment the sheet opens. The link is shown as well
+as copied, because people paste these into a chat and a link you cannot read
+before sending is one you have to trust. The pill is hidden for a non-NIM asset:
+a Nimiq request link over a Polygon address is a link to nothing.
+
 ⚠ **A QR that cannot be drawn no longer takes the receive view with it.** The
 draw used to be the last thing `openReceive` did, so a host `qr` renderer that
 threw aborted the function and left the sheet half-built with nothing surfaced.

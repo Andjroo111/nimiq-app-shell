@@ -28,7 +28,7 @@ describe('corner-control data', () => {
   test('the menu strings exist in every shipped locale', () => {
     const keys = [
       'shell.receive', 'shell.amountsIn', 'shell.openInPay', 'shell.network',
-      'shell.tapToCopy', 'shell.createCashlink', 'shell.newToNimiq',
+      'shell.createCashlink', 'shell.newToNimiq',
     ];
     for (const [locale, messages] of Object.entries(shellLocales)) {
       for (const key of keys) {
@@ -977,7 +977,8 @@ describe('send and receive match the wallet sheets', () => {
     expect(fiat.hidden).toBe(false);
     const atZero = fiat.textContent ?? '';
 
-    const amount = host.querySelector('.nq-cc-amount-row .nq-cc-input') as HTMLInputElement;
+    const amount = host.querySelector(
+      '.nq-cc-view-send .nq-cc-amount-row .nq-cc-input') as HTMLInputElement;
     amount.value = '1000';
     amount.dispatchEvent(new (globalThis as unknown as { Event: typeof Event }).Event('input', { bubbles: true }));
     await settle();
@@ -1124,8 +1125,10 @@ describe('the type scale is the wallet\'s, not half of it', () => {
 
   test('the primary button carries the nq-button weight', async () => {
     const src = await Bun.file(new URL('./corner-control.ts', import.meta.url)).text();
-    expect(src).toMatch(/\.nq-cc-send-confirm \{[^}]*height:52px/);
-    expect(src).toMatch(/\.nq-cc-send-confirm \{[^}]*font-size:16px/);
+    // The rule is shared with the request sheet's copy button, so the selector
+    // is a group, not a single class.
+    expect(src).toMatch(/\.nq-cc-send-confirm[^{]*\{[^}]*height:52px/);
+    expect(src).toMatch(/\.nq-cc-send-confirm[^{]*\{[^}]*font-size:16px/);
   });
 
   // The taller sheet has to be reachable on a short window, and `vh` alone is
@@ -1143,5 +1146,147 @@ describe('the type scale is the wallet\'s, not half of it', () => {
     const src = await Bun.file(new URL('./corner-control.ts', import.meta.url)).text();
     expect(src).toContain('const QR_GLYPH');
     expect(src).toContain('M5.796 1.902a.304.304 0 00-.304-.305H1.938');
+  });
+});
+
+// The request-link sheet, plus the footer it hangs off. "Needs to work just
+// like the wallet" (Andrew, 9/15), so the link format is the wallet's own and
+// pinned in format/request-link.test.ts; this covers the sheet around it.
+describe('receive carries a working request link', () => {
+  const ADDRESS = 'NQ34 248H 8MB8 8QK2 5RVK EM8Q QJ8N 2Q5R 3XRK';
+  const COMPACT = 'NQ34248H8MB88QK25RVKEM8QQJ8N2Q5R3XRK';
+
+  function mount(opts: Partial<CornerControlOptions> = {}) {
+    const w = new Window();
+    for (const key of ['document', 'HTMLElement', 'navigator', 'localStorage',
+                       'getComputedStyle', 'Event']) {
+      (globalThis as unknown as Record<string, unknown>)[key] =
+        (w as unknown as Record<string, unknown>)[key];
+    }
+    const i18n = createI18n({ locales: mergeLocales(shellLocales), fallback: 'en' });
+    const wallet = {
+      mode: 'hub',
+      account: { address: ADDRESS, label: 'Test' },
+      connect: async () => null,
+      signAndSend: async () => ({ txHash: '' }),
+      pay: async () => ({ txHash: '' }),
+      signMessage: async () => ({ address: '', message: '', publicKeyHex: '', signatureHex: '' }),
+      onAccountChange: () => () => {},
+      disconnect: () => {},
+    } as unknown as Wallet;
+    const identicon = (address: string, size: number) => {
+      const d = w.document.createElement('div');
+      d.dataset.for = address; d.dataset.size = String(size);
+      return d as unknown as HTMLElement;
+    };
+    const host = w.document.createElement('div') as unknown as HTMLElement;
+    mountMiniWallet(host, { wallet, i18n, balance: false, identicon, ...opts });
+    return { host, w };
+  }
+  const settle = () => new Promise((r) => setTimeout(r, 40));
+  async function openRequest(host: HTMLElement) {
+    (host.querySelector('.nq-cc-face') as HTMLElement).click();
+    (host.querySelector('.nq-cc-receive') as HTMLElement).click();
+    await settle();
+    (host.querySelector('.nq-cc-request-open') as HTMLElement).click();
+  }
+
+  test('the pill opens a sheet titled for the asset', async () => {
+    const { host } = mount();
+    await openRequest(host);
+    expect((host.querySelector('.nq-cc') as HTMLElement).classList
+      .contains('nq-cc-show-request')).toBe(true);
+    expect(host.querySelector('.nq-cc-view-request .nq-cc-view-title')?.textContent)
+      .toBe('Request NIM');
+  });
+
+  // An empty amount is a request for ANY amount, not an unfinished form, so the
+  // link is valid and copyable the moment the sheet opens.
+  test('an untouched sheet already holds a valid link', async () => {
+    const { host } = mount();
+    await openRequest(host);
+    expect(host.querySelector('.nq-cc-request-link')?.textContent)
+      .toBe(`https://wallet.nimiq.com/#_request/${COMPACT}_`);
+  });
+
+  test('typing an amount rewrites the link, in NIM', async () => {
+    const { host } = mount();
+    await openRequest(host);
+    const amount = host.querySelector(
+      '.nq-cc-view-request .nq-cc-input') as HTMLInputElement;
+    amount.value = '125.5';
+    amount.dispatchEvent(
+      new (globalThis as unknown as { Event: typeof Event }).Event('input', { bubbles: true }));
+    expect(host.querySelector('.nq-cc-request-link')?.textContent)
+      .toBe(`https://wallet.nimiq.com/#_request/${COMPACT}/125.5_`);
+  });
+
+  // What is SHOWN has to be what gets COPIED, or the sheet is lying about the
+  // thing a person is about to paste into a chat.
+  test('the link on screen is the link on the clipboard', async () => {
+    let copied = '';
+    const { host, w } = mount();
+    // defineProperty, not assignment: happy-dom's navigator.clipboard is a
+    // readonly accessor.
+    Object.defineProperty((w as unknown as { navigator: object }).navigator, 'clipboard', {
+      configurable: true,
+      value: { writeText: (t: string) => { copied = t; return Promise.resolve(); } },
+    });
+    await openRequest(host);
+    const shown = host.querySelector('.nq-cc-request-link')?.textContent ?? '';
+    (host.querySelector('.nq-cc-request-copy') as HTMLElement).click();
+    expect(copied).toBe(shown);
+    expect(copied).not.toBe('');
+  });
+
+  // A Nimiq request link over a Polygon address is a link to nothing.
+  test('the pill is hidden for a non-NIM asset', async () => {
+    const { host } = mount({
+      assets: [
+        { ticker: 'NIM', name: 'Nimiq', network: 'Nimiq', decimals: 5,
+          address: ADDRESS, balance: async () => 1n },
+        { ticker: 'USDT', name: 'Tether USD', network: 'Polygon', decimals: 6,
+          address: '0x71C7656EC7ab88b098defB751B7401B5f6d8976F', balance: async () => 1n },
+      ],
+    } as never);
+    (host.querySelector('.nq-cc-face') as HTMLElement).click();
+    await settle();
+    (host.querySelectorAll('.nq-al-row')[1] as HTMLElement).click();
+    await settle();
+    expect((host.querySelector('.nq-cc-request-open') as HTMLElement).hidden).toBe(true);
+  });
+
+  // The wallet has no such line, and the Copied tooltip already confirms the
+  // tap, so it explained a thing the interface says for itself.
+  test('the tap-to-copy hint is gone, from the DOM and the locales', async () => {
+    const { host } = mount();
+    (host.querySelector('.nq-cc-face') as HTMLElement).click();
+    (host.querySelector('.nq-cc-receive') as HTMLElement).click();
+    await settle();
+    expect(host.querySelector('.nq-cc-receive-hint')).toBeNull();
+    for (const [locale, messages] of Object.entries(shellLocales)) {
+      expect((messages as Record<string, string>)['shell.tapToCopy'], locale).toBeUndefined();
+    }
+  });
+
+  // The disc is what makes the X read as a button; the back chevron is
+  // deliberately NOT one, in the wallet either.
+  test('the X wears the wallet disc and the chevron does not', async () => {
+    const { host } = mount();
+    (host.querySelector('.nq-cc-face') as HTMLElement).click();
+    await settle();
+    for (const head of host.querySelectorAll('.nq-cc-view-head')) {
+      expect(head.querySelector('.nq-cc-shut .nq-cc-shut-disc')).toBeTruthy();
+      expect(head.querySelector('.nq-cc-back .nq-cc-shut-disc')).toBeNull();
+    }
+  });
+
+  test('the send sheet is titled for the step it stands in for', async () => {
+    const { host } = mount();
+    (host.querySelector('.nq-cc-face') as HTMLElement).click();
+    (host.querySelector('.nq-cc-send') as HTMLElement).click();
+    await settle();
+    expect(host.querySelector('.nq-cc-view-send .nq-cc-view-title')?.textContent)
+      .toBe('Send Amount');
   });
 });
