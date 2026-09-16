@@ -1593,3 +1593,67 @@ describe('step one is the wallet\'s Send Transaction sheet', () => {
     expect(src.match(/\n\.nq-cc-contact \{/g)?.length ?? 0).toBe(1);
   });
 });
+
+// ONE door to the cashlink, not two (Andrew, 2026-09-16). It lives under the
+// send field where the wallet has it, beneath "Address unavailable?", which is
+// the question a cashlink answers.
+describe('the cashlink has exactly one home', () => {
+  const ADDRESS = 'NQ34 248H 8MB8 8QK2 5RVK EM8Q QJ8N 2Q5R 3XRK';
+
+  function mount() {
+    const w = new Window();
+    for (const key of ['document', 'HTMLElement', 'navigator', 'localStorage',
+                       'getComputedStyle', 'Event']) {
+      (globalThis as unknown as Record<string, unknown>)[key] =
+        (w as unknown as Record<string, unknown>)[key];
+    }
+    const i18n = createI18n({ locales: mergeLocales(shellLocales), fallback: 'en' });
+    const wallet = {
+      mode: 'hub',
+      account: { address: ADDRESS, label: 'Test' },
+      connect: async () => null,
+      signAndSend: async () => ({ txHash: '' }),
+      pay: async () => ({ txHash: 'x' }),
+      signMessage: async () => ({ address: '', message: '', publicKeyHex: '', signatureHex: '' }),
+      onAccountChange: () => () => {},
+      disconnect: () => {},
+    } as unknown as Wallet;
+    let fired = 0;
+    const host = w.document.createElement('div') as unknown as HTMLElement;
+    mountMiniWallet(host, {
+      wallet, i18n, balance: false, createCashlink: () => { fired += 1; },
+    } as never);
+    return { host, fired: () => fired };
+  }
+  const settle = () => new Promise((r) => setTimeout(r, 40));
+
+  test('the main menu no longer carries a cashlink row', async () => {
+    const { host } = mount();
+    (host.querySelector('.nq-cc-face') as HTMLElement).click();
+    await settle();
+    const labels = [...host.querySelectorAll('.nq-cc-view-main .nq-cc-row')]
+      .map((r) => r.textContent ?? '');
+    expect(labels.some((t) => t.includes('Cashlink'))).toBe(false);
+  });
+
+  test('it is on the send footer, and it fires', async () => {
+    const { host, fired } = mount();
+    (host.querySelector('.nq-cc-face') as HTMLElement).click();
+    (host.querySelector('.nq-cc-send') as HTMLElement).click();
+    await settle();
+    const pill = [...host.querySelectorAll('.nq-cc-sendto-foot button')]
+      .find((b) => (b.textContent ?? '').includes('Cashlink')) as HTMLElement;
+    expect(pill).toBeTruthy();
+    pill.click();
+    expect(fired()).toBe(1);
+  });
+
+  test('exactly one control in the whole menu offers it', async () => {
+    const { host } = mount();
+    (host.querySelector('.nq-cc-face') as HTMLElement).click();
+    await settle();
+    const offers = [...host.querySelectorAll('button')]
+      .filter((b) => (b.textContent ?? '').includes('Cashlink'));
+    expect(offers.length).toBe(1);
+  });
+});

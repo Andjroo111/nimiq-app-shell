@@ -169,7 +169,9 @@ export interface CornerControlOptions {
   send?: () => void;
   /** Wire the QR-scan button. Hidden when absent. */
   scan?: () => void;
-  /** Wire the opt-in "Create a Cashlink" row (HubApi.createCashlink). Hidden when absent. */
+  /** Wire "Create a Cashlink" (HubApi.createCashlink). It appears under the send
+   *  step-one field, beneath "Address unavailable?", which is where the wallet
+   *  puts it. Absent leaves that footer out. Was a main-menu row until v0.28.0. */
   createCashlink?: () => void;
   /** Wire the signed-out "New to Nimiq? Create a wallet" line. Hidden when absent.
    *
@@ -1146,10 +1148,6 @@ const SWITCH_ICON =
   '<path d="M1.396 9.752l2.988 5.304a1.36 1.36 0 001.186.703h6.858a1.36 1.36 0 001.186-.703l2.988-5.304"/>' +
   '<path d="M3.24 5.773L1.396 6.779L1.3 4.681M14.758 10.757L16.602 9.752L16.697 11.85"/></g></svg>';
 
-// wallet-verbatim cashlink glyph (upstream nimiq-style cashlink.svg)
-const CASHLINK_ICON =
-  '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" aria-hidden="true"><g fill="none" stroke="currentColor" stroke-linecap="round" stroke-width="2.5px" stroke-linejoin="round"><path d="M40.25,23.25v-.5a6.5,6.5,0,0,0-6.5-6.5h-3.5a6.5,6.5,0,0,0-6.5,6.5v6.5a6.5,6.5,0,0,0,6.5,6.5h2"/><path d="M23.75,40.75v.5a6.5,6.5,0,0,0,6.5,6.5h3.5a6.5,6.5,0,0,0,6.5-6.5v-6.5a6.5,6.5,0,0,0-6.5-6.5h-2"/><line x1="32" y1="11.25" x2="32" y2="15.25"/><line x1="32" y1="48.75" x2="32" y2="52.75"/></g></svg>';
-
 /** The gold brand hexagon for the "Open in Nimiq Pay" row. The gradient id is
  *  minted per instance (rule 3: never reuse a gradient id on one page). */
 let hexUid = 0;
@@ -1489,17 +1487,15 @@ export function mountMiniWallet(
   }
   el('div', 'nq-cc-divider nq-cc-when-connected nq-cc-when-hub', viewMain);
 
-  // ---- cashlink row (opt-in, hub + connected) ------------------------------
-  if (options.createCashlink) {
-    const row = el('button', 'nq-cc-row nq-cc-when-connected nq-cc-when-hub', viewMain);
-    row.type = 'button';
-    const slot = el('span', 'nq-cc-cashlink-slot', row);
-    slot.innerHTML = CASHLINK_ICON;
-    const label = el('span', 'nq-cc-strong', row);
-    tNode(label, 'shell.createCashlink');
-    row.addEventListener('click', () => { setOpen(false); options.createCashlink!(); });
-    el('div', 'nq-cc-divider nq-cc-when-connected nq-cc-when-hub', viewMain);
-  }
+  // ---- no cashlink row here any more ---------------------------------------
+  // It lives in ONE place, the send step-one footer, which is where the wallet
+  // has it and for the wallet's reason: a cashlink is what you make when you
+  // have no address to send to, which is exactly the question that footer asks
+  // ("Address unavailable?"). The same action on a main-menu row AND under the
+  // send field was two doors to one room (Andrew, 2026-09-16: "we could just
+  // have that cash link creation in one place").
+  //
+  // `createCashlink` is unchanged as an option, so no app has to edit anything.
 
   // ---- language accordion ---------------------------------------------------
   const langSection = el('div', 'nq-cc-section', viewMain);

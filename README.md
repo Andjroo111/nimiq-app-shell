@@ -217,9 +217,8 @@ mountMiniWallet(document.querySelector('#corner')!, { wallet, i18n });
 The face shows wallet state: outline **Connect wallet ▾**, then identicon +
 short label once connected. Everything else lives one click away in a single
 menu. That menu holds the balance block, a Receive / Send action bar, the
-address behind Receive, Language and **Show amounts in** as collapsed rows, an
-opt-in cashlink row, a network row on testnet only, Report a bug, and a quiet
-Disconnect.
+address behind Receive, Language and **Show amounts in** as collapsed rows, a
+network row on testnet only, Report a bug, and a quiet Disconnect.
 
 Inside Nimiq Pay (`wallet.mode === 'miniapp'`) the wallet is ambient, so the
 face collapses to the current-language flag and the menu keeps language alone.
@@ -1037,3 +1036,16 @@ type test cannot reach, and did ship a bug there once.
 ## License
 
 MIT
+
+### One home for the cashlink (v0.28.0)
+
+`createCashlink` used to render **twice**: an opt-in main-menu row and the send
+footer pill. Same action, two doors to one room. The menu row is **gone**; it
+lives under the send field, beneath `Address unavailable?`, which is where the
+wallet has it and for the wallet's reason: a cashlink is what you make when you
+have no address to send to.
+
+The **option is unchanged**, so no app has to edit anything. An app that wired
+`createCashlink` keeps it, in one place instead of two. A test pins that exactly
+one control in the whole menu offers it.
+
