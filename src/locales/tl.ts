@@ -19,6 +19,8 @@ export default {
   "shell.language": "Wika",
   "shell.notConnected": "Hindi nakakonekta",
   "shell.back": "Bumalik",
+  "shell.close": "Isara",
+  "shell.receiveSub": "Ibahagi ang iyong adres sa magpapadala.",
   "shell.send": "Ipadala",
   "shell.cancel": "Ikansela",
   "shell.retry": "Subukang muli",

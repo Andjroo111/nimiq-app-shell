@@ -16,6 +16,8 @@ export default {
   "shell.language": "Bahasa",
   "shell.notConnected": "Tidak terhubung",
   "shell.back": "Kembali",
+  "shell.close": "Tutup",
+  "shell.receiveSub": "Bagikan alamat Anda kepada pengirim.",
   "shell.send": "Kirim",
   "shell.cancel": "Batal",
   "shell.retry": "Coba lagi",

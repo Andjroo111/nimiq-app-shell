@@ -16,6 +16,8 @@ export default {
   "shell.language": "भाषा",
   "shell.notConnected": "कनेक्ट नहीं है",
   "shell.back": "वापस",
+  "shell.close": "बंद करें",
+  "shell.receiveSub": "भेजने वाले के साथ अपना पता साझा करें।",
   "shell.send": "भेजें",
   "shell.cancel": "रद्द करें",
   "shell.retry": "फिर कोशिश करें",

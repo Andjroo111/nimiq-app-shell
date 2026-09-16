@@ -16,6 +16,8 @@ export default {
   "shell.language": "Ngôn ngữ",
   "shell.notConnected": "Chưa kết nối",
   "shell.back": "Quay lại",
+  "shell.close": "Đóng",
+  "shell.receiveSub": "Chia sẻ địa chỉ của bạn với người gửi.",
   "shell.send": "Gửi",
   "shell.cancel": "Huỷ",
   "shell.retry": "Thử lại",

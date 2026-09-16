@@ -19,6 +19,8 @@ export default {
   "shell.language": "Dil",
   "shell.notConnected": "Bağlı değil",
   "shell.back": "Geri",
+  "shell.close": "Kapat",
+  "shell.receiveSub": "Adresinizi gönderene iletin.",
   "shell.send": "Gönder",
   "shell.cancel": "İptal et",
   "shell.retry": "Tekrar dene",

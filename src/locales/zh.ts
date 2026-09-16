@@ -19,6 +19,8 @@ export default {
   "shell.language": "语言",
   "shell.notConnected": "未连接",
   "shell.back": "返回",
+  "shell.close": "关闭",
+  "shell.receiveSub": "将您的地址分享给付款方。",
   "shell.send": "发送",
   "shell.cancel": "取消",
   "shell.retry": "重试",

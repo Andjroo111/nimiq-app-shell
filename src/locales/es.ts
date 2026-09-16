@@ -14,6 +14,8 @@ export default {
   'shell.language': 'Idioma',
   'shell.notConnected': 'No conectado',
   'shell.back': 'Atrás',
+  'shell.close': 'Cerrar',
+  'shell.receiveSub': 'Comparte tu dirección con quien te envía.',
   'shell.send': 'Enviar',
   'shell.cancel': 'Cancelar',
   'shell.retry': 'Reintentar',

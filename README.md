@@ -588,8 +588,14 @@ is deliberately no placeholder hexagon, because a placeholder there would say
 "identity confirmed" while showing no identity.
 
 **The receive QR is now built in** (registry `qr-code`: rounded modules, the
-light-blue radial). `qr` stays a seam and still overrides it, but an app that
+Nimiq **navy** radial). `qr` stays a seam and still overrides it, but an app that
 passes nothing gets the wallet's QR instead of no QR.
+
+⚠ **Navy, not the registry component's light-blue, and the two disagree on
+purpose.** `qr-code` is a verbatim port of the wallet's `QrCode.vue`, but the
+sheet the wallet actually renders behind Receive ships navy modules. This menu
+is a mini version of that sheet, so where the component and the live app
+diverge, the app wins (v0.22.0).
 
 ```ts
 mountMiniWallet(slot, {
@@ -600,9 +606,38 @@ mountMiniWallet(slot, {
 ```
 
 The QR sits on a white plate (`--nq-cc-qr-plate`). That is not decoration: a
-reader needs dark modules on a light field, so a blue QR drawn straight onto a
+reader needs dark modules on a light field, so a navy QR drawn straight onto a
 dark themed card is unscannable, not just off-brand. Retint it with
 `--nq-cc-qr-from` / `--nq-cc-qr-to` only if you have checked it still scans.
+
+---
+
+### Matching the wallet's own sheets (v0.22.0)
+
+Receive and Send are a **mini version of the wallet's sheets**, not a separate
+design. A side-by-side against the real ones found four places that had drifted,
+all fixed here:
+
+| What | Was | Now |
+| --- | --- | --- |
+| Receive title | bare `Receive` with no asset selected | `Receive NIM`, the wallet's own wording |
+| Receive subtitle | none | `Share your address with the sender.` |
+| Send amount | NIM only | the fiat value under the field, always, even at zero |
+| Sub-view header | back chevron only | back **and** an X, which are not the same escape |
+
+Back steps up one level and leaves the menu open. The X dismisses the menu
+outright, which is what the wallet's X does.
+
+The fiat line reads its rate **once per open** of the send view, not per
+keystroke, and the read is dropped when the reference currency changes so the
+next open picks up the new one. No `fiat` feed means no line; it never blocks a
+send, because the NIM amount is the authoritative one either way.
+
+Four differences were left alone on purpose, all of them width: the wallet's two
+sheets (`Send Transaction` then `Set Amount`), the sender-and-recipient identicon
+pair, the public message field, and the `Address unavailable?` cashlink footer.
+A 272px card cannot hold a 390px two-step flow, and the cashlink is already an
+opt-in row in the main menu.
 
 ---
 

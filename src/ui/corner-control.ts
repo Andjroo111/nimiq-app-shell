@@ -608,6 +608,11 @@ button.nq-cc-name:focus-visible { outline:2px solid var(--nq-cc-accent, #0582ca)
   color:color-mix(in srgb, var(--nq-cc-menu-fg, #1f2348) 45%, transparent); }
 .nq-cc-send-hint { font-size:12px; font-weight:600; color:var(--nq-cc-menu-muted, rgba(31,35,72,.5)); }
 .nq-cc-send-hint:empty { display:none; }
+/* Right-aligned, under the NIM suffix rather than under the digits: it belongs
+   to the field's unit, and the field is the one thing on this view the user is
+   typing into. */
+.nq-cc-send-fiat { margin:0; font-size:12px; font-weight:600; text-align:right;
+  color:var(--nq-cc-menu-muted, rgba(31,35,72,.5)); }
 .nq-cc-send-confirm { width:100%; height:36px; border:none; border-radius:500px; margin-top:2px;
   font-family:inherit; font-size:14px; font-weight:700; cursor:pointer;
   color:var(--nq-cc-send-fg, #fff); background-color:var(--nq-cc-send-bg, #0582ca);
@@ -632,13 +637,19 @@ button.nq-cc-name:focus-visible { outline:2px solid var(--nq-cc-accent, #0582ca)
   padding:2px 2px 0; }
 .nq-cc-view-title { grid-column:2; text-align:center; font-size:15px; font-weight:600;
   color:var(--nq-cc-menu-fg, #1f2348); }
-.nq-cc-back { grid-column:1; display:inline-flex; align-items:center; justify-content:center;
+.nq-cc-view-sub { margin:7px 12px 0; text-align:center; font-size:12px; font-weight:600;
+  line-height:1.35; color:var(--nq-cc-menu-muted, rgba(31,35,72,.5)); }
+.nq-cc-back, .nq-cc-shut { grid-column:1; display:inline-flex; align-items:center; justify-content:center;
   width:34px; height:34px; padding:0; border:none; border-radius:50%; background:none;
   font-family:inherit; color:var(--nq-cc-menu-muted, rgba(31,35,72,.6)); cursor:pointer;
   transition:background .15s var(--nimiq-ease, cubic-bezier(.25,0,0,1)); }
-.nq-cc-back:hover { background:var(--nq-cc-menu-hover, rgba(31,35,72,.06)); }
-.nq-cc-back:focus-visible { outline:2px solid var(--nq-cc-accent, #0582ca); outline-offset:-2px; }
+.nq-cc-back:hover, .nq-cc-shut:hover { background:var(--nq-cc-menu-hover, rgba(31,35,72,.06)); }
+.nq-cc-back:focus-visible, .nq-cc-shut:focus-visible { outline:2px solid var(--nq-cc-accent, #0582ca); outline-offset:-2px; }
 .nq-cc-chevron { display:block; width:8px; height:13px; }
+/* The X shares every pixel of the chevron button but its column, so it shares
+   the rule too rather than restating it and drifting from it. */
+.nq-cc-shut { grid-column:3; }
+.nq-cc-cross { display:block; width:11px; height:11px; }
 .nq-cc-receive-body { display:flex; flex-direction:column; align-items:center; padding:10px 8px 8px; }
 .nq-cc-qr { display:block; padding:10px; border-radius:8px;
   background:var(--nq-cc-qr-plate, #fff); }
@@ -823,6 +834,10 @@ button.nq-cc-name:focus-visible { outline:2px solid var(--nq-cc-accent, #0582ca)
 
 /** Back chevron. Same stroke weight and linecaps as the caret it sits beside,
  *  so the two read as one family rather than two icon sets. */
+const CROSS =
+  '<svg class="nq-cc-cross" viewBox="0 0 10 10" aria-hidden="true">' +
+  '<path d="M1 1l8 8M9 1l-8 8" fill="none" stroke="currentColor" stroke-width="1.3" ' +
+  'stroke-linecap="round"/></svg>';
 const CHEVRON_LEFT =
   '<svg class="nq-cc-chevron" viewBox="0 0 6 10" aria-hidden="true">' +
   '<path d="M5 1L1 5l4 4" fill="none" stroke="currentColor" stroke-width="1.15" ' +
@@ -1338,6 +1353,10 @@ export function mountMiniWallet(
         try { localStorage.setItem(FIAT_STORE_KEY, ticker); } catch { /* ignore */ }
         renderFiatValue();
         if (hasBalance) void refreshBalance(true);
+        // The send view's rate is now for the wrong currency. Dropping it is
+        // enough: openSend refetches, and the picker is only reachable from the
+        // main view, so nothing is on screen to restate.
+        sendRate = null;
         options.fiat!.onChange?.(ticker);
         window.setTimeout(() => collapse(acc, body), 260);
       });
@@ -1496,9 +1515,20 @@ export function mountMiniWallet(
     // The i18n subscription retranslates tNode content, but an aria-label is an
     // attribute and is not one of those nodes.
     backLabels.push(btn);
+    // The third grid column was reserved for symmetry and held nothing. The
+    // wallet gives its sheets both escapes because they are not the same one:
+    // back steps up a level, the X dismisses the menu outright. Leaving a view
+    // you opened by mistake took two taps before this.
+    const shut = el('button', 'nq-cc-shut', head);
+    shut.type = 'button';
+    shut.setAttribute('aria-label', i18n.t('shell.close'));
+    shut.insertAdjacentHTML('beforeend', CROSS);
+    shut.addEventListener('click', () => setOpen(false));
+    shutLabels.push(shut);
     return title;
   }
   const backLabels: HTMLElement[] = [];
+  const shutLabels: HTMLElement[] = [];
 
   // ---- receive view content -------------------------------------------------
   // The title carries the asset when one is being received, so repaintReceive
@@ -1507,6 +1537,11 @@ export function mountMiniWallet(
     viewReceive, 'shell.receive', () => root.classList.remove('nq-cc-show-receive'),
   );
   el('div', 'nq-cc-divider', viewReceive);
+  // The wallet's own one-line instruction. Receive is the one view where the
+  // user's job is not on the screen: everything here is READ and handed to
+  // someone else, so the line that says so is not decoration.
+  const receiveSub = el('p', 'nq-cc-view-sub', viewReceive);
+  tNode(receiveSub, 'shell.receiveSub');
   const receiveBody = el('div', 'nq-cc-receive-body', viewReceive);
   const qrSlot = el('div', 'nq-cc-qr', receiveBody);
   const copyWrap = el('span', 'nq-cc-copy-wrap', receiveBody);
@@ -1648,6 +1683,11 @@ export function mountMiniWallet(
   amountInput.autocomplete = 'off';
   const amountSuffix = el('span', 'nq-cc-amount-suffix', amountRow);
   amountSuffix.textContent = 'NIM';
+  // The fiat value of what is about to leave, which the wallet shows always,
+  // even at zero. NIM is the denomination; the number a person actually decided
+  // on is the one in their own currency, and a send screen that makes them
+  // convert it in their head is a send screen that gets the amount wrong.
+  const sendFiat = el('p', 'nq-cc-send-fiat', sendBody);
   const availableHint = el('p', 'nq-cc-send-hint', sendBody);
   const sendError = el('p', 'nq-cc-send-error', sendBody);
   const sendConfirm = el('button', 'nq-cc-send-confirm', sendBody);
@@ -1690,10 +1730,38 @@ export function mountMiniWallet(
     const n = Number(amountInput.value.replace(',', '.'));
     return Number.isFinite(n) ? n : 0;
   };
+  /** The rate behind the fiat line, read once per open of the send view.
+   *
+   *  Not per keystroke: that is a request per character typed. And not live
+   *  either, because a rate that moves mid-form changes the number under the
+   *  field while someone is reading it, which is worse than a number that is a
+   *  minute old. Cleared when the reference currency changes, so the next open
+   *  reads the new one. */
+  let sendRate: number | null = null;
+
+  function renderSendFiat(nim: number): void {
+    if (!hasFiat || sendRate === null) { sendFiat.hidden = true; return; }
+    sendFiat.hidden = false;
+    sendFiat.textContent = fmtFiat(nim * sendRate, fiatTicker);
+  }
+
+  async function refreshSendRate(): Promise<void> {
+    if (!hasFiat) { renderSendFiat(0); return; }
+    try {
+      sendRate = await options.fiat!.rate(fiatTicker);
+    } catch {
+      // No rate is a missing line, never a blocked send. The amount in NIM is
+      // the authoritative one either way.
+      sendRate = null;
+    }
+    renderSendFiat(amountNim());
+  }
+
   function validateSend(): void {
     const okAddress = NIM_ADDRESS_RE.test(compactRecipient());
     renderRecipientIcon(okAddress ? compactRecipient() : null);
     const nim = amountNim();
+    renderSendFiat(nim);
     const okAmount = nim > 0 && (balanceLuna === null || nim <= lunaToNim(balanceLuna));
     sendConfirm.disabled = !(okAddress && okAmount);
   }
@@ -1707,6 +1775,7 @@ export function mountMiniWallet(
     availableHint.textContent =
       balanceLuna !== null ? `${i18n.t('shell.available')}: ${fmtNim(balanceLuna)} NIM` : '';
     validateSend();
+    void refreshSendRate();
     root.classList.add('nq-cc-show-send');
     recipientInput.focus();
     // Read on open, not at mount: the host's book can change between sends, and
@@ -1764,9 +1833,11 @@ export function mountMiniWallet(
    *  address. Held so a language switch can restate the label and warning. */
   let receiveAsset: ShellAsset | null = null;
   repaintReceive = (): void => {
-    receiveTitle.textContent = receiveAsset
-      ? `${i18n.t('shell.receive')} ${receiveAsset.ticker}`
-      : i18n.t('shell.receive');
+    // The bare "Receive" is gone. With no asset this view IS the account's own
+    // NIM address, and the wallet's sheet names the coin ("Receive NIM"), which
+    // is also the last place to notice you opened the wrong asset.
+    receiveTitle.textContent =
+      `${i18n.t('shell.receive')} ${receiveAsset ? receiveAsset.ticker : 'NIM'}`;
     netWarn.hidden = !receiveAsset;
     netWarn.textContent = receiveAsset
       ? i18n.t('shell.networkOnly', {
@@ -1986,6 +2057,7 @@ export function mountMiniWallet(
   const unsubLang = i18n.onChange(() => {
     applyLang();
     for (const btn of backLabels) btn.setAttribute('aria-label', i18n.t('shell.back'));
+    for (const btn of shutLabels) btn.setAttribute('aria-label', i18n.t('shell.close'));
     renderLangValue();
     renderFaceFlag();
     renderFace();

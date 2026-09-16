@@ -880,3 +880,128 @@ describe('the menu order below the fold', () => {
     expect(order).not.toContain('report');
   });
 });
+
+// v0.22.0 parity pass. The mini wallet is a mini version of the wallet's own
+// Receive and Send sheets, and a comparison against the real ones (Andrew,
+// 9/15) found four places it had quietly stopped being one. Each test below
+// pins the wallet's behaviour, not ours, so a later refactor that drifts back
+// fails here rather than in a screenshot nobody takes.
+describe('send and receive match the wallet sheets', () => {
+  const ADDRESS = 'NQ34 248H 8MB8 8QK2 5RVK EM8Q QJ8N 2Q5R 3XRK';
+
+  function mount(opts: Partial<CornerControlOptions> = {}) {
+    const w = new Window();
+    // 'Event' rides along: happy-dom rejects an Event built by another realm's
+    // constructor, so a test that types into a field has to use the window's.
+    for (const key of ['document', 'HTMLElement', 'navigator', 'localStorage',
+                       'getComputedStyle', 'Event']) {
+      (globalThis as unknown as Record<string, unknown>)[key] =
+        (w as unknown as Record<string, unknown>)[key];
+    }
+    const i18n = createI18n({ locales: mergeLocales(shellLocales), fallback: 'en' });
+    const wallet = {
+      mode: 'hub',
+      account: { address: ADDRESS, label: 'Test' },
+      connect: async () => null,
+      signAndSend: async () => ({ txHash: '' }),
+      pay: async () => ({ txHash: '' }),
+      signMessage: async () => ({ address: '', message: '', publicKeyHex: '', signatureHex: '' }),
+      onAccountChange: () => () => {},
+      disconnect: () => {},
+    } as unknown as Wallet;
+    const host = w.document.createElement('div') as unknown as HTMLElement;
+    mountMiniWallet(host, { wallet, i18n, balance: false, ...opts });
+    return { host, i18n };
+  }
+  const settle = () => new Promise((r) => setTimeout(r, 40));
+  const open = (host: HTMLElement) =>
+    (host.querySelector('.nq-cc-face') as HTMLElement).click();
+
+  // A bare "Receive" over a NIM address is the one case the asset-aware title
+  // used to miss, because no asset was selected. The wallet says "Receive NIM".
+  test('the receive title names NIM when no asset is selected', async () => {
+    const { host } = mount();
+    open(host);
+    (host.querySelector('.nq-cc-receive') as HTMLElement).click();
+    await settle();
+    expect(host.querySelector('.nq-cc-view-title')?.textContent).toBe('Receive NIM');
+  });
+
+  test('receive carries the wallet instruction line', async () => {
+    const { host } = mount();
+    open(host);
+    await settle();
+    expect(host.querySelector('.nq-cc-view-sub')?.textContent)
+      .toBe('Share your address with the sender.');
+  });
+
+  // Two escapes, and they are NOT the same escape. Back steps up a level and
+  // leaves the menu open; the X dismisses the menu outright.
+  test('the X dismisses the whole menu, the chevron only steps back', async () => {
+    const { host } = mount();
+    open(host);
+    (host.querySelector('.nq-cc-receive') as HTMLElement).click();
+    await settle();
+    const menu = host.querySelector('.nq-cc-menu') as HTMLElement;
+    const view = host.querySelector('.nq-cc-view-receive') as HTMLElement;
+
+    (view.querySelector('.nq-cc-back') as HTMLElement).click();
+    expect(menu.hidden).toBe(false);
+
+    (host.querySelector('.nq-cc-receive') as HTMLElement).click();
+    await settle();
+    (view.querySelector('.nq-cc-shut') as HTMLElement).click();
+    expect(menu.hidden).toBe(true);
+  });
+
+  test('every sub-view header carries both escapes', async () => {
+    const { host } = mount();
+    open(host);
+    await settle();
+    for (const head of host.querySelectorAll('.nq-cc-view-head')) {
+      expect(head.querySelector('.nq-cc-back'), head.textContent ?? '').toBeTruthy();
+      expect(head.querySelector('.nq-cc-shut'), head.textContent ?? '').toBeTruthy();
+    }
+  });
+
+  // The wallet shows the fiat value of the amount always, even at zero. It is
+  // the number the person actually decided on; NIM is the denomination.
+  test('the send amount carries its fiat value, and tracks typing', async () => {
+    const { host } = mount({
+      fiat: { currencies: ['USD'], default: 'USD', rate: async () => 0.002 },
+    });
+    open(host);
+    (host.querySelector('.nq-cc-send') as HTMLElement).click();
+    await settle();
+    const fiat = host.querySelector('.nq-cc-send-fiat') as HTMLElement;
+    expect(fiat.hidden).toBe(false);
+    const atZero = fiat.textContent ?? '';
+
+    const amount = host.querySelector('.nq-cc-amount-row .nq-cc-input') as HTMLInputElement;
+    amount.value = '1000';
+    amount.dispatchEvent(new (globalThis as unknown as { Event: typeof Event }).Event('input', { bubbles: true }));
+    await settle();
+    expect(fiat.textContent).not.toBe(atZero);
+    expect(fiat.textContent).toContain('2');
+  });
+
+  // No feed is a missing line, never a blocked send: the NIM amount is the
+  // authoritative one with or without a rate.
+  test('no fiat feed leaves the line hidden and the send usable', async () => {
+    const { host } = mount();
+    open(host);
+    (host.querySelector('.nq-cc-send') as HTMLElement).click();
+    await settle();
+    expect((host.querySelector('.nq-cc-send-fiat') as HTMLElement).hidden).toBe(true);
+    expect(host.querySelector('.nq-cc-send-confirm')).toBeTruthy();
+  });
+
+  // The QR follows the live sheet, not the registry component it was ported
+  // from. Pinned at the source because the fill never reaches the DOM.
+  test('the receive QR is navy, the wallet sheet colour', async () => {
+    const src = await Bun.file(new URL('./qr.ts', import.meta.url)).text();
+    expect(src).toContain("const FILL_FROM = '#260133';");
+    expect(src).toContain("const FILL_TO = '#1F2348';");
+    expect(src).not.toContain('#0582CA');
+  });
+});

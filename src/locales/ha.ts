@@ -16,6 +16,8 @@ export default {
   "shell.language": "Harshe",
   "shell.notConnected": "Ba a haɗa ba",
   "shell.back": "Koma",
+  "shell.close": "Rufe",
+  "shell.receiveSub": "Ka raba adireshinka da mai aikawa.",
   "shell.send": "Aika",
   "shell.cancel": "Soke",
   "shell.retry": "Sake gwadawa",
