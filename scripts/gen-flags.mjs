@@ -3,7 +3,8 @@ import { readFileSync, writeFileSync, readdirSync } from "node:fs";
 // NOTE (2026-08-13): this SRC directory no longer exists, so this script cannot
 // currently be run end to end. It is kept for the day the flag set is rebuilt.
 // If you do rebuild it, read RASTERIZED below FIRST.
-const SRC = "/Users/andjroo/gdkc/projects/nimiq.life/public/flags";
+// SRC is not in this repo. Point FLAGS_SRC at a directory of <code>.svg files.
+const SRC = process.env.FLAGS_SRC ?? "../nimiq.life/public/flags";
 
 // Flags whose vector art is too heavy to inline, kept as a small raster wrapped
 // in an SVG so the renderer and the exported FLAG_SVG shape do not change.
@@ -17,7 +18,7 @@ const SRC = "/Users/andjroo/gdkc/projects/nimiq.life/public/flags";
 // Regenerating from SRC would silently restore the 80 KB version, so anything
 // listed here must be re-rasterized rather than re-inlined.
 const RASTERIZED = new Set(["mx"]);
-const OUT = "/Users/andjroo/gdkc/projects/nimiq-app-shell/src/flags/data.ts";
+const OUT = new URL("../src/flags/data.ts", import.meta.url).pathname;
 
 const codes = readdirSync(SRC)
   .filter((f) => f.endsWith(".svg"))
