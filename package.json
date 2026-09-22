@@ -20,6 +20,7 @@
   "dependencies": {
     "@nimiq/hub-api": "^1.14.0",
     "@nimiq/mini-app-sdk": "^0.1.0",
+    "nimiq-settlement": "github:Andjroo111/nimiq-settlement#v0.4.0",
     "qr-creator": "^1.0.0"
   },
   "peerDependencies": {

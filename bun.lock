@@ -7,6 +7,7 @@
       "dependencies": {
         "@nimiq/hub-api": "^1.14.0",
         "@nimiq/mini-app-sdk": "^0.1.0",
+        "nimiq-settlement": "github:Andjroo111/nimiq-settlement#v0.4.0",
         "qr-creator": "^1.0.0",
       },
       "devDependencies": {
@@ -154,6 +155,8 @@
     "nanoid": ["nanoid@3.3.14", "", { "bin": { "nanoid": "bin/nanoid.cjs" } }, "sha512-U9kYi5bpVMEI31yC8iw4bJJp0avcHXA0W8/wNfLfnvJYzihQo2ZRPYPvpAAd570HAcCBjCTN7vnr+v4StKl1IQ=="],
 
     "next-tick": ["next-tick@1.1.0", "", {}, "sha512-CXdUiJembsNjuToQvxayPZF9Vqht7hewsvy2sOWafLvi2awflj9mOC6bHIg50orX8IJvWKY9wYQ/zB2kogPslQ=="],
+
+    "nimiq-settlement": ["nimiq-settlement@github:Andjroo111/nimiq-settlement#1bdec5d", {}, "Andjroo111-nimiq-settlement-1bdec5d", "sha512-GOqdn34l0LIyumXsB5q+NYr6rPZ8uiaFGOKFJ7QPoG1kPoPMY3qcsbEUd9kLfKKyMFV8sNBAehUmWV9RBk1KqA=="],
 
     "node-gyp-build": ["node-gyp-build@4.8.4", "", { "bin": { "node-gyp-build": "bin.js", "node-gyp-build-optional": "optional.js", "node-gyp-build-test": "build-test.js" } }, "sha512-LA4ZjwlnUblHVgq0oBF3Jl/6h/Nvs5fzBLwdEF4nuxnFdsfajde4WfxtJr3CaiH+F6ewcIB/q4jQ4UzPyid+CQ=="],
 

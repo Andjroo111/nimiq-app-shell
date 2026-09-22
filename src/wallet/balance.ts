@@ -9,17 +9,27 @@
 // no balance. So the default is now "read it", and a host opts OUT.
 //
 // Scope is one JSON-RPC method against one chain. No settlement, no history,
-// no transaction building — the moment this file wants a second method, that
-// is nimiq-settlement asking to be a dependency, and the answer is still no.
+// no transaction building.
+//
+// The one thing taken from nimiq-settlement is its endpoint list, a deliberate
+// exception. Settlement's transport owns the ordered chain of nodes,
+// so a second hardcoded copy here could only drift from it. It is a constant
+// import from a package with no dependencies of its own, and it bundles down to
+// the list itself. The rule it replaces still holds for everything else: the
+// moment this file wants a second RPC METHOD, that is settlement asking to be
+// used for real, and the answer is still no.
 
-/** Public read-only Albatross RPC. Answers `access-control-allow-origin: *`,
+import { RPC_ENDPOINTS } from 'nimiq-settlement';
+
+/** Public read-only Albatross RPC, the first of settlement's mainnet
+ *  endpoints. Answers `access-control-allow-origin: *`,
  *  which is why a browser can call it with no proxy of the host's own.
  *
  *  ⚠ It rate-limits to 20 requests per 10s PER CLIENT IP. That is per VISITOR,
  *  not per app, and the corner caches for 30s, so a person would have to open
  *  and close the menu twenty times in ten seconds to feel it. A host that
  *  expects to blow through that should pass its own `rpc`. */
-export const DEFAULT_NIM_RPC = 'https://rpc.nimiqwatch.com';
+export const DEFAULT_NIM_RPC: string = RPC_ENDPOINTS.main[0];
 
 export interface NimBalanceReaderOptions {
   /** Node URL. Defaults to the public read-only one above. */
