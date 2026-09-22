@@ -131,7 +131,7 @@ export interface CreateWalletOptions {
    * Mini-app mode: the budget (ms) passed to the SDK's `init({ timeout })` when
    * `window.nimiq` is not yet injected at first connect. The SDK polls for the
    * provider; an outer race gives up 800ms past this budget in case the WebView
-   * never settles. Default: 5000ms when a Nimiq Pay host is hinted
+   * never settles. Default: 8000ms when a Nimiq Pay host is hinted
    * (window.nimiqPay, window.nimiq or a NimiqPay user agent), else 1200ms.
    * Does not affect which mode createWallet picks; that is detectModeSync. For
    * an async mode decision see detectMode().

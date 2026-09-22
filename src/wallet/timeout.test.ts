@@ -196,12 +196,12 @@ describe('init budget', () => {
     expect(timeouts).toEqual([2345]);
   });
 
-  test('default budget is 5000ms with a host hint', async () => {
+  test('default budget is 8000ms with a host hint', async () => {
     (globalThis as any).window = { nimiqPay: {} };
     const { sdk, timeouts } = recordingSdk(lateMiniAppProvider());
     __setMiniAppSdkLoader(async () => sdk);
     await createWallet().connect();
-    expect(timeouts).toEqual([5000]);
+    expect(timeouts).toEqual([8000]);
   });
 
   test('default budget is 1200ms without a host hint', async () => {

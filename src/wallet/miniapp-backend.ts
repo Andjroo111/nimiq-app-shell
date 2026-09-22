@@ -66,7 +66,7 @@ export interface MiniAppBackendOptions {
    *  absent, calling the SDK's init() (which polls Nimiq Pay). */
   getProvider?: () => Promise<MiniAppProvider>;
   /** Budget (ms) passed to the SDK's `init({ timeout })` when the default
-   *  provider resolver has to bootstrap it. Default: 5000 with a host hint,
+   *  provider resolver has to bootstrap it. Default: 8000 with a host hint,
    *  else 1200. createWallet threads `miniAppInitTimeout` into this. */
   initTimeout?: number;
 }
@@ -74,11 +74,14 @@ export interface MiniAppBackendOptions {
 /** The outer race sits this far past the init budget (C1-465). */
 const INIT_RACE_SLACK_MS = 800;
 
-/** Host-aware init budget: 5000ms when a Nimiq Pay host is hinted,
+/** Host-aware init budget: 8000ms when a Nimiq Pay host is hinted (the
+ *  same total as the detectMode ladder, which C1-373 measured on slow
+ *  Android; the SDK used to wait ~10s here, so a shorter budget would fail
+ *  hosts that work today),
  *  else 1200ms, unless the caller set one. */
 function initBudgetMs(initTimeout?: number): number {
   if (initTimeout !== undefined) return initTimeout;
-  return hasHostHint() ? 5000 : 1200;
+  return hasHostHint() ? 8000 : 1200;
 }
 
 async function defaultGetProvider(initTimeout?: number): Promise<MiniAppProvider> {
