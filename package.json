@@ -6,7 +6,8 @@
   "exports": {
     ".": "./src/index.ts",
     "./wallet": "./src/wallet/index.ts",
-    "./memo": "./src/format/memo.ts"
+    "./memo": "./src/format/memo.ts",
+    "./deeplink": "./src/deeplink/index.ts"
   },
   "scripts": {
     "check": "bun tsc --noEmit",

@@ -187,3 +187,31 @@ export {
   pageContext,
   type PageContext,
 } from './ui/report-capture';
+
+// ---- deeplink (open in Nimiq Pay: link builder, opener ladder, gate) ----
+export {
+  buildOpenInPayUrl,
+  payMiniAppSchemeTarget,
+  encodeMiniAppUrlValue,
+  detectMobilePlatform,
+  detectInAppBrowser,
+  isInsideNimiqPay,
+  openInNimiqPay,
+  mountOpenInPayGate,
+  APP_STORE_URL,
+  PLAY_STORE_URL,
+  NIMIQ_PAY_PACKAGE,
+  IOS_STORE_FALLBACK_MS,
+  type OpenInPayUrls,
+  type BuildOpenInPayOptions,
+  type MobilePlatform,
+  type InAppBrowser,
+  type DeeplinkWindow,
+  type DeeplinkDocument,
+  type OpenInNimiqPayOptions,
+  type OpenInNimiqPayResult,
+  type OpenRoute,
+  type OpenInPayGateOptions,
+  type OpenInPayGateHandle,
+  type GateVariant,
+} from './deeplink';
