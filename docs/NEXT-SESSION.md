@@ -6,22 +6,28 @@ The **mini wallet**: the fleet's one header control. `mountMiniWallet` is the
 canonical export; `mountCornerControl` is kept as an alias because ~25 apps
 import that name.
 
-**Current on main: v0.28.0, tagged, on jsDelivr.** PR #160 merged 2026-09-16.
+**Current on main: v0.30.0 plus one commit (`ef2addf`).** Tags `v0.29.0` (`ff50cd2`)
+and `v0.30.0` (`0c20f58`) are on jsDelivr, byte-identical to the tagged `dist`.
+`ef2addf` (PR #306, settlement endpoint import) is merged and NOT tagged.
 
-**`bump-fleet.ts v0.28.0` opened 20 PRs, 0 failed, NONE merged.** The script never
-merges; the merge button stays Andrew's. The fleet was on **v0.21.2** before this,
-not the v0.20.3 this doc used to claim.
+**Every tag before v0.29.0 was MOVED by the 2026-09 path/identity scrub.** Old
+lockfile SHAs 404 on codeload. 14 app relock PRs fixed installs on 2026-09-22.
+Judge anything against `origin/main` and `git ls-remote --tags`, never the Mini's
+local `main` or local tags: the primary checkout here is still on the pre-rewrite
+timeline (`e943eff`) until Andrew resets it.
 
-⏭ **NEXT: main-menu spacing.** The two collapsed settings rows (Language, Show
-amounts in) cost 96px of a 360px menu, as much as the whole account block at 98px.
-The account block should dominate. Numbers and the target are in the memory file
-`project_nimiq_app_shell_wallet_parity.md`.
+Fleet: the 15 package-pinned apps are on v0.30.0 (E2 bump, per eco-nimiq, not
+re-verified here). The 11 jsDelivr-URL loaders and the hand-vendored copies are
+E8's lane. Survey: see "Shipped 2026-09-22" below.
 
-`https://cdn.jsdelivr.net/gh/Andjroo111/nimiq-app-shell@v0.20.3/dist/app-shell.js`
+⏭ **NEXT (E1 lane): the remaining ports.** Memo wiring into the backends waits on
+the Nimiq Pay device test (does `sendBasicTransactionWithData` take plain UTF-8 or
+hex; hash or serialized tx; which sign prefix). `payThenConfirm` (C1-408) and
+pending-tx resume (C2-023) wait on E2's confirm endpoint. Everything else in the
+24 is unblocked. Spec: https://claude.ai/artifact/JiussKqK9bYDWLbduH5EzH
 
-**The 20 fleet apps pinned v0.21.2 before this bump.** No split, and the pin is deliberate: see
-"How the fleet takes an update" below before proposing a floating tag. Nothing
-in PR #160 reaches any app until it is merged, tagged, and `bump-fleet` is run.
+Older, still open, not E1's: main-menu spacing (see memory
+`project_nimiq_app_shell_wallet_parity.md`).
 
 ## Playground, the way to see any of this
 
@@ -38,6 +44,22 @@ slow read, an unpriced asset, and the three send outcomes.
 **Use 127.0.0.1, not localhost**, when driving it with Playwright. The IPv6
 route makes `page.goto` time out while curl works fine, which reads as a broken
 page for a while.
+
+## Shipped 2026-09-22 (E1-NIMIQ, wallet layer)
+
+| PR / tag | what |
+|---|---|
+| #304 → v0.29.0 | frozen contracts: `WalletOutcome`/`describeWalletError` (`pending` > `cancelled` > `unavailable`, `PENDING:` literal and case-sensitive), `SendHandle`/`classifySendResult` (never guesses), `buildMemo` (64 bytes, UTF-8-safe), `SignMessageResult.prefix` (Hub `signed-message`, mini-app `unknown`). Subpaths `./wallet`, `./memo` |
+| #305 → v0.30.0 | `./deeplink` (open in Pay, in-app-browser ladder, touch/QR gate) and `detectMode`/`walletDiagnostics`/`withTimeout`. `miniAppInitTimeout` works now: hinted host 8000 ms then throws. No timeout ever wraps a send or sign (test-enforced) |
+| #306 (untagged) | `DEFAULT_NIM_RPC` = settlement `RPC_ENDPOINTS.main[0]`, value unchanged, +81 B. Deliberate exception to the no-settlement rule |
+| 14 app PRs | re-locked `nimiq-app-shell` (12) and `nimiq-settlement` (gift, party, reviews, vote) after the tag rewrite; bun.lock only, trees proven identical |
+
+The bug reporter is `report-bug.ts` + `report-capture.ts` = 36,691 B. `corner-control.ts`
+(148,882 B) is the mini wallet itself. Dynamic-importing `openReportBugSheet` behind the
+tap saves ~30 KB per mini-wallet bundle; that call is E6's.
+
+Bump survey (28 repos, 12 S / 11 M / 5 L) is in the session scratchpad and summarised
+in the spec. The 5 L: kids, hashmark, tech, blog, win.
 
 ## In flight: PR #160, wallet parity, v0.22.0 to v0.27.1 (2026-09-15/16)
 
@@ -482,6 +504,16 @@ balance read against it is not the user's balance. BTC through the Hub is
 unreadable as well as unsendable. Issue #124 has the three routes.
 
 ## Lessons that cost real time here
+
+- **Merge with a fast-forward, never GitHub's squash button.** The identity gate checks author
+  AND committer, and a web squash stamps the committer `noreply@github.com`. Use
+  `gh api -X PATCH repos/<r>/git/refs/heads/main -f sha=<head> -F force=false`, which refuses
+  anything that is not a fast-forward. The PR run's identity failure on GitHub's own merge-ref
+  commit is a known false red.
+- **A frozen install proves nothing if `node_modules` exists or bun's cache is warm.** Prove
+  it in an empty directory with `BUN_INSTALL_CACHE_DIR=$(mktemp -d)`. The warm cache hid a
+  dead settlement SHA in two apps.
+- **bun.lock records the TAG OBJECT sha for an annotated tag**, not the peeled commit.
 
 - **The CSS lives in a JS template literal.** A backtick in a comment turns the
   whole stylesheet into a tagged-template call. `tsc` and the tests both catch
