@@ -48,6 +48,14 @@ export interface SendResult {
   serializedTx?: string;
 }
 
+/** Which Keyguard envelope produced a signature. The two values match
+ *  nimiq-keyguard SignMessagePrefix (ClientEnums.js:53-54). */
+export type SignMessagePrefix = 'signed-message' | 'connect-challenge' | 'unknown';
+
+// FROZEN as of 0.29.0, INCLUDING the `prefix` field: out-of-package verifiers
+// pin this exact shape and read its fields by name, so renaming, removing or
+// retyping one here is a BREAKING change for them, not an internal refactor.
+// Add a field if you must; never alter one.
 /** Result of signMessage — a wallet-ownership proof, normalised across both
  *  backends to hex strings. The shape matches the `{ address, message,
  *  publicKeyHex, signatureHex }` proof that Nimiq signed-message verifiers
@@ -62,6 +70,18 @@ export interface SignMessageResult {
   publicKeyHex: string;
   /** Ed25519 signature over the Nimiq-prefixed message hash, hex (64 bytes). */
   signatureHex: string;
+  /**
+   * Which envelope the signature was produced under. Hub mode is always
+   * 'signed-message'. Mini-app mode is 'unknown', because the Pay SDK does not
+   * report which envelope it used.
+   *
+   * A verifier MUST treat 'unknown' as a decision it has to make, never as a
+   * default to 'signed-message': the Keyguard signs sign-in challenges under
+   * CONNECT_CHALLENGE precisely so they cannot be replayed as ordinary signed
+   * messages, and assuming the wrong envelope is the impersonation that
+   * separation exists to prevent.
+   */
+  prefix: SignMessagePrefix;
 }
 
 /** Listener invoked whenever the connected account changes (or clears). */

@@ -8,6 +8,7 @@ import type {
   CreateWalletOptions,
   SendArgs,
   SendResult,
+  SignMessagePrefix,
   SignMessageResult,
   Wallet,
   WalletMode,
@@ -23,6 +24,7 @@ export type {
   CreateWalletOptions,
   SendArgs,
   SendResult,
+  SignMessagePrefix,
   SignMessageResult,
   Wallet,
   WalletMode,
@@ -31,6 +33,17 @@ export { detectModeSync, isMiniAppHost, hasNimiqProvider } from './detect';
 export { MiniAppBackend, type MiniAppProvider } from './miniapp-backend';
 export { HubBackend, type HubClient } from './hub-backend';
 export type { WalletBackend } from './backend';
+
+// Outcomes and send handles (v0.29.0). Types and pure classifiers only — no
+// backend touches these yet; they are the contract the settlement and memo
+// lanes build against.
+export {
+  describeWalletError,
+  type WalletError,
+  type WalletErrorKind,
+  type WalletOutcome,
+} from './outcome';
+export { classifySendResult, type SendHandle } from './send-handle';
 
 /** Extra (test/advanced) knobs forwarded to the chosen backend. Not part of the
  *  public happy path — apps generally only need CreateWalletOptions. */

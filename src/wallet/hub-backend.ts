@@ -204,6 +204,9 @@ export class HubBackend implements WalletBackend {
       message,
       publicKeyHex: bytesToHex(result.signerPublicKey),
       signatureHex: bytesToHex(result.signature),
+      // Hub's signMessage takes no prefix argument, so this is the Keyguard's
+      // SIGNED_MESSAGE path, not CONNECT_CHALLENGE.
+      prefix: 'signed-message',
     };
   }
 

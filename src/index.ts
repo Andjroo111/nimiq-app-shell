@@ -29,6 +29,7 @@ export {
   type CreateWalletAdvanced,
   type SendArgs,
   type SendResult,
+  type SignMessagePrefix,
   type SignMessageResult,
   type Wallet,
   type WalletMode,
@@ -45,6 +46,19 @@ export {
   type NimBalanceReaderOptions,
 } from './wallet/balance';
 
+// ---- wallet outcomes + send handles ----
+// The frozen contracts (v0.29.0): how a wallet rejection is classified, and
+// what a send actually handed back. Pure functions, no backend wiring — the
+// settlement lane builds against these.
+export {
+  describeWalletError,
+  classifySendResult,
+  type WalletError,
+  type WalletErrorKind,
+  type WalletOutcome,
+  type SendHandle,
+} from './wallet';
+
 // ---- nim-format ----
 export {
   LUNA_PER_NIM,
@@ -57,6 +71,19 @@ export {
   parseNim,
   type FmtNimOptions,
 } from './format/nim';
+
+// ---- memo (the tx data field, which is capped in BYTES, not characters) ----
+// Build only. Parsing a memo back apart belongs to another package, by design.
+export {
+  buildMemo,
+  memoByteLength,
+  MemoTooLongError,
+  MAX_TX_DATA_BYTES,
+  MEMO_SEP,
+  MEMO_TAG_RE,
+  MEMO_ID_RE,
+  type BuildMemoArgs,
+} from './format/memo';
 
 // ---- i18n ----
 export {

@@ -160,12 +160,20 @@ export class MiniAppBackend implements WalletBackend {
     // straight through. NOTE: whether Nimiq Pay applies the same Nimiq
     // signed-message prefix Hub/Keyguard does is not provable from the SDK
     // types; the Hub path is the interop-verified one (see PR notes).
+    //
+    // That is why `prefix` is 'unknown' here and not 'signed-message'. The
+    // Keyguard has TWO envelopes (ClientEnums.js: SIGNED_MESSAGE and
+    // CONNECT_CHALLENGE), and it signs sign-in challenges under the second one
+    // "to avoid blind signing as a regular Nimiq message, which could be used
+    // to impersonate the user". Guessing SIGNED_MESSAGE here would hand a
+    // verifier exactly that assumption. The caller decides.
     const result = unwrap(await provider.sign(message));
     return {
       address: this.current.address,
       message,
       publicKeyHex: result.publicKey,
       signatureHex: result.signature,
+      prefix: 'unknown',
     };
   }
 

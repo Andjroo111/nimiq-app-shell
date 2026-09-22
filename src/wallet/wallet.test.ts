@@ -192,7 +192,22 @@ describe('miniapp wallet', () => {
       message: 'demo:sign-in:nonce123:1700000000000',
       publicKeyHex: 'ab'.repeat(32),
       signatureHex: 'cd'.repeat(64),
+      prefix: 'unknown',
     });
+  });
+
+  // The Keyguard has two envelopes (SIGNED_MESSAGE and CONNECT_CHALLENGE) and
+  // the Pay SDK does not say which one it used. Reporting 'signed-message' here
+  // would let a verifier accept a connect challenge as an ordinary signed
+  // message, which is the impersonation the two envelopes exist to prevent.
+  test('signMessage reports an unknown prefix rather than assuming signed-message', async () => {
+    const provider = fakeMiniAppProvider({
+      sign: async () => ({ publicKey: 'ab'.repeat(32), signature: 'cd'.repeat(64) }),
+    });
+    setWindow({ nimiqPay: {}, nimiq: provider });
+    const w = createWallet({}, { miniApp: { provider } });
+    await w.connect();
+    expect((await w.signMessage('m')).prefix).toBe('unknown');
   });
 
   test('signMessage before connect throws', async () => {
@@ -305,6 +320,9 @@ describe('hub wallet', () => {
       message: 'Demo:sign-in:nonceX:1700000000000',
       publicKeyHex: '0102ff',
       signatureHex: 'deadbeef',
+      // Hub.signMessage takes no prefix argument: this is Keyguard's
+      // SIGNED_MESSAGE envelope, never CONNECT_CHALLENGE.
+      prefix: 'signed-message',
     });
   });
 
