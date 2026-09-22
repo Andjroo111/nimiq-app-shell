@@ -175,3 +175,20 @@ describe('WalletOutcome', () => {
     expect(seen).toEqual(['hash', 'cancelled']);
   });
 });
+
+// ---- cancel beats transient (cross-lane rule, shared with nimiq-settlement) ----
+
+describe('describeWalletError: a cancel is never retried', () => {
+  // A message can carry a cancel word and a transient word at once. Read as
+  // transient, the caller retries and re-prompts someone who already said no.
+  // Only a literal PENDING: prefix ranks above a cancel, and a user refusal
+  // cannot produce one.
+  test.each([
+    'request cancelled while syncing',
+    'user rejected: request timed out',
+    'User denied, network unavailable',
+    'dismissed before timeout',
+  ])('%s', (message) => {
+    expect(describeWalletError(message).kind).toBe('cancelled');
+  });
+});
