@@ -180,3 +180,35 @@ describe('MemoTooLongError', () => {
     expect(memoByteLength(longest)).toBeLessThanOrEqual(MAX_TX_DATA_BYTES);
   });
 });
+
+// ---- the walk-back under real caps -----------------------------------------
+
+describe('buildMemo: multi-byte truncation at the maximum tag and id', () => {
+  // Elsewhere the walk-back is exercised with a short tag, where the budget is
+  // wide. At the caps the two regexes actually allow, 16 + 1 + 32 + 1 = 50
+  // bytes of prefix leave 14, and one emoji is over a fifth of that. This is
+  // the narrowest the budget can legally get, so it is the case where a
+  // character-counting truncation would ship an oversized transaction.
+  const TAG = 'A'.repeat(16);
+  const ID = 'B'.repeat(32);
+  const budget = MAX_TX_DATA_BYTES - memoByteLength(`${TAG}${MEMO_SEP}${ID}${MEMO_SEP}`);
+
+  const build = (text: string) => buildMemo({ tag: TAG, id: ID, text });
+  const textOf = (memo: string) => memo.slice(`${TAG}${MEMO_SEP}${ID}${MEMO_SEP}`.length);
+
+  test('the budget at the caps is 14 bytes', () => {
+    expect(budget).toBe(14);
+  });
+
+  test.each([
+    ['ascii fills the budget exactly', 'x'.repeat(20), 'x'.repeat(14)],
+    ['a trailing emoji is dropped whole', `${'a'.repeat(12)}\u{1F389}`, 'a'.repeat(12)],
+    ['four 4-byte emoji become three', '\u{1F389}'.repeat(4), '\u{1F389}'.repeat(3)],
+    ['fourteen 2-byte accents become seven', 'é'.repeat(14), 'é'.repeat(7)],
+  ])('%s', (_label, input, expected) => {
+    const memo = build(input);
+    expect(textOf(memo)).toBe(expected);
+    expect(memoByteLength(memo)).toBeLessThanOrEqual(MAX_TX_DATA_BYTES);
+    expect(memo).not.toContain(REPLACEMENT);
+  });
+});
