@@ -29,7 +29,18 @@ export type {
   Wallet,
   WalletMode,
 };
-export { detectModeSync, isMiniAppHost, hasNimiqProvider } from './detect';
+export {
+  detectModeSync,
+  isMiniAppHost,
+  hasNimiqProvider,
+  detectMode,
+  isNimiqPayUserAgent,
+  walletDiagnostics,
+  type DetectModeOptions,
+  type WalletDiagnostics,
+  type WalletResolvedVia,
+} from './detect';
+export { withTimeout } from './timeout';
 export { MiniAppBackend, type MiniAppProvider } from './miniapp-backend';
 export { HubBackend, type HubClient } from './hub-backend';
 export type { WalletBackend } from './backend';
@@ -82,7 +93,7 @@ export function createWallet(
 
   const backend: WalletBackend =
     mode === 'miniapp'
-      ? new MiniAppBackend(advanced.miniApp)
+      ? new MiniAppBackend({ initTimeout: opts.miniAppInitTimeout, ...advanced.miniApp })
       : new HubBackend({
           appName: opts.appName ?? 'Nimiq App',
           hubEndpoint: opts.hubEndpoint,

@@ -21,6 +21,10 @@ export {
   detectModeSync,
   isMiniAppHost,
   hasNimiqProvider,
+  detectMode,
+  isNimiqPayUserAgent,
+  walletDiagnostics,
+  withTimeout,
   MiniAppBackend,
   HubBackend,
   type Account,
@@ -36,6 +40,9 @@ export {
   type WalletBackend,
   type MiniAppProvider,
   type HubClient,
+  type DetectModeOptions,
+  type WalletDiagnostics,
+  type WalletResolvedVia,
 } from './wallet';
 // The mini wallet's own NIM balance read — the one chain read in this package,
 // and only because an opt-in balance meant nineteen apps showing none. See the

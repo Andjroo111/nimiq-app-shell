@@ -11,6 +11,9 @@
 
 import type { Account, SendArgs, SendResult, SignMessageResult } from './types';
 import { type WalletBackend, dataToHex } from './backend';
+import { errorMessage, hasHostHint, recordWalletDiagnostics } from './detect';
+import { loadMiniAppSdk } from './sdk-loader';
+import { withTimeout } from './timeout';
 
 /** The slice of the SDK provider this backend depends on. window.nimiq from
  *  @nimiq/mini-app-sdk satisfies it; tests inject a fake of the same shape. */
@@ -62,17 +65,65 @@ export interface MiniAppBackendOptions {
   /** Resolve the provider lazily — defaults to reading window.nimiq, and if
    *  absent, calling the SDK's init() (which polls Nimiq Pay). */
   getProvider?: () => Promise<MiniAppProvider>;
+  /** Budget (ms) passed to the SDK's `init({ timeout })` when the default
+   *  provider resolver has to bootstrap it. Default: 5000 with a host hint,
+   *  else 1200. createWallet threads `miniAppInitTimeout` into this. */
+  initTimeout?: number;
 }
 
-async function defaultGetProvider(): Promise<MiniAppProvider> {
+/** The outer race sits this far past the init budget (C1-465). */
+const INIT_RACE_SLACK_MS = 800;
+
+/** Host-aware init budget: 5000ms when a Nimiq Pay host is hinted,
+ *  else 1200ms, unless the caller set one. */
+function initBudgetMs(initTimeout?: number): number {
+  if (initTimeout !== undefined) return initTimeout;
+  return hasHostHint() ? 5000 : 1200;
+}
+
+async function defaultGetProvider(initTimeout?: number): Promise<MiniAppProvider> {
+  const start = Date.now();
+  const budgetMs = initBudgetMs(initTimeout);
   if (typeof window !== 'undefined' && window.nimiq) {
+    recordWalletDiagnostics({
+      sdkImported: false,
+      resolvedVia: 'window.nimiq',
+      initError: null,
+      elapsedMs: Date.now() - start,
+      budgetMs,
+      provider: window.nimiq,
+    });
     return window.nimiq as unknown as MiniAppProvider;
   }
   // Lazy-load the real SDK only when we actually need to bootstrap it; keeps it
   // out of the standalone (Hub) code path.
-  const sdk = await import('@nimiq/mini-app-sdk');
-  const provider = await sdk.init();
-  return provider as unknown as MiniAppProvider;
+  let sdkImported = false;
+  let initError: string | null = null;
+  let provider: unknown = null;
+  try {
+    const sdk = await loadMiniAppSdk();
+    sdkImported = true;
+    // init is read-only bootstrap, so a timeout is safe here (never on a send).
+    // The outer race covers a suspended WebView whose init never settles.
+    provider = await withTimeout(
+      sdk.init({ timeout: budgetMs }),
+      budgetMs + INIT_RACE_SLACK_MS,
+      null,
+    );
+    if (!provider) initError = `init did not settle within ${budgetMs + INIT_RACE_SLACK_MS}ms`;
+  } catch (err) {
+    initError = errorMessage(err);
+  }
+  recordWalletDiagnostics({
+    sdkImported,
+    resolvedVia: provider ? 'sdk-init' : 'fallback',
+    initError,
+    elapsedMs: Date.now() - start,
+    budgetMs,
+    provider: provider ?? undefined,
+  });
+  if (!provider) throw new Error(`Nimiq Pay: ${initError ?? 'provider unavailable'}`);
+  return provider as MiniAppProvider;
 }
 
 export class MiniAppBackend implements WalletBackend {
@@ -84,7 +135,7 @@ export class MiniAppBackend implements WalletBackend {
 
   constructor(opts: MiniAppBackendOptions = {}) {
     this.provider = opts.provider ?? null;
-    this.getProviderFn = opts.getProvider ?? defaultGetProvider;
+    this.getProviderFn = opts.getProvider ?? (() => defaultGetProvider(opts.initTimeout));
   }
 
   private async resolveProvider(): Promise<MiniAppProvider> {
