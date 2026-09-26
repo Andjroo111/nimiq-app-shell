@@ -499,6 +499,30 @@ persists.
   moving, and only for an address the book does not already hold.
 - **A failed contacts read renders no chips** rather than breaking the send view.
 
+### Nimiq names (NNS)
+
+The send sheet's recipient field takes a name as well as an address. Type
+`gaston`, and a row appears with the face and first blocks of the address the
+name proves to. Tapping it fills the field with that address and moves to the
+amount step, where the recipient shows as `gaston`.
+
+The registry is [NNS](https://nimiqnames.com) (selfcrypto, MIT), live on
+mainnet. The shell does not run its own. Resolution is their
+`@nimiqnames/resolver`, pinned exactly: two independent resolvers must agree,
+and each answer's Merkle proof is recombined in the browser.
+
+| field state | what the sheet shows |
+|---|---|
+| proven name | a row to tap; no auto-advance, since `gast` may be registered too |
+| unregistered | "No one holds the name gaston" |
+| repointed since the last checkpoint | "gaston just changed. Try again in a minute" |
+| resolver down, quorum split, bad proof | "Could not check gaston right now" |
+| `NQ..` | the address grid, unchanged, and no lookup |
+
+On by default. `names: false` restores the old field; `names: { resolvers }`
+adds resolvers to the shipped two. The pure pieces are exported from
+`nimiq-app-shell/names` (`nameQuery`, `createNameResolver`).
+
 ### Report a bug (v0.8.0)
 
 The corner control carries the fleet's bug reporter, as a **Report a bug** row in

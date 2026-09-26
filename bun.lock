@@ -7,6 +7,8 @@
       "dependencies": {
         "@nimiq/hub-api": "^1.14.0",
         "@nimiq/mini-app-sdk": "^0.1.0",
+        "@nimiqnames/core": "0.1.0",
+        "@nimiqnames/resolver": "0.1.0",
         "nimiq-settlement": "github:Andjroo111/nimiq-settlement#v0.4.0",
         "qr-creator": "^1.0.0",
       },
@@ -43,6 +45,16 @@
     "@nimiq/rpc": ["@nimiq/rpc@0.4.1", "", {}, "sha512-aQigD21o7S1+J9kfWBA9sDPjtQ+K1keL02eahc6UjSL/+9SVMY+zetSDdjq6d4zNBLRnVayjw0G2hc/yKUMZ0Q=="],
 
     "@nimiq/utils": ["@nimiq/utils@0.11.7", "", { "dependencies": { "big-integer": "^1.6.44" } }, "sha512-FLeQ9kBFsOBfOjh0T+jI8kl9K77XOuyQA3yel1VIzOK4dLcnvMmgXjegJfuPAEht9oGe+gxcyzFsb0Yi9Js8Dg=="],
+
+    "@nimiqnames/anchor": ["@nimiqnames/anchor@0.1.0", "", { "dependencies": { "@nimiqnames/core": "0.1.0", "@noble/hashes": "^2.3.0" } }, "sha512-1hoa4qZp1T3rlzNQPqdMhIXWrgWJ24yEmMKbNcFeCI+PDYXYQwjf2Qp/HHuOATaA02tzCsdnIstbUDHHPL9TbA=="],
+
+    "@nimiqnames/core": ["@nimiqnames/core@0.1.0", "", { "dependencies": { "@noble/curves": "^2.3.0", "@noble/hashes": "^2.3.0" } }, "sha512-RQZL7LkQCEL+RX66+sNju1hw8mntEXjXzapHJYt5wRW1Y+ThUbnzPZPMrBRxoyZ366t+/Q0Yh3YA540oBrIyWw=="],
+
+    "@nimiqnames/resolver": ["@nimiqnames/resolver@0.1.0", "", { "dependencies": { "@nimiqnames/anchor": "0.1.0", "@nimiqnames/core": "0.1.0" } }, "sha512-6XguWa3gnvOqUT0tZxQTqymhfn9DzyzOFy3x6m9Cc+VRLzLh2ARUSWNg9zXz1xaEgjzOd0g+gUBgl6K5uNS4xg=="],
+
+    "@noble/curves": ["@noble/curves@2.4.0", "", { "dependencies": { "@noble/hashes": "2.4.0" } }, "sha512-P4/62zrgfH33CneE3Dn4WhJVA22YUU0eR51wKIan4NVRvwsA0YnPTwWGpNbpuacSujmSFLvyzpyuR30+fbq2Ew=="],
+
+    "@noble/hashes": ["@noble/hashes@2.4.0", "", {}, "sha512-X5XaVWZIBCT7HHZGm5I7ZQXDwLG+bGXuSrMQAW+7Zvl87h1kmc1ZB1VSRJcpUfoUrGQp4Fkoxm5kZ+Ms+aW+eA=="],
 
     "@oxc-project/types": ["@oxc-project/types@0.133.0", "", {}, "sha512-KzkdCd6Uxqnf6l3HOw1xfatAlUURA0g14cvBYFyJ5SaNOQbOUvBr9PKArcPcrNIeRsBdgcUzOGrhKveVpvOIGA=="],
 

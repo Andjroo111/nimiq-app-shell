@@ -222,3 +222,16 @@ export {
   type OpenInPayGateHandle,
   type GateVariant,
 } from './deeplink';
+
+// ---- names ----
+// NNS (nimiqnames.com) resolution for the recipient field. The registry is
+// theirs; see names/index.ts for why the fleet reads it rather than runs one.
+export {
+  nameQuery,
+  createNameResolver,
+  NNS_RESOLVERS,
+  type NameLookup,
+  type NameResolver,
+  type NameResolverOptions,
+  type NnsResolverEndpoint,
+} from './names';

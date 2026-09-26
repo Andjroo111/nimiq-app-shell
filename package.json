@@ -7,7 +7,8 @@
     ".": "./src/index.ts",
     "./wallet": "./src/wallet/index.ts",
     "./memo": "./src/format/memo.ts",
-    "./deeplink": "./src/deeplink/index.ts"
+    "./deeplink": "./src/deeplink/index.ts",
+    "./names": "./src/names/index.ts"
   },
   "scripts": {
     "check": "bun tsc --noEmit",
@@ -20,6 +21,8 @@
   "dependencies": {
     "@nimiq/hub-api": "^1.14.0",
     "@nimiq/mini-app-sdk": "^0.1.0",
+    "@nimiqnames/core": "0.1.0",
+    "@nimiqnames/resolver": "0.1.0",
     "nimiq-settlement": "github:Andjroo111/nimiq-settlement#v0.4.0",
     "qr-creator": "^1.0.0"
   },

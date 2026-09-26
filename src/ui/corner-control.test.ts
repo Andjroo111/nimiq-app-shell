@@ -1557,7 +1557,7 @@ describe('step one is the wallet\'s Send Transaction sheet', () => {
     const { host } = mount();
     await openSend(host);
     expect(host.querySelector('.nq-cc-view-sendto .nq-cc-eyebrow')?.textContent)
-      .toBe('Enter address');
+      .toBe('Enter address or name');
     const src = await Bun.file(new URL('./corner-control.ts', import.meta.url)).text();
     expect(src).toMatch(/\.nq-cc-eyebrow \{[^}]*text-transform:uppercase/);
   });
