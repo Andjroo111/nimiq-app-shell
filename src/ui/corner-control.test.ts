@@ -379,6 +379,24 @@ describe('switching account drops the previous account money', () => {
     expect(host.querySelector('.nq-cc')?.className).not.toContain('nq-cc-open');
   });
 
+  test('cashOut.available hides the pill until it says yes, checked on each open', async () => {
+    let has = false;
+    const { host } = mount(undefined, {
+      cashOut: { label: 'Cash out to bank', open: () => {}, available: async () => has },
+    });
+    await settle();
+    const face = host.querySelector('.nq-cc-face') as HTMLElement;
+    const pill = host.querySelector('.nq-cc-cashout') as HTMLElement;
+    face.click();
+    await settle();
+    expect(pill.hidden).toBe(true);
+    face.click();
+    has = true;
+    face.click();
+    await settle();
+    expect(pill.hidden).toBe(false);
+  });
+
   test('without cashOut there is no pill', async () => {
     const { host } = mount();
     await settle();
