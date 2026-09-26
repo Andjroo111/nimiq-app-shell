@@ -366,6 +366,25 @@ describe('switching account drops the previous account money', () => {
     expect(host.querySelector('.nq-cc-disconnect')?.textContent).toBe('Disconnect');
   });
 
+  test('cashOut: a pill under Receive/Send with the app label, closing the menu first', async () => {
+    let opened = 0;
+    const { host } = mount(undefined, { cashOut: { label: 'Cash out to bank', open: () => { opened += 1; } } });
+    await settle();
+    const pill = host.querySelector('.nq-cc-wallet .nq-cc-cashout') as HTMLElement;
+    expect(pill?.textContent).toBe('Cash out to bank');
+    expect(pill.querySelector('svg')).not.toBeNull();
+    expect(pill.previousElementSibling?.className).toContain('nq-cc-actions');
+    pill.click();
+    expect(opened).toBe(1);
+    expect(host.querySelector('.nq-cc')?.className).not.toContain('nq-cc-open');
+  });
+
+  test('without cashOut there is no pill', async () => {
+    const { host } = mount();
+    await settle();
+    expect(host.querySelector('.nq-cc-cashout')).toBeNull();
+  });
+
   test('the switch row exists and is not the disconnect', async () => {
     const { host } = mount();
     await settle();
