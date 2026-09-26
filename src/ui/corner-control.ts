@@ -129,6 +129,11 @@ export interface CornerControlOptions {
   scan?: () => void;
   /** Wire the opt-in "Create a Cashlink" row (HubApi.createCashlink). Hidden when absent. */
   createCashlink?: () => void;
+  /** Opt-in full-width pill under Receive/Send that hands off to the app's own
+   *  cash-out flow (a bank off-ramp). The app supplies the label in its own
+   *  language, since only it knows the flow; the menu closes first, like the
+   *  send override. Hidden when absent, and only shown when connected. */
+  cashOut?: { label: string; open: () => void };
   /** Wire the signed-out "New to Nimiq? Create a wallet" line. Hidden when absent.
    *
    *  NOT `HubApi.onboard`, whatever the older docs said. `ONBOARD` is commented
@@ -420,6 +425,12 @@ button.nq-cc-name:focus-visible { outline:2px solid var(--nq-cc-accent, #0582ca)
   color:#fff; background-color:#0582ca; background-image:radial-gradient(100% 100% at 100% 100%, #265dd7, #0582ca); }
 .nq-cc-send:hover { background-image:radial-gradient(100% 100% at 100% 100%, #1f4fbc, #0473b3); }
 .nq-cc-send:focus-visible { outline:2px solid var(--nq-cc-accent, #0582ca); outline-offset:3px; }
+.nq-cc-cashout { display:flex; align-items:center; justify-content:center; gap:8px; width:100%; height:36px; margin-top:8px;
+  border:none; border-radius:500px; background:#fff; box-shadow:inset 0 0 0 1.5px var(--nq-cc-menu-line, rgba(31,35,72,.15));
+  font-family:inherit; font-size:14px; font-weight:700; color:var(--nq-cc-menu-fg, #1f2348); cursor:pointer; }
+.nq-cc-cashout:hover { background:var(--nq-cc-menu-hover, rgba(31,35,72,.07)); }
+.nq-cc-cashout:focus-visible { outline:2px solid var(--nq-cc-accent, #0582ca); outline-offset:2px; }
+.nq-cc-cashout svg { width:16px; height:16px; flex:none; }
 .nq-cc-arrow-up { transform:rotate(-90deg); width:11px; height:8px; }
 .nq-cc-arrow-down { transform:rotate(90deg); width:11px; height:8px; }
 .nq-cc-scan { flex:none; padding:4px; border:none; background:none; cursor:pointer; color:var(--nq-cc-menu-fg, #1f2348);
@@ -664,6 +675,8 @@ const SWITCH_ICON =
   '<path d="M50 39.5H14"/><path d="M23.5 30L14 39.5l9.5 9.5"/></g></svg>';
 
 // wallet-verbatim cashlink glyph (upstream nimiq-style cashlink.svg)
+// lucide "landmark": a bank, for the cash-out pill
+const BANK_ICON = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 22h18"/><path d="M6 18v-7"/><path d="M10 18v-7"/><path d="M14 18v-7"/><path d="M18 18v-7"/><path d="m12 2 8 5H4Z"/></svg>';
 const CASHLINK_ICON =
   '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" aria-hidden="true"><g fill="none" stroke="currentColor" stroke-linecap="round" stroke-width="2.5px" stroke-linejoin="round"><path d="M40.25,23.25v-.5a6.5,6.5,0,0,0-6.5-6.5h-3.5a6.5,6.5,0,0,0-6.5,6.5v6.5a6.5,6.5,0,0,0,6.5,6.5h2"/><path d="M23.75,40.75v.5a6.5,6.5,0,0,0,6.5,6.5h3.5a6.5,6.5,0,0,0,6.5-6.5v-6.5a6.5,6.5,0,0,0-6.5-6.5h-2"/><line x1="32" y1="11.25" x2="32" y2="15.25"/><line x1="32" y1="48.75" x2="32" y2="52.75"/></g></svg>';
 
@@ -966,6 +979,15 @@ export function mountMiniWallet(
       btn.insertAdjacentHTML('beforeend', SCAN_QR);
       btn.addEventListener('click', () => { setOpen(false); options.scan!(); });
     }
+  }
+  if (options.cashOut) {
+    const out = options.cashOut;
+    const btn = el('button', 'nq-cc-cashout nq-cc-when-connected', walletSection);
+    btn.type = 'button';
+    btn.insertAdjacentHTML('beforeend', BANK_ICON);
+    const span = el('span', undefined, btn);
+    span.textContent = out.label;
+    btn.addEventListener('click', () => { setOpen(false); out.open(); });
   }
   el('div', 'nq-cc-divider nq-cc-when-connected nq-cc-when-hub', viewMain);
 
