@@ -132,8 +132,11 @@ export interface CornerControlOptions {
   /** Opt-in full-width pill under Receive/Send that hands off to the app's own
    *  cash-out flow (a bank off-ramp). The app supplies the label in its own
    *  language, since only it knows the flow; the menu closes first, like the
-   *  send override. Hidden when absent, and only shown when connected. */
-  cashOut?: { label: string; open: () => void };
+   *  send override. Hidden when absent, and only shown when connected.
+   *  `available`, when given, runs each time the menu opens (next to the balance
+   *  refresh); the pill shows only once it resolves true, e.g. when there is a
+   *  balance to cash out. */
+  cashOut?: { label: string; open: () => void; available?: () => boolean | Promise<boolean> };
   /** Wire the signed-out "New to Nimiq? Create a wallet" line. Hidden when absent.
    *
    *  NOT `HubApi.onboard`, whatever the older docs said. `ONBOARD` is commented
@@ -980,6 +983,7 @@ export function mountMiniWallet(
       btn.addEventListener('click', () => { setOpen(false); options.scan!(); });
     }
   }
+  let cashOutPill: HTMLButtonElement | null = null;
   if (options.cashOut) {
     const out = options.cashOut;
     const btn = el('button', 'nq-cc-cashout nq-cc-when-connected', walletSection);
@@ -988,6 +992,7 @@ export function mountMiniWallet(
     const span = el('span', undefined, btn);
     span.textContent = out.label;
     btn.addEventListener('click', () => { setOpen(false); out.open(); });
+    if (out.available) cashOutPill = btn;
   }
   el('div', 'nq-cc-divider nq-cc-when-connected nq-cc-when-hub', viewMain);
 
@@ -1567,6 +1572,18 @@ export function mountMiniWallet(
   }
 
   // ---- open / close ---------------------------------------------------------
+  async function refreshCashOut(): Promise<void> {
+    const pill = cashOutPill;
+    const check = options.cashOut?.available;
+    if (!pill || !check) return;
+    pill.hidden = true;
+    try {
+      pill.hidden = !(await check());
+    } catch {
+      pill.hidden = true;
+    }
+  }
+
   function setOpen(open: boolean): void {
     menu.hidden = !open;
     face.setAttribute('aria-expanded', String(open));
@@ -1575,6 +1592,7 @@ export function mountMiniWallet(
       document.addEventListener('click', onDocClick, true);
       document.addEventListener('keydown', onKeydown);
       void refreshBalance();
+      void refreshCashOut();
     } else {
       root.classList.remove('nq-cc-show-receive');
       root.classList.remove('nq-cc-show-send');
