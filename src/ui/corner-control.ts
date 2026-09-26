@@ -173,6 +173,14 @@ export interface CornerControlOptions {
    *  step-one field, beneath "Address unavailable?", which is where the wallet
    *  puts it. Absent leaves that footer out. Was a main-menu row until v0.28.0. */
   createCashlink?: () => void;
+  /** Opt-in full-width pill under Receive/Send that hands off to the app's own
+   *  cash-out flow (a bank off-ramp). The app supplies the label in its own
+   *  language, since only it knows the flow; the menu closes first, like the
+   *  send override. Hidden when absent, and only shown when connected.
+   *  `available`, when given, runs each time the menu opens (next to the balance
+   *  refresh); the pill shows only once it resolves true, e.g. when there is a
+   *  balance to cash out. */
+  cashOut?: { label: string; open: () => void; available?: () => boolean | Promise<boolean> };
   /** Wire the signed-out "New to Nimiq? Create a wallet" line. Hidden when absent.
    *
    *  NOT `HubApi.onboard`, whatever the older docs said. `ONBOARD` is commented
@@ -528,6 +536,12 @@ button.nq-cc-name:focus-visible { outline:2px solid var(--nq-cc-accent, #0582ca)
 .nq-cc-send:hover { background-image:var(--nq-cc-send-image-hover,
   radial-gradient(100% 100% at 100% 100%, #1f4fbc, #0473b3)); }
 .nq-cc-send:focus-visible { outline:2px solid var(--nq-cc-accent, #0582ca); outline-offset:3px; }
+.nq-cc-cashout { display:flex; align-items:center; justify-content:center; gap:8px; width:100%; height:36px; margin-top:8px;
+  border:none; border-radius:500px; background:var(--nq-cc-menu-bg, #fff); box-shadow:inset 0 0 0 1.5px var(--nq-cc-menu-line, rgba(31,35,72,.15));
+  font-family:inherit; font-size:14px; font-weight:700; color:var(--nq-cc-menu-fg, #1f2348); cursor:pointer; }
+.nq-cc-cashout:hover { background:var(--nq-cc-menu-hover, rgba(31,35,72,.07)); }
+.nq-cc-cashout:focus-visible { outline:2px solid var(--nq-cc-accent, #0582ca); outline-offset:2px; }
+.nq-cc-cashout svg { width:16px; height:16px; flex:none; }
 .nq-cc-arrow-up { transform:rotate(-90deg); width:11px; height:8px; }
 .nq-cc-arrow-down { transform:rotate(90deg); width:11px; height:8px; }
 .nq-cc-scan { flex:none; padding:4px; border:none; background:none; cursor:pointer; color:var(--nq-cc-menu-fg, #1f2348);
@@ -1148,6 +1162,9 @@ const SWITCH_ICON =
   '<path d="M1.396 9.752l2.988 5.304a1.36 1.36 0 001.186.703h6.858a1.36 1.36 0 001.186-.703l2.988-5.304"/>' +
   '<path d="M3.24 5.773L1.396 6.779L1.3 4.681M14.758 10.757L16.602 9.752L16.697 11.85"/></g></svg>';
 
+// lucide "landmark": a bank, for the cash-out pill
+const BANK_ICON = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 22h18"/><path d="M6 18v-7"/><path d="M10 18v-7"/><path d="M14 18v-7"/><path d="M18 18v-7"/><path d="m12 2 8 5H4Z"/></svg>';
+
 /** The gold brand hexagon for the "Open in Nimiq Pay" row. The gradient id is
  *  minted per instance (rule 3: never reuse a gradient id on one page). */
 let hexUid = 0;
@@ -1484,6 +1501,17 @@ export function mountMiniWallet(
       btn.insertAdjacentHTML('beforeend', SCAN_QR);
       btn.addEventListener('click', () => { setOpen(false); options.scan!(); });
     }
+  }
+  let cashOutPill: HTMLButtonElement | null = null;
+  if (options.cashOut) {
+    const out = options.cashOut;
+    const btn = el('button', 'nq-cc-cashout nq-cc-when-connected', walletSection);
+    btn.type = 'button';
+    btn.insertAdjacentHTML('beforeend', BANK_ICON);
+    const span = el('span', undefined, btn);
+    span.textContent = out.label;
+    btn.addEventListener('click', () => { setOpen(false); out.open(); });
+    if (out.available) cashOutPill = btn;
   }
   el('div', 'nq-cc-divider nq-cc-when-connected nq-cc-when-hub', viewMain);
 
@@ -2499,6 +2527,18 @@ export function mountMiniWallet(
     const shift = menuShift(r.left, r.right, window.innerWidth);
     if (shift) menu.style.setProperty('--nq-cc-menu-shift', `${shift}px`);
   }
+  async function refreshCashOut(): Promise<void> {
+    const pill = cashOutPill;
+    const check = options.cashOut?.available;
+    if (!pill || !check) return;
+    pill.hidden = true;
+    try {
+      pill.hidden = !(await check());
+    } catch {
+      pill.hidden = true;
+    }
+  }
+
   function setOpen(open: boolean): void {
     menu.hidden = !open;
     face.setAttribute('aria-expanded', String(open));
@@ -2509,6 +2549,7 @@ export function mountMiniWallet(
       document.addEventListener('click', onDocClick, true);
       document.addEventListener('keydown', onKeydown);
       void refreshBalance();
+      void refreshCashOut();
     } else {
       root.classList.remove('nq-cc-show-receive');
       root.classList.remove('nq-cc-show-qr');
