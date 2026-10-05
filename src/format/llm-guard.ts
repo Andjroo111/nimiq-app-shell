@@ -46,6 +46,7 @@ function decodeEntities(t: string): string {
  *  can split an address the browser renders whole. */
 export function normalizeForGuard(text: string): string {
   return decodeEntities(text)
+    .replace(/<!--[\s\S]*?(?:-->|$)/g, '')
     .replace(/<\/?[a-z][^>]*>/gi, (tag) => (/^<\/?a\b/i.test(tag) ? tag : ''))
     .normalize('NFKC')
     .replace(ZERO_WIDTH, '')
@@ -110,17 +111,44 @@ export function enforceLinkAllowlist(text: string, allowedHosts: readonly string
 // N then Q, two check digits, then 24..32 Nimiq base32 characters, with any
 // run of separators a renderer would hide: spaces, newlines, dashes, dots,
 // markdown emphasis or code ticks.
-const SEP = String.raw`[\s\-.*_\x60~|'"‐-―]*`;
+const SEP = String.raw`[\s\-.*_\x60~|'"<>‐-―]*`;
 const NQ_LIKE = new RegExp(
   String.raw`[NH]${SEP}Q${SEP}\d${SEP}\d(?:${SEP}[0-9A-HJ-NP-VXY]){24,32}`,
   'gi',
 );
 const compact = (a: string) => a.replace(/[^0-9A-Z]/gi, '').toUpperCase();
 
-/** Replace every address-shaped token not in `verified` (any spelling). */
+/** What a reader actually sees: comments, tags and markdown link/image syntax
+ *  removed, link text and image alts kept. Addresses are scanned here, because
+ *  markup can split an address the renderer shows whole. */
+export function visibleText(normalized: string): string {
+  return normalized
+    .replace(/<!--[\s\S]*?(?:-->|$)/g, '')
+    .replace(/<[^>]*>/g, '')
+    .replace(/!?\[([^\]]*)\]\([^)]*\)/g, '$1')
+    .replace(/!?\[([^\]]*)\]\[[^\]]*\]/g, '$1')
+    .replace(/^[ \t]*\[[^\]]+\]:.*$/gm, '')
+    // Fragments of tags a renderer would swallow (unclosed, or broken by a '>' in an attribute).
+    .replace(/<\/?[a-z!][^\s>]*/gi, '');
+}
+
+/**
+ * Replace every address-shaped token not in `verified` (any spelling). When an
+ * unverified address only appears once markup is removed, the markup goes:
+ * the visible text, with the address replaced, is returned.
+ */
 export function stripUnverifiedNqAddresses(text: string, verified: readonly string[], replacement = 'your NQ address'): string {
   const ok = new Set(verified.map(compact));
-  return normalizeForGuard(text).replace(NQ_LIKE, (m) => (ok.has(compact(m)) ? m : replacement));
+  const scrub = (t: string) => t.replace(NQ_LIKE, (m) => (ok.has(compact(m)) ? m : replacement));
+  const direct = scrub(normalizeForGuard(text));
+  const seen = visibleText(direct);
+  const cleaned = scrub(seen);
+  return cleaned === seen ? direct : cleaned;
+}
+
+/** Both guards in the safe order: links first, then addresses on what remains. */
+export function guardModelText(text: string, o: { allowedHosts: readonly string[]; verifiedAddresses: readonly string[] }): string {
+  return stripUnverifiedNqAddresses(enforceLinkAllowlist(text, o.allowedHosts), o.verifiedAddresses);
 }
 
 const LINE_SPLIT = new RegExp('\\r\\n|[\\r\\n\\u2028\\u2029\\u0085\\v\\f]');

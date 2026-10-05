@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'bun:test';
-import { enforceLinkAllowlist, normalizeForGuard, stripForgedLines, stripUnverifiedNqAddresses } from './llm-guard';
+import { enforceLinkAllowlist, guardModelText, normalizeForGuard, stripForgedLines, stripUnverifiedNqAddresses } from './llm-guard';
 
 const ROOTS = ['nimiq.com', 'nimiq.sale'];
 const L = (t: string) => enforceLinkAllowlist(t, ROOTS);
@@ -102,4 +102,26 @@ describe('stripForgedLines', () => {
 
 test('normalizeForGuard folds width, zero-width and look-alikes', () => {
   expect(normalizeForGuard('ＮＱ​Ѕ')).toBe('NQS');
+});
+
+describe('addresses split by markup (third review probe)', () => {
+  const FAKE_GROUPS = '0000 0000 0000 0000 0000 0000 0000 0000';
+  for (const [name, t] of [
+    ['html comment', `NQ07<!-- x -->${FAKE_GROUPS}`],
+    ['markdown link text', 'NQ07 [0000 0000](https://nimiq.com) 0000 0000 0000 0000 0000 0000'],
+    ['image alts', '![NQ07 0000 0000](a.png)![0000 0000 0000 0000 0000 0000](b.png)'],
+    ['a tag', 'NQ07 <a href="https://nimiq.com">0000 0000</a> 0000 0000 0000 0000 0000 0000'],
+    ['tag attr gt', `NQ07 <b title='>'>${FAKE_GROUPS}`],
+    ['unclosed tag', `NQ07 <b ${FAKE_GROUPS}`],
+  ] as const) {
+    test(name, () => {
+      const out = guardModelText(t, { allowedHosts: ['nimiq.com'], verifiedAddresses: [] });
+      expect(out.replace(/[^0-9]/g, '')).not.toMatch(/0000000000/);
+      expect(out).toContain('your NQ address');
+    });
+  }
+  test('text with no address keeps its markdown', () => {
+    const t = 'See [docs](https://nimiq.com/a) and **bold**.';
+    expect(guardModelText(t, { allowedHosts: ['nimiq.com'], verifiedAddresses: [] })).toBe(t);
+  });
 });
