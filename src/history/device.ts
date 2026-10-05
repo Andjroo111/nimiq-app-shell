@@ -92,7 +92,11 @@ export function createDeviceHistory(o: DeviceHistoryOptions = {}): DeviceHistory
   }
   const store = safe(ls);
   const key = o.key ?? 'nq-shell:history:v1';
-  const cap = Math.max(1, o.cap ?? 50);
+  const c0 = o.cap ?? 50;
+  if (!Number.isFinite(c0)) throw new RangeError('createDeviceHistory: cap must be finite');
+  const cap = Math.max(1, Math.floor(c0));
+  // Many wallets on one device: keep the whole store bounded too.
+  const totalCap = cap * 20;
 
   const read = (): Row[] => {
     try {
@@ -115,7 +119,9 @@ export function createDeviceHistory(o: DeviceHistoryOptions = {}): DeviceHistory
       const others = rows.filter((r) => r.owner !== k);
       const row: Row = { owner: k, ref: entry.ref, kind: entry.kind, createdAt: entry.createdAt };
       if (entry.label !== undefined) row.label = entry.label;
-      write([...others, row, ...mine].slice(0, others.length + cap));
+      const kept = [...others, row, ...mine.slice(0, cap - 1)];
+      // Oldest wallets' rows go first once the device-wide bound is hit.
+      write(kept.length > totalCap ? kept.slice(kept.length - totalCap) : kept);
     },
     list(owner) {
       const k = ownerKey(owner);

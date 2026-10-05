@@ -67,4 +67,13 @@ describe('createDeviceHistory', () => {
     h.remember(A, { ...e('r'), label: 'Coffee', amount: 5 } as never);
     expect(JSON.parse(s.getItem('nq-shell:history:v1')!)[0]).toEqual({ owner: A.replace(/ /g, ''), ref: 'r', kind: 'invoice', createdAt: 1, label: 'Coffee' });
   });
+
+  test('NaN cap throws; the device-wide store stays bounded across many wallets', () => {
+    expect(() => createDeviceHistory({ storage: mem(), cap: NaN })).toThrow();
+    const s = mem();
+    const h = createDeviceHistory({ storage: s, cap: 2 });
+    for (let i = 0; i < 100; i++) h.remember(`NQ${String(i).padStart(2, '0')} WALLET`, e(`r${i}`));
+    expect(JSON.parse(s.getItem('nq-shell:history:v1')!).length).toBeLessThanOrEqual(40);
+    expect(h.list('NQ99 WALLET').map((x) => x.ref)).toEqual(['r99']);
+  });
 });
