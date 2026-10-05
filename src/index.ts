@@ -55,6 +55,15 @@ export {
 
 // ---- network override + explorer links ----
 export { queryNetwork, parseNetwork, explorerUrl, type ShellNetwork } from './format/network';
+// ---- address checksum ----
+// Zero-dep IBAN check for NQ addresses; matches @nimiq/utils isValidAddress.
+export {
+  isValidNimAddress,
+  normalizeNimAddress,
+  compactNimAddress,
+  nimAddressCheckDigits,
+  NIMIQ_ALPHABET,
+} from './format/address';
 
 // ---- wallet outcomes + send handles ----
 // The frozen contracts (v0.29.0): how a wallet rejection is classified, and
