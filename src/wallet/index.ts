@@ -41,6 +41,14 @@ export {
   type WalletResolvedVia,
 } from './detect';
 export { withTimeout } from './timeout';
+export {
+  matchNetworkByHeight,
+  walletMatchesNetwork,
+  readWalletHeight,
+  WALLET_HEAD_TOLERANCE_BLOCKS,
+  type NetworkMatch,
+  type NetworkName,
+} from './network-gate';
 export { MiniAppBackend, type MiniAppProvider } from './miniapp-backend';
 export { HubBackend, type HubClient } from './hub-backend';
 export type { WalletBackend } from './backend';
