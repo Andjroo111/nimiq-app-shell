@@ -127,3 +127,19 @@ describe('createNimBalanceReader failover', () => {
     expect(await createNimBalanceReader({ rpc: 'https://only', fetchImpl: one })(A_SPACED)).toBe(3);
   });
 });
+
+describe('createNimBalanceReader rejects wrong answers and fails over', () => {
+  const answer = (data: unknown) => new Response(JSON.stringify({ jsonrpc: '2.0', id: 1, result: { data } }));
+  test('negative balance or another address on node A: node B answers', async () => {
+    for (const bad of [{ balance: -5 }, { address: 'NQ00 OTHE RRRR', balance: 42 }]) {
+      const impl = (async (url: string) => (url === 'https://a' ? answer(bad) : answer({ address: A_SPACED, balance: 7 }))) as unknown as typeof fetch;
+      expect(await createNimBalanceReader({ rpc: ['https://a', 'https://b'], fetchImpl: impl })(A_SPACED)).toBe(7);
+    }
+  });
+  test('NaN or huge timeouts do not time every node out at once', async () => {
+    const impl = (async () => answer({ balance: 3 })) as unknown as typeof fetch;
+    for (const timeoutMs of [NaN, Infinity, 2 ** 40]) {
+      expect(await createNimBalanceReader({ rpc: ['https://a'], timeoutMs, fetchImpl: impl })(A_SPACED)).toBe(3);
+    }
+  });
+});

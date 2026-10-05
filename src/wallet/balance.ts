@@ -75,7 +75,10 @@ export function createNimBalanceReader(
   const urls: readonly string[] =
     options.rpc === undefined ? RPC_ENDPOINTS.main : typeof options.rpc === 'string' ? [options.rpc] : options.rpc;
   if (urls.length === 0) throw new Error('nim balance: no rpc url');
-  const timeoutMs = Math.max(1, options.timeoutMs ?? 4000);
+  // setTimeout clamps anything over 2^31-1 (and NaN) to ~1 ms, which would
+  // time every node out at once.
+  const t0 = options.timeoutMs ?? 4000;
+  const timeoutMs = Number.isFinite(t0) ? Math.min(Math.max(1, t0), 2_147_483_647) : 4000;
   const doFetch = options.fetchImpl ?? ((...args: Parameters<typeof fetch>) => fetch(...args));
 
   const readOne = async (url: string, spaced: string): Promise<RpcAccount> => {
@@ -104,6 +107,14 @@ export function createNimBalanceReader(
       if (body.error) throw new Error(`nim balance: ${body.error.message ?? 'rpc error'}`);
       const account = unwrap(body);
       if (!account) throw new Error('nim balance: no result in rpc response');
+      // A node answering about another address, or with a negative balance, is
+      // wrong: try the next one rather than show its number.
+      if (typeof account.address === 'string' && account.address.replace(/\s+/g, '').toUpperCase() !== spaced.replace(/\s+/g, '')) {
+        throw new Error(`nim balance: ${url} answered for another address`);
+      }
+      if (typeof account.balance === 'number' && !(Number.isFinite(account.balance) && account.balance >= 0)) {
+        throw new Error(`nim balance: ${url} answered an invalid balance`);
+      }
       return account;
     } finally {
       clearTimeout(timer);
