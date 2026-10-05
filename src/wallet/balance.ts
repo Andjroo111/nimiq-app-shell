@@ -35,8 +35,11 @@ export const DEFAULT_NIM_RPC: string = RPC_ENDPOINTS.main[0];
 const MAX_HEIGHT_SPREAD = 86_400;
 
 export interface NimBalanceReaderOptions {
-  /** Node URL, or an ordered list tried in turn. Defaults to settlement's
-   *  mainnet list, which starts with DEFAULT_NIM_RPC. */
+  /** Node URL, or a list read in parallel. Defaults to settlement's mainnet
+   *  list (DEFAULT_NIM_RPC first). Every URL here is TRUSTED: the reader
+   *  filters lag and absurd heights, not a node that lies, so list only nodes
+   *  you would believe about a balance. The default list includes a
+   *  community-run node (rpc.nimiqwatch.com), fine for display, not for money. */
   rpc?: string | readonly string[];
   /** Per-node abort before the next node is tried. Default 4000 ms. */
   timeoutMs?: number;
@@ -137,8 +140,8 @@ export function createNimBalanceReader(
       if (r.status === 'rejected') last = r.reason;
       else ok.push(r.value);
     }
-    // TRUST MODEL: every endpoint is a Nimiq node the app chose to trust
-    // (settlement's RPC_ENDPOINTS by default). This filter handles LAG and
+    // TRUST MODEL: every endpoint is a node the app chose to trust (settlement's
+    // RPC_ENDPOINTS by default, which includes a community-run node). This filter handles LAG and
     // absurd heights from a broken node; it is NOT liar-resistant: a node that
     // lies at a plausible height, or a majority of lying nodes, still wins.
     // Display-only read; never base a payment decision on it.
