@@ -54,7 +54,8 @@ export {
 } from './wallet/balance';
 
 // ---- guards for model-written text ----
-export { enforceLinkAllowlist, stripUnverifiedNqAddresses, stripForgedLines, normalizeForGuard, visibleText, guardModelText } from './format/llm-guard';
+// Only the combined guard is exported: the split functions in the wrong order miss addresses split by links.
+export { guardModelText, stripForgedLines } from './format/llm-guard';
 
 // ---- wallet outcomes + send handles ----
 // The frozen contracts (v0.29.0): how a wallet rejection is classified, and

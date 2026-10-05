@@ -125,3 +125,10 @@ describe('addresses split by markup (third review probe)', () => {
     expect(guardModelText(t, { allowedHosts: ['nimiq.com'], verifiedAddresses: [] })).toBe(t);
   });
 });
+
+test('any punctuation, a hard break, a setext underline or a heading line splits nothing (round 4)', () => {
+  for (const sep of ['+', '/', ':', '&', '(', ')', '!', '%', '@', '$', '?', ',', ';', '\\\n', '\n===\n', '\n#\n', '\n|--|--|\n|']) {
+    const t = `NQ07 0000 0000 0000 0000${sep}0000 0000 0000 0000`;
+    expect(guardModelText(t, { allowedHosts: [], verifiedAddresses: [] })).toContain('your NQ address');
+  }
+});

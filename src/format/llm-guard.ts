@@ -111,7 +111,9 @@ export function enforceLinkAllowlist(text: string, allowedHosts: readonly string
 // N then Q, two check digits, then 24..32 Nimiq base32 characters, with any
 // run of separators a renderer would hide: spaces, newlines, dashes, dots,
 // markdown emphasis or code ticks.
-const SEP = String.raw`[\s\-.*_\x60~|'"<>‐-―]*`;
+// Any run (up to 24) of non-alphanumerics between characters: a renderer can hide or
+// join across nearly every punctuation mark, so none is trusted as a boundary.
+const SEP = String.raw`[^0-9A-Za-z]{0,24}`;
 const NQ_LIKE = new RegExp(
   String.raw`[NH]${SEP}Q${SEP}\d${SEP}\d(?:${SEP}[0-9A-HJ-NP-VXY]){24,32}`,
   'gi',
