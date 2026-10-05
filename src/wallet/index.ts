@@ -41,6 +41,7 @@ export {
   type WalletResolvedVia,
 } from './detect';
 export { withTimeout } from './timeout';
+export { createPendingTxStore, verifyWithRetry, classifyVerifyMessage, type PendingTx, type VerifyAnswer, type VerifyOutcome } from './pending-tx';
 export { MiniAppBackend, type MiniAppProvider } from './miniapp-backend';
 export { HubBackend, type HubClient } from './hub-backend';
 export type { WalletBackend } from './backend';
