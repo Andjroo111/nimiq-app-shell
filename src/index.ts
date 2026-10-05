@@ -30,6 +30,8 @@ export {
   readWalletHeight,
   WALLET_HEAD_TOLERANCE_BLOCKS,
   type NetworkMatch,
+  pickValidityStartHeight,
+  isValidityWindowError,
   MiniAppBackend,
   HubBackend,
   type Account,

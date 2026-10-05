@@ -49,6 +49,7 @@ export {
   type NetworkMatch,
   type NetworkName,
 } from './network-gate';
+export { pickValidityStartHeight, isValidityWindowError } from './validity';
 export { MiniAppBackend, type MiniAppProvider } from './miniapp-backend';
 export { HubBackend, type HubClient } from './hub-backend';
 export type { WalletBackend } from './backend';
