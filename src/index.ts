@@ -66,6 +66,9 @@ export { queryNetwork, parseNetwork, explorerUrl, type ShellNetwork } from './fo
 export { startLivePoll, type LivePoll, type LivePollOptions } from './live/poll';
 // ---- device-local, wallet-scoped history ----
 export { createDeviceHistory, type DeviceHistory, type HistoryEntry } from './history/device';
+// ---- guards for model-written text ----
+// Only the combined guard is exported: the split functions in the wrong order miss addresses split by links.
+export { guardModelText, stripForgedLines } from './format/llm-guard';
 // ---- address checksum ----
 // Zero-dep IBAN check for NQ addresses; matches @nimiq/utils isValidAddress.
 export {
