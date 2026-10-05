@@ -62,6 +62,8 @@ export {
 
 // ---- network override + explorer links ----
 export { queryNetwork, parseNetwork, explorerUrl, type ShellNetwork } from './format/network';
+// ---- live updates by version token ----
+export { startLivePoll, type LivePoll, type LivePollOptions } from './live/poll';
 // ---- address checksum ----
 // Zero-dep IBAN check for NQ addresses; matches @nimiq/utils isValidAddress.
 export {
