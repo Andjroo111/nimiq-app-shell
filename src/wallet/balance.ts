@@ -31,6 +31,9 @@ import { RPC_ENDPOINTS } from 'nimiq-settlement';
  *  expects to blow through that should pass its own `rpc`. */
 export const DEFAULT_NIM_RPC: string = RPC_ENDPOINTS.main[0];
 
+/** One day of ~1 s Albatross blocks: a node further than this from the others is not believed. */
+const MAX_HEIGHT_SPREAD = 86_400;
+
 export interface NimBalanceReaderOptions {
   /** Node URL, or an ordered list tried in turn. Defaults to settlement's
    *  mainnet list, which starts with DEFAULT_NIM_RPC. */
@@ -117,7 +120,7 @@ export function createNimBalanceReader(
       }
       const meta = (body.result as { metadata?: { blockNumber?: unknown } } | undefined)?.metadata;
       const h = meta?.blockNumber;
-      return { account, height: typeof h === 'number' && Number.isFinite(h) ? h : null };
+      return { account, height: typeof h === 'number' && Number.isSafeInteger(h) && h > 0 ? h : null };
     } finally {
       clearTimeout(timer);
     }
@@ -128,14 +131,22 @@ export function createNimBalanceReader(
     // Every node at once; the answer from the HIGHEST block wins, so a lagging
     // node cannot show a stale balance as current. Ties keep list order.
     const settled = await Promise.allSettled(urls.map((u) => readOne(u, spaced)));
-    let best: { account: RpcAccount; height: number | null } | null = null;
+    const ok: { account: RpcAccount; height: number | null }[] = [];
     let last: unknown = null;
     for (const r of settled) {
-      if (r.status === 'rejected') {
-        last = r.reason;
-        continue;
-      }
-      if (!best || (r.value.height ?? -1) > (best.height ?? -1)) best = r.value;
+      if (r.status === 'rejected') last = r.reason;
+      else ok.push(r.value);
+    }
+    // One node claiming an absurd height must not win: heights more than a
+    // day of blocks from the lower median are outliers. The freshest of the
+    // rest wins; with no heights at all, list order decides.
+    const hs = ok.map((x) => x.height).filter((h): h is number => h !== null).sort((a, b) => a - b);
+    const median = hs.length ? hs[Math.floor((hs.length - 1) / 2)]! : null;
+    const plausible = (h: number | null) => h === null || median === null || Math.abs(h - median) <= MAX_HEIGHT_SPREAD;
+    let best: { account: RpcAccount; height: number | null } | null = null;
+    for (const x of ok) {
+      if (!plausible(x.height)) continue;
+      if (!best || (x.height ?? -1) > (best.height ?? -1)) best = x;
     }
     if (!best) throw last instanceof Error ? last : new Error('nim balance: every node failed');
     const account = best.account;

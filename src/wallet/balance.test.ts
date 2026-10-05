@@ -156,3 +156,12 @@ describe('createNimBalanceReader prefers the freshest node', () => {
     expect(await createNimBalanceReader({ rpc: ['https://down', 'https://a', 'https://b'], fetchImpl: impl })(A_SPACED)).toBe(1);
   });
 });
+
+test('a node claiming an absurd height does not win (review)', async () => {
+  const at = (balance: number, blockNumber: number) =>
+    new Response(JSON.stringify({ jsonrpc: '2.0', id: 1, result: { data: { balance }, metadata: { blockNumber } } }));
+  for (const lie of [1e15, 1e308]) {
+    const impl = (async (url: string) => (url === 'https://liar' ? at(999_999, lie) : at(5, 1000))) as unknown as typeof fetch;
+    expect(await createNimBalanceReader({ rpc: ['https://liar', 'https://a', 'https://b', 'https://c'], fetchImpl: impl })(A_SPACED)).toBe(5);
+  }
+});
