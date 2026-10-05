@@ -63,6 +63,9 @@ function stripComments(t: string): string {
  *  back to the original and Cyrillic or Greek prose is output untouched. */
 function foldForMatch(t: string): string {
   return t
+    .replace(/[Ԛԛ]/g, 'Q') // Cyrillic Qa
+    .replace(/[٠-٩]/g, (d) => String(d.charCodeAt(0) - 0x0660)) // Arabic-Indic digits
+    .replace(/[۰-۹]/g, (d) => String(d.charCodeAt(0) - 0x06f0)) // Extended Arabic-Indic
     .replace(/[Нн](?=[^0-9A-Za-zЀ-ӿ]{0,64}[Qq])/g, 'N') // Cyrillic En before Q reads as an N here
     .replace(/[Ͱ-ϿЀ-ӿ]/g, (c) => CONFUSABLE[c] ?? c);
 }
@@ -89,7 +92,7 @@ const TLDS =
 // so no pattern below can backtrack across the whole input.
 const TOKEN_RE = /[^\s<>"'\x60()\[\]{},;!*|]{1,4096}/g;
 const SCHEME_IN_TOKEN = /(?:https?|ftp|wss?|mailto|javascript|data|nimiq|ipfs):|www\./i;
-const BARE_DOMAIN = /^(?:[\p{L}\p{N}-]+\.)+([\p{L}]{2,24})([/?#].*)?$/iu;
+const BARE_DOMAIN = /^(?:[\p{L}\p{N}-]{1,63}\.){1,10}([\p{L}]{2,24})([/?#].*)?$/iu;
 const BARE_IPV4 = /^\d{1,3}(?:\.\d{1,3}){3}(?:[:/?#].*)?$/;
 const TLD_SET = new Set(TLDS.split('|').map((t) => t.replace('?', '')).concat(['claims']));
 
@@ -108,7 +111,8 @@ function urlInBareToken(tok: string): [string, string] | null {
   if (m) return [tok.slice(0, m.index), tok.slice(m.index)];
   // Protocol-relative (//host/path) is a link to whatever host follows.
   if (tok.startsWith('//')) return BARE_DOMAIN.test(tok.replace(/^\/+/, '').replace(/[/?#].*$/, '') + '/') ? ['', tok] : null;
-  const d = BARE_DOMAIN.exec(tok);
+  // No dot, no domain: skip the unicode pattern entirely (it is the costly one).
+  const d = tok.includes('.') ? BARE_DOMAIN.exec(tok) : null;
   if (d && (d[2] || TLD_SET.has(d[1]!.toLowerCase()))) return ['', tok];
   return null;
 }

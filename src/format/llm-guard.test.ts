@@ -177,3 +177,13 @@ test('protocol-relative links and tabs inside a scheme are still links', () => {
   expect(enforceLinkAllowlist('[x](ht\ttps://evil.com)', ['nimiq.com'])).toBe('x');
   expect(enforceLinkAllowlist('<a href="ht\ntps://evil.com">x</a>', ['nimiq.com'])).toBe('x');
 });
+
+test('Cyrillic Qa and Arabic-Indic check digits do not hide an address; long non-Latin tokens stay fast', () => {
+  for (const t of ['N\u051a07 0000 0000 0000 0000 0000 0000 0000 0000', 'NQ\u0660\u0667 0000 0000 0000 0000 0000 0000 0000 0000']) {
+    expect(guardModelText(t, { allowedHosts: [], verifiedAddresses: [] })).toContain('your NQ address');
+  }
+  const t0 = Date.now();
+  guardModelText('\u043d'.repeat(200_000), { allowedHosts: ['nimiq.com'], verifiedAddresses: [] });
+  guardModelText(('\u043d'.repeat(4000) + ' ').repeat(12), { allowedHosts: ['nimiq.com'], verifiedAddresses: [] });
+  expect(Date.now() - t0).toBeLessThan(1500);
+});
