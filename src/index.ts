@@ -69,6 +69,8 @@ export { createDeviceHistory, type DeviceHistory, type HistoryEntry } from './hi
 // ---- guards for model-written text ----
 // Only the combined guard is exported: the split functions in the wrong order miss addresses split by links.
 export { guardModelText, stripForgedLines } from './format/llm-guard';
+// ---- session token as a header (WebViews drop cookies) ----
+export { createSessionTokenStore, type SessionTokenStore, type SessionTokenOptions } from './session/token';
 // ---- address checksum ----
 // Zero-dep IBAN check for NQ addresses; matches @nimiq/utils isValidAddress.
 export {
