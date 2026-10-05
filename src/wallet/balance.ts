@@ -137,9 +137,13 @@ export function createNimBalanceReader(
       if (r.status === 'rejected') last = r.reason;
       else ok.push(r.value);
     }
-    // One node claiming an absurd height must not win: heights more than a
-    // day of blocks from the lower median are outliers. The freshest of the
-    // rest wins; with no heights at all, list order decides.
+    // TRUST MODEL: every endpoint is a Nimiq node the app chose to trust
+    // (settlement's RPC_ENDPOINTS by default). This filter handles LAG and
+    // absurd heights from a broken node; it is NOT liar-resistant: a node that
+    // lies at a plausible height, or a majority of lying nodes, still wins.
+    // Display-only read; never base a payment decision on it.
+    // Heights more than a day of blocks from the lower median are outliers;
+    // the freshest of the rest wins; with no heights at all, list order decides.
     const hs = ok.map((x) => x.height).filter((h): h is number => h !== null).sort((a, b) => a - b);
     const median = hs.length ? hs[Math.floor((hs.length - 1) / 2)]! : null;
     const plausible = (h: number | null) => h === null || median === null || Math.abs(h - median) <= MAX_HEIGHT_SPREAD;
