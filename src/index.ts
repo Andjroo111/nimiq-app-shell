@@ -60,6 +60,8 @@ export {
   type NimBalanceReaderOptions,
 } from './wallet/balance';
 
+// ---- network override + explorer links ----
+export { queryNetwork, parseNetwork, explorerUrl, type ShellNetwork } from './format/network';
 // ---- address checksum ----
 // Zero-dep IBAN check for NQ addresses; matches @nimiq/utils isValidAddress.
 export {
