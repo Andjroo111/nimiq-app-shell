@@ -104,4 +104,46 @@ describe('startLivePoll', () => {
     await h.flush();
     expect(h.reads()).toBe(3);
   });
+
+  test('NaN options throw instead of busy-looping', () => {
+    for (const k of ['fastMs', 'maxMs', 'factor']) {
+      expect(() => startLivePoll({ fetchToken: async () => 'a', onChange: () => {}, doc: null, win: null, [k]: NaN })).toThrow();
+    }
+  });
+
+  test('a throwing onChange gets the same token again next poll', async () => {
+    let calls = 0;
+    const timers: (() => void)[] = [];
+    const p = startLivePoll({
+      fetchToken: async () => 'a',
+      onChange: () => { calls++; if (calls === 1) throw new Error('render failed'); },
+      doc: null, win: null,
+      setTimer: (fn) => (timers.push(fn), timers.length - 1),
+      clearTimer: () => {},
+    });
+    await new Promise((r) => setTimeout(r, 0));
+    timers.pop()!();
+    await new Promise((r) => setTimeout(r, 0));
+    expect(calls).toBe(2);
+    p.stop();
+  });
+
+  test('a hung fetchToken times out and polling continues', async () => {
+    let n = 0;
+    const timers: (() => void)[] = [];
+    const p = startLivePoll({
+      fetchToken: () => (n++ === 0 ? new Promise<string>(() => {}) : Promise.resolve('b')),
+      onChange: () => {},
+      tokenTimeoutMs: 10,
+      doc: null, win: null,
+      setTimer: (fn) => (timers.push(fn), timers.length - 1),
+      clearTimer: () => {},
+    });
+    await new Promise((r) => setTimeout(r, 30));
+    expect(timers.length).toBe(1); // the loop rescheduled after the timeout
+    timers.pop()!();
+    await new Promise((r) => setTimeout(r, 0));
+    expect(n).toBe(2);
+    p.stop();
+  });
 });
