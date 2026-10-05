@@ -27,6 +27,7 @@ const DAY = 24 * 3600_000;
 export function createPendingTxStore(o: { storage?: StorageLike | null; prefix?: string; ttlMs?: number; now?: () => number } = {}) {
   const prefix = o.prefix ?? 'nq-shell:pending-tx:';
   const ttl = o.ttlMs ?? DAY;
+  if (!Number.isFinite(ttl) || ttl <= 0) throw new RangeError('createPendingTxStore: ttlMs must be a finite number > 0');
   const now = o.now ?? Date.now;
   const mem = new Map<string, string>();
   let s: StorageLike | null = null;
@@ -38,7 +39,8 @@ export function createPendingTxStore(o: { storage?: StorageLike | null; prefix?:
       s = null;
     }
   }
-  const k = (intent: string, owner: string) => `${prefix}${intent}:${compact(owner)}`;
+  // JSON-encoded pair: no separator inside intent or owner can make two pairs collide.
+  const k = (intent: string, owner: string) => prefix + JSON.stringify([intent, compact(owner)]);
   const get = (key: string) => {
     try {
       return s ? s.getItem(key) : (mem.get(key) ?? null);
@@ -77,6 +79,8 @@ export function createPendingTxStore(o: { storage?: StorageLike | null; prefix?:
       try {
         const v = JSON.parse(raw) as PendingTx;
         if (typeof v.handle !== 'string' || typeof v.savedAt !== 'number') return null;
+        // Belt and braces: the stored row must be for exactly this pair.
+        if (v.intent !== intent || v.owner !== compact(owner)) return null;
         if (now() - v.savedAt > ttl) {
           del(key);
           return null;
@@ -107,13 +111,24 @@ export type VerifyOutcome =
   /** Gave up WAITING, not on the payment: keep the saved entry and resume later. */
   | { state: 'still-pending'; lastProgress?: string };
 
-/** Map a server message onto a VerifyAnswer. Unknown text is pending, never rejected. */
-export function classifyVerifyMessage(msg: string): VerifyAnswer {
-  const m = msg.toLowerCase();
-  if (/already[\s-]?(consumed|used|redeemed|credited|verified)/.test(m)) return { kind: 'done' };
+/**
+ * Map a server message onto a VerifyAnswer, conservatively. A free-text
+ * message is only `done` when it is nothing but an "already consumed" style
+ * phrase, and only `rejected` when it names a mismatch with no negation in
+ * it. Anything else, including mixed or hostile text, is pending: a wrong
+ * `done` marks an unpaid order paid, a wrong `rejected` invites a second
+ * payment. Prefer a structured server answer over this whenever you have one.
+ */
+export function classifyVerifyMessage(msg: unknown): VerifyAnswer {
+  if (typeof msg !== 'string') return { kind: 'pending' };
+  const m = msg.trim().toLowerCase();
+  if (/^(?:tx|transaction|payment)?\s*(?:was\s+|is\s+|has\s+been\s+)?already[\s-](?:consumed|used|redeemed|credited|verified)\.?$/.test(m)) {
+    return { kind: 'done' };
+  }
   const conf = m.match(/has (\d+) confirmations?,? (\d+) required/);
   if (conf) return { kind: 'pending', progress: `${conf[1]} of ${conf[2]} confirmations` };
-  if (/(wrong|insufficient|mismatch|invalid) (amount|recipient|value|memo)|execution failed|failed on chain/.test(m)) {
+  const negated = /\b(no|not|without|never|none)\b/.test(m);
+  if (!negated && /\b(wrong|insufficient|mismatched?|invalid) (amount|recipient|value|memo)\b|\bexecution failed\b|\bfailed on chain\b/.test(m)) {
     return { kind: 'rejected', reason: msg };
   }
   return { kind: 'pending' };
@@ -128,18 +143,30 @@ export async function verifyWithRetry(
   verify: () => Promise<VerifyAnswer>,
   o: { intervalMs?: number; maxMs?: number; onProgress?: (p: string) => void; sleep?: (ms: number) => Promise<void>; now?: () => number } = {},
 ): Promise<VerifyOutcome> {
-  const interval = Math.max(1, o.intervalMs ?? 4000);
-  const maxMs = Math.max(interval, o.maxMs ?? 120_000);
+  const interval = o.intervalMs ?? 4000;
+  const maxMs0 = o.maxMs ?? 120_000;
+  if (!Number.isFinite(interval) || interval < 1 || !Number.isFinite(maxMs0)) {
+    throw new RangeError('verifyWithRetry: intervalMs and maxMs must be finite');
+  }
+  const maxMs = Math.max(interval, maxMs0);
   const sleep = o.sleep ?? ((ms) => new Promise((r) => setTimeout(r, ms)));
   const now = o.now ?? Date.now;
   const start = now();
   let last: string | undefined;
   for (;;) {
     let a: VerifyAnswer;
+    const left = Math.max(1, maxMs - (now() - start));
+    let timer: ReturnType<typeof setTimeout> | undefined;
     try {
-      a = await verify();
+      // A verify call that never answers must not hold the caller past maxMs.
+      a = await Promise.race([
+        verify(),
+        new Promise<VerifyAnswer>((res) => (timer = setTimeout(() => res({ kind: 'pending' }), left))),
+      ]);
     } catch {
       a = { kind: 'pending' };
+    } finally {
+      clearTimeout(timer);
     }
     if (a.kind === 'done') return { state: 'done' };
     if (a.kind === 'rejected') return { state: 'rejected', reason: a.reason };

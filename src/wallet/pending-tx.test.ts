@@ -76,3 +76,31 @@ describe('verifyWithRetry', () => {
     expect(calls).toBe(4); // at 0, 4, 8 and 12 s
   });
 });
+
+describe('review findings', () => {
+  test('mixed or hostile text is never done; negated mismatch text is never rejected', () => {
+    for (const m of [
+      'transaction already used for another order',
+      'Rejected: wrong amount (already consumed)',
+      'payment not yet credited; wallet already verified a different tx',
+    ]) expect(classifyVerifyMessage(m).kind).not.toBe('done');
+    for (const m of ['Payment verified OK, no mismatch value', 'no invalid amount detected, confirmed']) {
+      expect(classifyVerifyMessage(m).kind).not.toBe('rejected');
+    }
+    expect(classifyVerifyMessage('Transaction already consumed.')).toEqual({ kind: 'done' });
+    expect(classifyVerifyMessage(undefined)).toEqual({ kind: 'pending' });
+  });
+
+  test('intent and owner cannot collide through a separator', () => {
+    const s = createPendingTxStore({ storage: mem() });
+    s.save('a:B', 'X', 'H');
+    expect(s.load('a', 'B:X')).toBe(null);
+  });
+
+  test('NaN options throw; a verify that never answers yields still-pending by maxMs', async () => {
+    expect(() => createPendingTxStore({ storage: mem(), ttlMs: NaN })).toThrow();
+    await expect(verifyWithRetry(async () => ({ kind: 'pending' }), { intervalMs: NaN })).rejects.toThrow();
+    const r = await verifyWithRetry(() => new Promise<VerifyAnswer>(() => {}), { intervalMs: 5, maxMs: 30 });
+    expect(r.state).toBe('still-pending');
+  });
+});
