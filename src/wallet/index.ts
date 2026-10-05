@@ -41,6 +41,7 @@ export {
   type WalletResolvedVia,
 } from './detect';
 export { withTimeout } from './timeout';
+export { pickValidityStartHeight, isValidityWindowError } from './validity';
 export { MiniAppBackend, type MiniAppProvider } from './miniapp-backend';
 export { HubBackend, type HubClient } from './hub-backend';
 export type { WalletBackend } from './backend';

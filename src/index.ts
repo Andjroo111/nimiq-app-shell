@@ -25,6 +25,8 @@ export {
   isNimiqPayUserAgent,
   walletDiagnostics,
   withTimeout,
+  pickValidityStartHeight,
+  isValidityWindowError,
   MiniAppBackend,
   HubBackend,
   type Account,
