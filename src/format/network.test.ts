@@ -2,10 +2,15 @@ import { describe, expect, test } from 'bun:test';
 import { explorerUrl, parseNetwork, queryNetwork } from './network';
 
 describe('queryNetwork', () => {
-  test('the query parameter wins over the default', () => {
+  test('a URL can always move an app toward testnet', () => {
     expect(queryNetwork('?network=test', 'main')).toBe('test');
-    expect(queryNetwork('?network=MainAlbatross', 'test')).toBe('main');
     expect(queryNetwork('?net=testnet&x=1', 'main')).toBe('test');
+  });
+  test('a URL can NOT move a testnet app onto mainnet without the app opting in', () => {
+    expect(queryNetwork('?network=MainAlbatross', 'test')).toBe('test');
+    expect(queryNetwork('?net=main', 'test')).toBe('test');
+    expect(queryNetwork('?network=main', 'test', { allowMainnet: true })).toBe('main');
+    expect(queryNetwork('?network=main', 'main')).toBe('main');
   });
   test('absent or unrecognised falls back, never guesses', () => {
     expect(queryNetwork('', 'main')).toBe('main');

@@ -27,8 +27,16 @@ export function parseNetwork(v: unknown): ShellNetwork | null {
 /**
  * `?network=` (or `?net=`) from a search string, else `fallback`. An
  * unrecognised value is ignored rather than guessed. Pass `location.search`.
+ *
+ * SAFE BY DEFAULT: a URL may only move an app toward TESTNET. Anyone can send
+ * a link, so `?network=main` flipping a testnet build onto real money is
+ * refused unless the app passes `allowMainnet: true` on purpose.
  */
-export function queryNetwork(search: string | null | undefined, fallback: ShellNetwork): ShellNetwork {
+export function queryNetwork(
+  search: string | null | undefined,
+  fallback: ShellNetwork,
+  opts: { allowMainnet?: boolean } = {},
+): ShellNetwork {
   if (!search) return fallback;
   let params: URLSearchParams;
   try {
@@ -36,7 +44,10 @@ export function queryNetwork(search: string | null | undefined, fallback: ShellN
   } catch {
     return fallback;
   }
-  return parseNetwork(params.get('network')) ?? parseNetwork(params.get('net')) ?? fallback;
+  const asked = parseNetwork(params.get('network')) ?? parseNetwork(params.get('net'));
+  if (asked === null) return fallback;
+  if (asked === 'main' && fallback !== 'main' && opts.allowMainnet !== true) return fallback;
+  return asked;
 }
 
 const EXPLORER: Record<ShellNetwork, string> = {
