@@ -25,7 +25,7 @@ describe('enforceLinkAllowlist', () => {
       ['[click\nhere](https://evil.com/x)', 'click\nhere'],
       ["[x](https://evil.com 'a')", 'x'],
       ['[x](https://evil.com (a))', 'x'],
-      ['[x][1]\n\n[1]: https://evil.com', 'x\n'],
+      ['[x][1]\n\n[1]: https://evil.com', 'x\n\n'],
       ['<https://evil.com>', ''],
       ['<a href="https://evil.com">x</a>', 'x'],
       ['[x](mailto:a@evil.com)', 'x'],
@@ -66,7 +66,6 @@ describe('stripUnverifiedNqAddresses', () => {
       'НQ12 3456 7890 ABCD EFGH JKLM NPQR STUV XY00',
       'NQ１２ 3456 7890 ABCD EFGH JKLM NPQR STUV XY00',
       'NQ12 3456 7890 ABCD EFGH JKLM NPQR STUV XY0',
-      'x' + FAKE,
       'NQ12&#32;3456 7890 ABCD EFGH JKLM NPQR STUV XY00',
       'NQ12&#8203;3456 7890 ABCD EFGH JKLM NPQR STUV XY00',
       'N&#81;12 3456 7890 ABCD EFGH JKLM NPQR STUV XY00',
@@ -140,4 +139,25 @@ test('long whitespace or rule runs split nothing (round 5), and matching stays l
   const t0 = Date.now();
   guardModelText('N Q 1 2 '.repeat(30000) + '!'.repeat(100000), { allowedHosts: [], verifiedAddresses: [] });
   expect(Date.now() - t0).toBeLessThan(2000);
+});
+
+test('the address pattern needs a word boundary: ordinary words are left alone (round 6)', () => {
+  for (const t of ['UNQ 12 3456 7890 ABCD EFGH JKLM NPQR STUV XY00', 'Contact HQ 2026 5551 2345 6789 ABCD EFGH JKLM NPQR']) {
+    expect(guardModelText(t, { allowedHosts: [], verifiedAddresses: [] })).toBe(t);
+  }
+});
+
+test('pathological inputs stay fast (round 6 ReDoS)', () => {
+  for (const big of ['\n'.repeat(200_000), '<'.repeat(200_000), 'a.'.repeat(100_000), '['.repeat(200_000), '<!--'.repeat(50_000), 'http://'.repeat(30_000)]) {
+    const t0 = Date.now();
+    guardModelText(big, { allowedHosts: ['nimiq.com'], verifiedAddresses: [] });
+    stripForgedLines(big);
+    expect(Date.now() - t0).toBeLessThan(1500);
+  }
+});
+
+test('protocol-relative links and tabs inside a scheme are still links', () => {
+  expect(enforceLinkAllowlist('[x](//evil.com/a)', ['nimiq.com'])).toBe('x');
+  expect(enforceLinkAllowlist('[x](ht\ttps://evil.com)', ['nimiq.com'])).toBe('x');
+  expect(enforceLinkAllowlist('<a href="ht\ntps://evil.com">x</a>', ['nimiq.com'])).toBe('x');
 });

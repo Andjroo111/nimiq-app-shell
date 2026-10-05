@@ -44,24 +44,53 @@ function decodeEntities(t: string): string {
 /** The form every guard matches against, and returns. Entities are decoded
  *  and HTML tags other than <a> removed: model output is markdown, and a tag
  *  can split an address the browser renders whole. */
+/** Remove <!-- ... --> (an unclosed one runs to the end), in one linear pass. */
+function stripComments(t: string): string {
+  let out = '';
+  let i = 0;
+  for (;;) {
+    const a = t.indexOf('<!--', i);
+    if (a < 0) return out + t.slice(i);
+    out += t.slice(i, a);
+    const b = t.indexOf('-->', a + 4);
+    if (b < 0) return out;
+    i = b + 3;
+  }
+}
+
+/** Longest input any guard will scan; model output past this is cut, not slowly scanned. */
+export const GUARD_MAX_CHARS = 50_000;
+
 export function normalizeForGuard(text: string): string {
-  return decodeEntities(text)
-    .replace(/<!--[\s\S]*?(?:-->|$)/g, '')
-    .replace(/<\/?[a-z][^>]*>/gi, (tag) => (/^<\/?a\b/i.test(tag) ? tag : ''))
+  return stripComments(decodeEntities(text.length > GUARD_MAX_CHARS ? text.slice(0, GUARD_MAX_CHARS) : text))
+    // [^<>]: a run of '<' cannot make each start scan to the end (quadratic).
+    .replace(/<\/?[a-z][^<>]*>/gi, (tag) => (/^<\/?a\b/i.test(tag) ? tag : ''))
     .normalize('NFKC')
     .replace(ZERO_WIDTH, '')
     .replace(/[  -   　]/g, ' ')
+    .replace(/[Нн](?=[^0-9A-Za-zЀ-ӿ]{0,64}[Qq])/g, 'N') // Cyrillic En before Q reads as an N here
     .replace(/[Ͱ-ϿЀ-ӿ]/g, (c) => CONFUSABLE[c] ?? c);
 }
 
 const TLDS =
   'com|net|org|io|co|app|dev|xyz|me|info|biz|ai|link|site|online|top|ru|cn|tk|gg|fun|sale|cool|money|finance|wallet|click|live|vip|pro|club|shop|store|support|help|page|zip|mov|claims?|gift|win|cash|exchange';
-// Any scheme URL, a www. host, an angle autolink target, or a bare domain with a
-// known TLD or a path.
-const URL_RE = new RegExp(
-  String.raw`(?:\b(?:https?|ftp|wss?|mailto|javascript|data|nimiq|ipfs):[^\s<>"'\x60()\[\]]+|\bwww\.[^\s<>"'\x60()\[\]]+|\b(?:[a-z0-9-]+\.)+(?:${TLDS})\b(?:[/?#][^\s<>"'\x60()\[\]]*)?|\b(?:[a-z0-9-]+\.)+[a-z]{2,24}/[^\s<>"'\x60()\[\]]*)`,
-  'gi',
-);
+// Tokens are runs of characters that can sit inside a URL; each is bounded,
+// so no pattern below can backtrack across the whole input.
+const TOKEN_RE = /[^\s<>"'\x60()\[\]{},;!*|]{1,4096}/g;
+const SCHEME_IN_TOKEN = /(?:https?|ftp|wss?|mailto|javascript|data|nimiq|ipfs):|www\./i;
+const BARE_DOMAIN = /^(?:[a-z0-9-]+\.)+([a-z]{2,24})([/?#].*)?$/i;
+const TLD_SET = new Set(TLDS.split('|').map((t) => t.replace('?', '')).concat(['claims']));
+
+/** Split a token into [prefix, url] when it holds a URL, else null. */
+function urlInToken(tok: string): [string, string] | null {
+  const m = SCHEME_IN_TOKEN.exec(tok);
+  if (m) return [tok.slice(0, m.index), tok.slice(m.index)];
+  // Protocol-relative (//host/path) is a link to whatever host follows.
+  if (tok.startsWith('//')) return BARE_DOMAIN.test(tok.replace(/^\/+/, '').replace(/[/?#].*$/, '') + '/') ? ['', tok] : null;
+  const d = BARE_DOMAIN.exec(tok);
+  if (d && (d[2] || TLD_SET.has(d[1]!.toLowerCase()))) return ['', tok];
+  return null;
+}
 
 function hostOf(token: string): string | null {
   // A renderer unescapes "\\@" to "@" while URL() reads "\\" as "/": they disagree
@@ -93,18 +122,28 @@ function allowedHost(host: string | null, roots: readonly string[]): boolean {
  * scaffolding left empty is cleaned up so the visible words survive.
  */
 export function enforceLinkAllowlist(text: string, allowedHosts: readonly string[]): string {
-  let out = normalizeForGuard(text).replace(URL_RE, (m) => {
-    const clean = m.replace(/[.,;:!?)\]}'"*_]+$/, '');
-    const tail = m.slice(clean.length);
-    return allowedHost(hostOf(clean), allowedHosts) ? m : tail;
+  // A browser drops tabs and newlines inside a URL ("ht\ttps:" is https:), so
+  // they are removed inside link targets and href values before tokenizing.
+  const squeezed = normalizeForGuard(text)
+    .replace(/\]\(([^()]*)\)/g, (_m, inner: string) => `](${inner.replace(/[\t\r\n]/g, '')})`)
+    .replace(/\bhref\s*=\s*("[^"<>]*"|'[^'<>]*')/gi, (_m, v: string) => `href=${v.replace(/[\t\r\n]/g, '')}`);
+  let out = squeezed.replace(TOKEN_RE, (tok) => {
+    const hit = urlInToken(tok);
+    if (!hit) return tok;
+    const [prefix, url] = hit;
+    const clean = url.replace(/[.:?'"_]+$/, '');
+    const tail = url.slice(clean.length);
+    return allowedHost(hostOf(clean), allowedHosts) ? tok : prefix + tail;
   });
+  // Every pattern excludes its own opener from its body, so none can scan to
+  // the end of the input once per opener (the quadratic case).
   out = out
-    .replace(/<a\b[^>]*>/gi, '')
+    .replace(/<a\b[^<>]*>/gi, '')
     .replace(/<\/a>/gi, '')
-    .replace(/\[([^\]]*)\]\(\s*(?:\([^)]*\)|'[^']*'|"[^"]*")?\s*\)/g, '$1') // [title]() with only a title left
-    .replace(/\[([^\]]*)\]\[[^\]]*\]/g, '$1') // ref-style use
-    .replace(/^\s*\[[^\]]+\]:\s*$/gm, '') // ref definition whose target was removed
-    .replace(/<\s*>/g, '');
+    .replace(/\[([^\[\]]*)\]\([ \t]*(?:\([^()\n]*\)|'[^'\n]*'|"[^"\n]*")?[ \t]*\)/g, '$1') // [title]() with only a title left
+    .replace(/\[([^\[\]]*)\]\[[^\[\]]*\]/g, '$1') // ref-style use
+    .replace(/^[ \t]*\[[^\[\]\n]+\]:[ \t]*$/gm, '') // ref definition whose target was removed
+    .replace(/<[ \t]*>/g, '');
   return out;
 }
 
@@ -118,7 +157,7 @@ export function enforceLinkAllowlist(text: string, allowedHosts: readonly string
 // One character class between fixed anchors: linear, no catastrophic backtracking.
 const SEP = String.raw`[^0-9A-Za-z]*`;
 const NQ_LIKE = new RegExp(
-  String.raw`[NH]${SEP}Q${SEP}\d${SEP}\d(?:${SEP}[0-9A-HJ-NP-VXY]){24,32}`,
+  String.raw`(?<![A-Za-z0-9])N${SEP}Q${SEP}\d${SEP}\d(?:${SEP}[0-9A-HJ-NP-VXY]){24,32}`,
   'gi',
 );
 const compact = (a: string) => a.replace(/[^0-9A-Z]/gi, '').toUpperCase();
@@ -127,12 +166,11 @@ const compact = (a: string) => a.replace(/[^0-9A-Z]/gi, '').toUpperCase();
  *  removed, link text and image alts kept. Addresses are scanned here, because
  *  markup can split an address the renderer shows whole. */
 export function visibleText(normalized: string): string {
-  return normalized
-    .replace(/<!--[\s\S]*?(?:-->|$)/g, '')
-    .replace(/<[^>]*>/g, '')
-    .replace(/!?\[([^\]]*)\]\([^)]*\)/g, '$1')
-    .replace(/!?\[([^\]]*)\]\[[^\]]*\]/g, '$1')
-    .replace(/^[ \t]*\[[^\]]+\]:.*$/gm, '')
+  return stripComments(normalized)
+    .replace(/<[^<>]*>/g, '')
+    .replace(/!?\[([^\[\]]*)\]\([^()]*\)/g, '$1')
+    .replace(/!?\[([^\[\]]*)\]\[[^\[\]]*\]/g, '$1')
+    .replace(/^[ \t]*\[[^\[\]\n]+\]:.*$/gm, '')
     // Fragments of tags a renderer would swallow (unclosed, or broken by a '>' in an attribute).
     .replace(/<\/?[a-z!][^\s>]*/gi, '');
 }
