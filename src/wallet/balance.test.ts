@@ -94,3 +94,74 @@ describe('createNimBalanceReader', () => {
     expect(createNimBalanceReader({ fetchImpl: impl })(A_SPACED)).rejects.toThrow(/no result/);
   });
 });
+
+describe('createNimBalanceReader failover', () => {
+  const ok = (balance: number) =>
+    new Response(JSON.stringify({ jsonrpc: '2.0', id: 1, result: { data: { balance } } }), { status: 200 });
+
+  test('the default list starts at DEFAULT_NIM_RPC and fails over to the next node', async () => {
+    const seen: string[] = [];
+    const impl = (async (url: string) => {
+      seen.push(url);
+      return url === DEFAULT_NIM_RPC ? new Response('', { status: 502 }) : ok(5);
+    }) as unknown as typeof fetch;
+    expect(await createNimBalanceReader({ fetchImpl: impl })(A_SPACED)).toBe(5);
+    expect(seen[0]).toBe(DEFAULT_NIM_RPC);
+    expect(seen).toHaveLength(2);
+  });
+
+  test('a node that never answers is abandoned at the timeout', async () => {
+    const impl = ((url: string, init?: RequestInit) =>
+      url === 'https://slow'
+        ? new Promise<Response>((_, rej) => init?.signal?.addEventListener('abort', () => rej(new Error('aborted'))))
+        : Promise.resolve(ok(9))) as unknown as typeof fetch;
+    const t0 = Date.now();
+    expect(await createNimBalanceReader({ rpc: ['https://slow', 'https://fast'], timeoutMs: 30, fetchImpl: impl })(A_SPACED)).toBe(9);
+    expect(Date.now() - t0).toBeLessThan(1000);
+  });
+
+  test('all nodes down throws the last error, a single string rpc still works', async () => {
+    const down = (async () => { throw new Error('ECONNREFUSED'); }) as unknown as typeof fetch;
+    await expect(createNimBalanceReader({ rpc: ['https://a', 'https://b'], fetchImpl: down })(A_SPACED)).rejects.toThrow('https://b unreachable');
+    const one = (async () => ok(3)) as unknown as typeof fetch;
+    expect(await createNimBalanceReader({ rpc: 'https://only', fetchImpl: one })(A_SPACED)).toBe(3);
+  });
+});
+
+describe('createNimBalanceReader rejects wrong answers and fails over', () => {
+  const answer = (data: unknown) => new Response(JSON.stringify({ jsonrpc: '2.0', id: 1, result: { data } }));
+  test('negative balance or another address on node A: node B answers', async () => {
+    for (const bad of [{ balance: -5 }, { address: 'NQ00 OTHE RRRR', balance: 42 }]) {
+      const impl = (async (url: string) => (url === 'https://a' ? answer(bad) : answer({ address: A_SPACED, balance: 7 }))) as unknown as typeof fetch;
+      expect(await createNimBalanceReader({ rpc: ['https://a', 'https://b'], fetchImpl: impl })(A_SPACED)).toBe(7);
+    }
+  });
+  test('NaN or huge timeouts do not time every node out at once', async () => {
+    const impl = (async () => answer({ balance: 3 })) as unknown as typeof fetch;
+    for (const timeoutMs of [NaN, Infinity, 2 ** 40]) {
+      expect(await createNimBalanceReader({ rpc: ['https://a'], timeoutMs, fetchImpl: impl })(A_SPACED)).toBe(3);
+    }
+  });
+});
+
+describe('createNimBalanceReader prefers the freshest node', () => {
+  const at = (balance: number, blockNumber?: number) =>
+    new Response(JSON.stringify({ jsonrpc: '2.0', id: 1, result: { data: { balance }, ...(blockNumber ? { metadata: { blockNumber } } : {}) } }));
+  test('a lagging first node loses to a node at a higher block', async () => {
+    const impl = (async (url: string) => (url === 'https://lagging' ? at(100, 1000) : at(40, 1500))) as unknown as typeof fetch;
+    expect(await createNimBalanceReader({ rpc: ['https://lagging', 'https://fresh'], fetchImpl: impl })(A_SPACED)).toBe(40);
+  });
+  test('no metadata anywhere: list order decides; one failing node does not matter', async () => {
+    const impl = (async (url: string) => (url === 'https://a' ? at(1) : url === 'https://b' ? at(2) : new Response('', { status: 502 }))) as unknown as typeof fetch;
+    expect(await createNimBalanceReader({ rpc: ['https://down', 'https://a', 'https://b'], fetchImpl: impl })(A_SPACED)).toBe(1);
+  });
+});
+
+test('a node claiming an absurd height does not win (review)', async () => {
+  const at = (balance: number, blockNumber: number) =>
+    new Response(JSON.stringify({ jsonrpc: '2.0', id: 1, result: { data: { balance }, metadata: { blockNumber } } }));
+  for (const lie of [1e15, 1e308]) {
+    const impl = (async (url: string) => (url === 'https://liar' ? at(999_999, lie) : at(5, 1000))) as unknown as typeof fetch;
+    expect(await createNimBalanceReader({ rpc: ['https://liar', 'https://a', 'https://b', 'https://c'], fetchImpl: impl })(A_SPACED)).toBe(5);
+  }
+});
