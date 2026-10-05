@@ -146,4 +146,23 @@ describe('startLivePoll', () => {
     expect(n).toBe(2);
     p.stop();
   });
+
+  test('a hung onChange does not freeze the loop', async () => {
+    const timers: (() => void)[] = [];
+    let n = 0;
+    const p = startLivePoll({
+      fetchToken: async () => 'a',
+      onChange: () => (n++ === 0 ? new Promise<void>(() => {}) : undefined),
+      tokenTimeoutMs: 10,
+      doc: null, win: null,
+      setTimer: (fn) => (timers.push(fn), timers.length - 1),
+      clearTimer: () => {},
+    });
+    await new Promise((r) => setTimeout(r, 30));
+    expect(timers.length).toBe(1);
+    timers.pop()!();
+    await new Promise((r) => setTimeout(r, 0));
+    expect(n).toBe(2);
+    p.stop();
+  });
 });

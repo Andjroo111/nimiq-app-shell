@@ -81,7 +81,17 @@ export function startLivePoll(o: LivePollOptions): LivePoll {
       if (stopped) return;
       if (token !== last) {
         interval = fastMs;
-        await o.onChange(token);
+        // A hung onChange must not freeze the loop: it gets the same timeout as
+        // the fetch, and an unfinished delivery is retried next poll.
+        let changeTimer: ReturnType<typeof setTimeout> | undefined;
+        try {
+          await Promise.race([
+            Promise.resolve().then(() => o.onChange(token)),
+            new Promise<never>((_, rej) => (changeTimer = setTimeout(() => rej(new Error('onChange timed out')), tokenTimeoutMs))),
+          ]);
+        } finally {
+          clearTimeout(changeTimer);
+        }
         // Only a delivered token counts as seen; a throwing onChange gets it again.
         last = token;
       } else {
