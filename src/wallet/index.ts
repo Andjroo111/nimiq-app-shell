@@ -50,6 +50,7 @@ export {
   type NetworkName,
 } from './network-gate';
 export { pickValidityStartHeight, isValidityWindowError } from './validity';
+export { createPendingTxStore, verifyWithRetry, classifyVerifyMessage, type PendingTx, type VerifyAnswer, type VerifyOutcome } from './pending-tx';
 export { MiniAppBackend, type MiniAppProvider } from './miniapp-backend';
 export { HubBackend, type HubClient } from './hub-backend';
 export type { WalletBackend } from './backend';
