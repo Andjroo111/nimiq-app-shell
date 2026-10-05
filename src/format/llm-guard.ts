@@ -58,18 +58,29 @@ function stripComments(t: string): string {
   }
 }
 
+/** Look-alike letters folded to Latin, ONLY for matching: same length as the
+ *  input (every mapping is one character to one), so match positions carry
+ *  back to the original and Cyrillic or Greek prose is output untouched. */
+function foldForMatch(t: string): string {
+  return t
+    .replace(/[Нн](?=[^0-9A-Za-zЀ-ӿ]{0,64}[Qq])/g, 'N') // Cyrillic En before Q reads as an N here
+    .replace(/[Ͱ-ϿЀ-ӿ]/g, (c) => CONFUSABLE[c] ?? c);
+}
+
 /** Longest input any guard will scan; model output past this is cut, not slowly scanned. */
 export const GUARD_MAX_CHARS = 50_000;
 
 export function normalizeForGuard(text: string): string {
-  return stripComments(decodeEntities(text.length > GUARD_MAX_CHARS ? text.slice(0, GUARD_MAX_CHARS) : text))
+  const cut = text.length > GUARD_MAX_CHARS;
+  const body = stripComments(decodeEntities(cut ? text.slice(0, GUARD_MAX_CHARS) : text))
     // [^<>]: a run of '<' cannot make each start scan to the end (quadratic).
     .replace(/<\/?[a-z][^<>]*>/gi, (tag) => (/^<\/?a\b/i.test(tag) ? tag : ''))
     .normalize('NFKC')
     .replace(ZERO_WIDTH, '')
-    .replace(/[  -   　]/g, ' ')
-    .replace(/[Нн](?=[^0-9A-Za-zЀ-ӿ]{0,64}[Qq])/g, 'N') // Cyrillic En before Q reads as an N here
-    .replace(/[Ͱ-ϿЀ-ӿ]/g, (c) => CONFUSABLE[c] ?? c);
+    .replace(/[\u3002\uff61]/g, '.') // ideographic full stops render as a dot in a host
+    .replace(/[  -   　]/g, ' ');
+  // Say so when the input was cut: a silent truncation reads as the whole answer.
+  return cut ? `${body}\n[truncated]` : body;
 }
 
 const TLDS =
@@ -78,11 +89,21 @@ const TLDS =
 // so no pattern below can backtrack across the whole input.
 const TOKEN_RE = /[^\s<>"'\x60()\[\]{},;!*|]{1,4096}/g;
 const SCHEME_IN_TOKEN = /(?:https?|ftp|wss?|mailto|javascript|data|nimiq|ipfs):|www\./i;
-const BARE_DOMAIN = /^(?:[a-z0-9-]+\.)+([a-z]{2,24})([/?#].*)?$/i;
+const BARE_DOMAIN = /^(?:[\p{L}\p{N}-]+\.)+([\p{L}]{2,24})([/?#].*)?$/iu;
+const BARE_IPV4 = /^\d{1,3}(?:\.\d{1,3}){3}(?:[:/?#].*)?$/;
 const TLD_SET = new Set(TLDS.split('|').map((t) => t.replace('?', '')).concat(['claims']));
 
 /** Split a token into [prefix, url] when it holds a URL, else null. */
-function urlInToken(tok: string): [string, string] | null {
+function urlInToken(raw: string): [string, string] | null {
+  // Leading backslashes are escapes a renderer drops ("\\evil.com").
+  const lead = /^\\+/.exec(raw)?.[0] ?? '';
+  const tok = raw.slice(lead.length);
+  const hit = urlInBareToken(tok);
+  return hit ? [lead + hit[0], hit[1]] : null;
+}
+
+function urlInBareToken(tok: string): [string, string] | null {
+  if (BARE_IPV4.test(tok)) return ['', tok];
   const m = SCHEME_IN_TOKEN.exec(tok);
   if (m) return [tok.slice(0, m.index), tok.slice(m.index)];
   // Protocol-relative (//host/path) is a link to whatever host follows.
@@ -124,9 +145,18 @@ function allowedHost(host: string | null, roots: readonly string[]): boolean {
 export function enforceLinkAllowlist(text: string, allowedHosts: readonly string[]): string {
   // A browser drops tabs and newlines inside a URL ("ht\ttps:" is https:), so
   // they are removed inside link targets and href values before tokenizing.
+  // A link target or href is kept only when it is an allowed http(s) URL;
+  // anything else (vbscript:, file:, data:, a bare word) is emptied. Browsers
+  // drop tabs and newlines inside a URL, so those are removed first.
+  const targetOk = (raw: string) => {
+    const url = raw.replace(/[\t\r\n]/g, '').trim().split(/\s/)[0]!.replace(/^<|>$/g, '');
+    return /^https?:\/\//i.test(url) && allowedHost(hostOf(url), allowedHosts);
+  };
   const squeezed = normalizeForGuard(text)
-    .replace(/\]\(([^()]*)\)/g, (_m, inner: string) => `](${inner.replace(/[\t\r\n]/g, '')})`)
-    .replace(/\bhref\s*=\s*("[^"<>]*"|'[^'<>]*')/gi, (_m, v: string) => `href=${v.replace(/[\t\r\n]/g, '')}`);
+    // One level of parens inside the target ('vbscript:msgbox(1)'); each branch starts
+    // on a different character, so the repetition cannot backtrack.
+    .replace(/\]\(((?:[^()]|\([^()]*\))*)\)/g, (_m, inner: string) => (targetOk(inner) ? `](${inner.replace(/[\t\r\n]/g, '')})` : ']()'))
+    .replace(/\bhref\s*=\s*("[^"<>]*"|'[^'<>]*')/gi, (_m, v: string) => (targetOk(v.slice(1, -1)) ? `href=${v.replace(/[\t\r\n]/g, '')}` : ''));
   let out = squeezed.replace(TOKEN_RE, (tok) => {
     const hit = urlInToken(tok);
     if (!hit) return tok;
@@ -157,7 +187,7 @@ export function enforceLinkAllowlist(text: string, allowedHosts: readonly string
 // One character class between fixed anchors: linear, no catastrophic backtracking.
 const SEP = String.raw`[^0-9A-Za-z]*`;
 const NQ_LIKE = new RegExp(
-  String.raw`(?<![A-Za-z0-9])N${SEP}Q${SEP}\d${SEP}\d(?:${SEP}[0-9A-HJ-NP-VXY]){24,32}`,
+  String.raw`N${SEP}Q${SEP}\d${SEP}\d(?:${SEP}[0-9A-HJ-NP-VXY]){24,32}`,
   'gi',
 );
 const compact = (a: string) => a.replace(/[^0-9A-Z]/gi, '').toUpperCase();
@@ -182,7 +212,19 @@ export function visibleText(normalized: string): string {
  */
 export function stripUnverifiedNqAddresses(text: string, verified: readonly string[], replacement = 'your NQ address'): string {
   const ok = new Set(verified.map(compact));
-  const scrub = (t: string) => t.replace(NQ_LIKE, (m) => (ok.has(compact(m)) ? m : replacement));
+  // Match on the folded copy (same length), splice into the original text.
+  const scrub = (t: string) => {
+    const f = foldForMatch(t);
+    let out = '';
+    let at = 0;
+    for (const m of f.matchAll(NQ_LIKE)) {
+      const i = m.index!;
+      const end = i + m[0].length;
+      out += t.slice(at, i) + (ok.has(compact(m[0])) ? t.slice(i, end) : replacement);
+      at = end;
+    }
+    return out + t.slice(at);
+  };
   const direct = scrub(normalizeForGuard(text));
   const seen = visibleText(direct);
   const cleaned = scrub(seen);
@@ -206,8 +248,9 @@ export function stripForgedLines(userInput: string): string {
       if (/<\|[a-z_]*\|>/i.test(line)) return false; // chat-template tokens anywhere
       // Strip markdown decoration a header could hide behind.
       const bare = line.replace(/^[\s>#*_\-+`~|]+/, '').replace(/^\d+[.)]\s*/, '').replace(/[*_`~]/g, '');
-      if (/^\[(?:system|assistant|developer|tool|user|human)\]/i.test(bare)) return false;
-      return !ROLE.test(bare);
+      if (/^\[(?:system|assistant|developer|tool|user|human)\]/i.test(foldForMatch(bare))) return false;
+      // Match on the folded form (a Cyrillic S in 'System:'), keep the original line.
+      return !ROLE.test(foldForMatch(bare));
     })
     .join('\n');
 }

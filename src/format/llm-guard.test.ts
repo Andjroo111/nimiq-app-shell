@@ -99,8 +99,10 @@ describe('stripForgedLines', () => {
   });
 });
 
-test('normalizeForGuard folds width, zero-width and look-alikes', () => {
-  expect(normalizeForGuard('ＮＱ​Ѕ')).toBe('NQS');
+test('normalizeForGuard folds width and zero-width but leaves Cyrillic prose alone (round 7)', () => {
+  expect(normalizeForGuard('\uff2e\uff31\u200b\u0405')).toBe('NQ\u0405');
+  const ru = '\u043f\u0440\u0438\u0432\u0435\u0442 \u043c\u0438\u0440';
+  expect(guardModelText(ru, { allowedHosts: [], verifiedAddresses: [] })).toBe(ru);
 });
 
 describe('addresses split by markup (third review probe)', () => {
@@ -141,10 +143,24 @@ test('long whitespace or rule runs split nothing (round 5), and matching stays l
   expect(Date.now() - t0).toBeLessThan(2000);
 });
 
-test('the address pattern needs a word boundary: ordinary words are left alone (round 6)', () => {
-  for (const t of ['UNQ 12 3456 7890 ABCD EFGH JKLM NPQR STUV XY00', 'Contact HQ 2026 5551 2345 6789 ABCD EFGH JKLM NPQR']) {
-    expect(guardModelText(t, { allowedHosts: [], verifiedAddresses: [] })).toBe(t);
+test('only N starts an address: HQ prose is left alone; a glued prefix does not hide one (round 7)', () => {
+  const hq = 'Contact HQ 2026 5551 2345 6789 ABCD EFGH JKLM NPQR';
+  expect(guardModelText(hq, { allowedHosts: [], verifiedAddresses: [] })).toBe(hq);
+  for (const pre of ['pay', 'to', '42', 'pay<b></b>', 'pay&zwj;', '\uff50ay']) {
+    const out = guardModelText(`${pre}NQ07 0000 0000 0000 0000 0000 0000 0000 0000`, { allowedHosts: [], verifiedAddresses: [] });
+    expect(out).toContain('your NQ address');
   }
+});
+
+test('link targets: only allowed https survives (vbscript:, file:, data: emptied)', () => {
+  for (const tgt of ['vbscript:msgbox(1)', 'file:///etc/passwd', 'data:text/html,<script>x</script>', 'nimiq.com']) {
+    expect(enforceLinkAllowlist(`[x](${tgt})`, ['nimiq.com'])).toBe('x');
+  }
+  expect(enforceLinkAllowlist('[x](https://nimiq.com/a)', ['nimiq.com'])).toBe('[x](https://nimiq.com/a)');
+});
+
+test('truncation is visible', () => {
+  expect(normalizeForGuard('a'.repeat(60_000)).endsWith('[truncated]')).toBe(true);
 });
 
 test('pathological inputs stay fast (round 6 ReDoS)', () => {
