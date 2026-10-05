@@ -132,3 +132,12 @@ test('any punctuation, a hard break, a setext underline or a heading line splits
     expect(guardModelText(t, { allowedHosts: [], verifiedAddresses: [] })).toContain('your NQ address');
   }
 });
+
+test('long whitespace or rule runs split nothing (round 5), and matching stays linear', () => {
+  for (const sep of [' '.repeat(30), ' '.repeat(30), '\n'.repeat(30), '='.repeat(100), '\n' + '-'.repeat(60) + '\n', '*'.repeat(30)]) {
+    expect(guardModelText(`NQ07 0000 0000 0000 0000${sep}0000 0000 0000 0000`, { allowedHosts: [], verifiedAddresses: [] })).toContain('your NQ address');
+  }
+  const t0 = Date.now();
+  guardModelText('N Q 1 2 '.repeat(30000) + '!'.repeat(100000), { allowedHosts: [], verifiedAddresses: [] });
+  expect(Date.now() - t0).toBeLessThan(2000);
+});

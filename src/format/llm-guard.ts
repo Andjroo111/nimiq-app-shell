@@ -113,7 +113,10 @@ export function enforceLinkAllowlist(text: string, allowedHosts: readonly string
 // markdown emphasis or code ticks.
 // Any run (up to 24) of non-alphanumerics between characters: a renderer can hide or
 // join across nearly every punctuation mark, so none is trusted as a boundary.
-const SEP = String.raw`[^0-9A-Za-z]{0,24}`;
+// Any run of non-alphanumerics, unbounded: HTML collapses whitespace and markdown turns
+// long '=', '-' or '*' runs into rules or headings, so no length is a safe boundary.
+// One character class between fixed anchors: linear, no catastrophic backtracking.
+const SEP = String.raw`[^0-9A-Za-z]*`;
 const NQ_LIKE = new RegExp(
   String.raw`[NH]${SEP}Q${SEP}\d${SEP}\d(?:${SEP}[0-9A-HJ-NP-VXY]){24,32}`,
   'gi',
