@@ -32,8 +32,11 @@ import { RPC_ENDPOINTS } from 'nimiq-settlement';
 export const DEFAULT_NIM_RPC: string = RPC_ENDPOINTS.main[0];
 
 export interface NimBalanceReaderOptions {
-  /** Node URL. Defaults to the public read-only one above. */
-  rpc?: string;
+  /** Node URL, or an ordered list tried in turn. Defaults to settlement's
+   *  mainnet list, which starts with DEFAULT_NIM_RPC. */
+  rpc?: string | readonly string[];
+  /** Per-node abort before the next node is tried. Default 4000 ms. */
+  timeoutMs?: number;
   /** Injected for tests. Defaults to the global `fetch`. */
   fetchImpl?: typeof fetch;
 }
@@ -67,26 +70,59 @@ function unwrap(body: RpcEnvelope): RpcAccount | null {
 export function createNimBalanceReader(
   options: NimBalanceReaderOptions = {},
 ): (address: string) => Promise<number> {
-  const url = options.rpc ?? DEFAULT_NIM_RPC;
+  // Failover (recon C2-296): one dead or slow node no longer blanks the
+  // balance. Same single method, so the rule above still holds.
+  const urls: readonly string[] =
+    options.rpc === undefined ? RPC_ENDPOINTS.main : typeof options.rpc === 'string' ? [options.rpc] : options.rpc;
+  if (urls.length === 0) throw new Error('nim balance: no rpc url');
+  const timeoutMs = Math.max(1, options.timeoutMs ?? 4000);
   const doFetch = options.fetchImpl ?? ((...args: Parameters<typeof fetch>) => fetch(...args));
+
+  const readOne = async (url: string, spaced: string): Promise<RpcAccount> => {
+    const ctrl = new AbortController();
+    const timer = setTimeout(() => ctrl.abort(), timeoutMs);
+    try {
+      let res: Response;
+      try {
+        res = await doFetch(url, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            jsonrpc: '2.0',
+            id: 1,
+            method: 'getAccountByAddress',
+            params: [spaced],
+          }),
+          signal: ctrl.signal,
+        });
+      } catch (e) {
+        if (ctrl.signal.aborted) throw new Error(`nim balance: ${url} timed out after ${timeoutMs}ms`);
+        throw new Error(`nim balance: ${url} unreachable: ${(e as Error)?.message ?? e}`);
+      }
+      if (!res.ok) throw new Error(`nim balance: ${url} answered ${res.status}`);
+      const body = (await res.json()) as RpcEnvelope;
+      if (body.error) throw new Error(`nim balance: ${body.error.message ?? 'rpc error'}`);
+      const account = unwrap(body);
+      if (!account) throw new Error('nim balance: no result in rpc response');
+      return account;
+    } finally {
+      clearTimeout(timer);
+    }
+  };
 
   return async function getBalanceLuna(address: string): Promise<number> {
     const spaced = address.replace(/\s+/g, '').toUpperCase().replace(/(.{4})(?=.)/g, '$1 ');
-    const res = await doFetch(url, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        jsonrpc: '2.0',
-        id: 1,
-        method: 'getAccountByAddress',
-        params: [spaced],
-      }),
-    });
-    if (!res.ok) throw new Error(`nim balance: ${url} answered ${res.status}`);
-    const body = (await res.json()) as RpcEnvelope;
-    if (body.error) throw new Error(`nim balance: ${body.error.message ?? 'rpc error'}`);
-    const account = unwrap(body);
-    if (!account) throw new Error('nim balance: no result in rpc response');
+    let account: RpcAccount | null = null;
+    let last: unknown = null;
+    for (const url of urls) {
+      try {
+        account = await readOne(url, spaced);
+        break;
+      } catch (e) {
+        last = e;
+      }
+    }
+    if (!account) throw last instanceof Error ? last : new Error('nim balance: every node failed');
     // A valid address the chain has never seen answers `balance: 0` rather than
     // erroring (verified against the live node), so a brand-new account reads
     // as zero and not as a failure. That matters: on failure the corner KEEPS

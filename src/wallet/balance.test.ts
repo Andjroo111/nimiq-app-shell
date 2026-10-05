@@ -94,3 +94,36 @@ describe('createNimBalanceReader', () => {
     expect(createNimBalanceReader({ fetchImpl: impl })(A_SPACED)).rejects.toThrow(/no result/);
   });
 });
+
+describe('createNimBalanceReader failover', () => {
+  const ok = (balance: number) =>
+    new Response(JSON.stringify({ jsonrpc: '2.0', id: 1, result: { data: { balance } } }), { status: 200 });
+
+  test('the default list starts at DEFAULT_NIM_RPC and fails over to the next node', async () => {
+    const seen: string[] = [];
+    const impl = (async (url: string) => {
+      seen.push(url);
+      return url === DEFAULT_NIM_RPC ? new Response('', { status: 502 }) : ok(5);
+    }) as unknown as typeof fetch;
+    expect(await createNimBalanceReader({ fetchImpl: impl })(A_SPACED)).toBe(5);
+    expect(seen[0]).toBe(DEFAULT_NIM_RPC);
+    expect(seen).toHaveLength(2);
+  });
+
+  test('a node that never answers is abandoned at the timeout', async () => {
+    const impl = ((url: string, init?: RequestInit) =>
+      url === 'https://slow'
+        ? new Promise<Response>((_, rej) => init?.signal?.addEventListener('abort', () => rej(new Error('aborted'))))
+        : Promise.resolve(ok(9))) as unknown as typeof fetch;
+    const t0 = Date.now();
+    expect(await createNimBalanceReader({ rpc: ['https://slow', 'https://fast'], timeoutMs: 30, fetchImpl: impl })(A_SPACED)).toBe(9);
+    expect(Date.now() - t0).toBeLessThan(1000);
+  });
+
+  test('all nodes down throws the last error, a single string rpc still works', async () => {
+    const down = (async () => { throw new Error('ECONNREFUSED'); }) as unknown as typeof fetch;
+    await expect(createNimBalanceReader({ rpc: ['https://a', 'https://b'], fetchImpl: down })(A_SPACED)).rejects.toThrow('https://b unreachable');
+    const one = (async () => ok(3)) as unknown as typeof fetch;
+    expect(await createNimBalanceReader({ rpc: 'https://only', fetchImpl: one })(A_SPACED)).toBe(3);
+  });
+});
