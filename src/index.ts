@@ -53,6 +53,9 @@ export {
   type NimBalanceReaderOptions,
 } from './wallet/balance';
 
+// ---- guards for model-written text ----
+export { enforceLinkAllowlist, stripUnverifiedNqAddresses, stripForgedLines } from './format/llm-guard';
+
 // ---- wallet outcomes + send handles ----
 // The frozen contracts (v0.29.0): how a wallet rejection is classified, and
 // what a send actually handed back. Pure functions, no backend wiring — the
