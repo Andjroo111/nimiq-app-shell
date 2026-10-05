@@ -1,33 +1,52 @@
 // Guards for model-written text before a user sees it (recon C2-297).
 //
 // A model invents links and addresses. A made-up URL is a phishing link with
-// our name on it; a made-up NQ address is one a user may pay. Pure string
-// functions, no deps. Fenced and inline code is left alone, so code samples
-// survive.
+// our name on it; a made-up NQ address is one a user may pay. Default-deny:
+// text is normalized first (NFKC, zero-width removed, look-alike letters
+// folded, HTML space entities resolved), then EVERY link-shaped and
+// address-shaped token is checked, inside code too, because a code span
+// renders a copyable address just as well. Output is the normalized text.
 
-const NQ_RE = /\bNQ\d{2}(?:[ \t]?[0-9A-HJ-NP-VXY]{4}){8}\b/gi;
-const MD_LINK_RE = /\[([^\]\n]*)\]\(\s*<?([^)\s>]+)>?(?:\s+"[^"]*")?\s*\)/g;
-const BARE_URL_RE = /\b(?:https?:\/\/|www\.)[^\s<>()\]]+/gi;
+const ZERO_WIDTH = /[­​-‏⁠-⁤﻿᠎]/g;
+// Cyrillic and Greek letters that render like Latin ones.
+const CONFUSABLE: Record<string, string> = {
+  А: 'A', В: 'B', Е: 'E', К: 'K', М: 'M', Н: 'H', О: 'O', Р: 'P', С: 'C', Т: 'T', Х: 'X', Ѕ: 'S', І: 'I', Ј: 'J',
+  а: 'a', в: 'b', е: 'e', к: 'k', м: 'm', н: 'h', о: 'o', р: 'p', с: 'c', т: 't', у: 'y', х: 'x', ѕ: 's', і: 'i', ј: 'j',
+  Α: 'A', Β: 'B', Ε: 'E', Ζ: 'Z', Η: 'H', Ι: 'I', Κ: 'K', Μ: 'M', Ν: 'N', Ο: 'O', Ρ: 'P', Τ: 'T', Υ: 'Y', Χ: 'X',
+  ο: 'o', ν: 'v',
+};
 
-/** Run `fn` on the prose parts only, leaving ```fenced``` and `inline` code as is. */
-function onProse(text: string, fn: (s: string) => string): string {
+/** The form every guard matches against, and returns. */
+export function normalizeForGuard(text: string): string {
   return text
-    .split(/(```[\s\S]*?```|`[^`\n]*`)/g)
-    .map((part, i) => (i % 2 === 1 ? part : fn(part)))
-    .join('');
+    .normalize('NFKC')
+    .replace(ZERO_WIDTH, '')
+    .replace(/&(nbsp|#160|#xa0|ensp|emsp|thinsp);/gi, ' ')
+    .replace(/[  -   　]/g, ' ')
+    .replace(/[Ͱ-ϿЀ-ӿ]/g, (c) => CONFUSABLE[c] ?? c);
 }
 
-const compact = (a: string) => a.replace(/\s+/g, '').toUpperCase();
+const TLDS =
+  'com|net|org|io|co|app|dev|xyz|me|info|biz|ai|link|site|online|top|ru|cn|tk|gg|fun|sale|cool|money|finance|wallet|click|live|vip|pro|club|shop|store|support|help|page|zip|mov|claims?|gift|win|cash|exchange';
+// Any scheme URL, a www. host, an angle autolink target, or a bare domain with a
+// known TLD or a path.
+const URL_RE = new RegExp(
+  String.raw`(?:\b(?:https?|ftp|wss?|mailto|javascript|data|nimiq|ipfs):[^\s<>"'\x60()\[\]]+|\bwww\.[^\s<>"'\x60()\[\]]+|\b(?:[a-z0-9-]+\.)+(?:${TLDS})\b(?:[/?#][^\s<>"'\x60()\[\]]*)?|\b(?:[a-z0-9-]+\.)+[a-z]{2,24}/[^\s<>"'\x60()\[\]]*)`,
+  'gi',
+);
 
-function hostOf(url: string): string | null {
+function hostOf(token: string): string | null {
+  const t = /^[a-z][a-z0-9+.-]*:/i.test(token) ? token : `https://${token}`;
   try {
-    return new URL(/^www\./i.test(url) ? `https://${url}` : url).hostname.toLowerCase();
+    const u = new URL(t);
+    if (u.protocol !== 'https:' && u.protocol !== 'http:') return null;
+    if (u.username || u.password) return null;
+    return u.hostname.toLowerCase();
   } catch {
     return null;
   }
 }
 
-/** True when `host` is an allowed root or a subdomain of one. */
 function allowedHost(host: string | null, roots: readonly string[]): boolean {
   if (!host) return false;
   return roots.some((r) => {
@@ -37,41 +56,57 @@ function allowedHost(host: string | null, roots: readonly string[]): boolean {
 }
 
 /**
- * Keep links only to `allowedHosts` (and their subdomains). A disallowed
- * markdown link keeps its title text; a disallowed bare URL is removed.
- * Only http(s) links ever survive.
+ * Keep http(s) links only to `allowedHosts` and their subdomains. Every other
+ * URL-shaped token is removed wherever it appears (markdown target or title,
+ * reference definition, autolink, HTML attribute, code). Markdown and HTML
+ * scaffolding left empty is cleaned up so the visible words survive.
  */
 export function enforceLinkAllowlist(text: string, allowedHosts: readonly string[]): string {
-  return onProse(text, (prose) =>
-    prose
-      .replace(MD_LINK_RE, (m, title: string, url: string) => {
-        const ok = /^https?:\/\//i.test(url) && allowedHost(hostOf(url), allowedHosts);
-        return ok ? m : title;
-      })
-      .replace(BARE_URL_RE, (url, offset: number, whole: string) => {
-        // Inside a kept markdown link target: leave it.
-        if (whole[offset - 1] === '(' && whole[offset - 2] === ']') return url;
-        const clean = url.replace(/[.,;:!?'"]+$/, '');
-        const tail = url.slice(clean.length);
-        return allowedHost(hostOf(clean), allowedHosts) ? url : tail;
-      }),
-  );
+  let out = normalizeForGuard(text).replace(URL_RE, (m) => {
+    const clean = m.replace(/[.,;:!?)\]}'"*_]+$/, '');
+    const tail = m.slice(clean.length);
+    return allowedHost(hostOf(clean), allowedHosts) ? m : tail;
+  });
+  out = out
+    .replace(/<a\b[^>]*>/gi, '')
+    .replace(/<\/a>/gi, '')
+    .replace(/\[([^\]]*)\]\(\s*(?:\([^)]*\)|'[^']*'|"[^"]*")?\s*\)/g, '$1') // [title]() with only a title left
+    .replace(/\[([^\]]*)\]\[[^\]]*\]/g, '$1') // ref-style use
+    .replace(/^\s*\[[^\]]+\]:\s*$/gm, '') // ref definition whose target was removed
+    .replace(/<\s*>/g, '');
+  return out;
 }
 
-/** Replace any NQ address not in `verified` (any spelling) with `replacement`. */
-export function stripUnverifiedNqAddresses(
-  text: string,
-  verified: readonly string[],
-  replacement = 'your NQ address',
-): string {
+// N then Q, two check digits, then 24..32 Nimiq base32 characters, with any
+// run of separators a renderer would hide: spaces, newlines, dashes, dots,
+// markdown emphasis or code ticks.
+const SEP = String.raw`[\s\-.*_\x60~|'"‐-―]*`;
+const NQ_LIKE = new RegExp(
+  String.raw`[NH]${SEP}Q${SEP}\d${SEP}\d(?:${SEP}[0-9A-HJ-NP-VXY]){24,32}`,
+  'gi',
+);
+const compact = (a: string) => a.replace(/[^0-9A-Z]/gi, '').toUpperCase();
+
+/** Replace every address-shaped token not in `verified` (any spelling). */
+export function stripUnverifiedNqAddresses(text: string, verified: readonly string[], replacement = 'your NQ address'): string {
   const ok = new Set(verified.map(compact));
-  return onProse(text, (prose) => prose.replace(NQ_RE, (m) => (ok.has(compact(m)) ? m : replacement)));
+  return normalizeForGuard(text).replace(NQ_LIKE, (m) => (ok.has(compact(m)) ? m : replacement));
 }
+
+const LINE_SPLIT = new RegExp('\\r\\n|[\\r\\n\\u2028\\u2029\\u0085\\v\\f]');
+const ROLE =
+  /^(?:system|human|user|assistant|developer|tool|function|context|instruction|instructions|admin|operator)\b[^:\n]{0,24}:/i;
 
 /** Drop lines in USER input that pose as a role or context header. */
 export function stripForgedLines(userInput: string): string {
-  return userInput
-    .split(/\r?\n/)
-    .filter((l) => !/^\s*(system|context|assistant|developer)\s*:/i.test(l))
+  return normalizeForGuard(userInput)
+    .split(LINE_SPLIT)
+    .filter((line) => {
+      if (/<\|[a-z_]*\|>/i.test(line)) return false; // chat-template tokens anywhere
+      // Strip markdown decoration a header could hide behind.
+      const bare = line.replace(/^[\s>#*_\-+`~|]+/, '').replace(/^\d+[.)]\s*/, '').replace(/[*_`~]/g, '');
+      if (/^\[(?:system|assistant|developer|tool|user|human)\]/i.test(bare)) return false;
+      return !ROLE.test(bare);
+    })
     .join('\n');
 }
