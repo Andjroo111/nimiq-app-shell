@@ -16,12 +16,39 @@ const CONFUSABLE: Record<string, string> = {
   ο: 'o', ν: 'v',
 };
 
-/** The form every guard matches against, and returns. */
+const NAMED: Record<string, string> = {
+  nbsp: ' ', ensp: ' ', emsp: ' ', thinsp: ' ', amp: '&', lt: '<', gt: '>', quot: '"', apos: "'",
+  colon: ':', sol: '/', bsol: '\\', period: '.', comma: ',', lpar: '(', rpar: ')', lsqb: '[', rsqb: ']',
+  zwsp: '', zwj: '', zwnj: '', shy: '', commat: '@', num: '#', excl: '!', quest: '?', equals: '=',
+  lowbar: '_', hyphen: '-', dash: '-', tab: '\t', newline: '\n',
+};
+
+/** Decode every HTML entity, repeatedly, so &amp;#32; cannot hide a space. */
+function decodeEntities(t: string): string {
+  for (let i = 0; i < 4; i++) {
+    const next = t.replace(/&(#x[0-9a-f]+|#\d+|[a-z]+);?/gi, (m, e: string) => {
+      if (e[0] === '#') {
+        const hex = e[1] === 'x' || e[1] === 'X';
+        const cp = hex ? parseInt(e.slice(2), 16) : parseInt(e.slice(1), 10);
+        return Number.isFinite(cp) && cp >= 0 && cp <= 0x10ffff ? String.fromCodePoint(cp) : '';
+      }
+      const v = NAMED[e.toLowerCase()];
+      return v === undefined ? m : v;
+    });
+    if (next === t) break;
+    t = next;
+  }
+  return t;
+}
+
+/** The form every guard matches against, and returns. Entities are decoded
+ *  and HTML tags other than <a> removed: model output is markdown, and a tag
+ *  can split an address the browser renders whole. */
 export function normalizeForGuard(text: string): string {
-  return text
+  return decodeEntities(text)
+    .replace(/<\/?[a-z][^>]*>/gi, (tag) => (/^<\/?a\b/i.test(tag) ? tag : ''))
     .normalize('NFKC')
     .replace(ZERO_WIDTH, '')
-    .replace(/&(nbsp|#160|#xa0|ensp|emsp|thinsp);/gi, ' ')
     .replace(/[  -   　]/g, ' ')
     .replace(/[Ͱ-ϿЀ-ӿ]/g, (c) => CONFUSABLE[c] ?? c);
 }
@@ -36,6 +63,9 @@ const URL_RE = new RegExp(
 );
 
 function hostOf(token: string): string | null {
+  // A renderer unescapes "\\@" to "@" while URL() reads "\\" as "/": they disagree
+  // about the host, so a backslash is never allowed.
+  if (token.includes('\\')) return null;
   const t = /^[a-z][a-z0-9+.-]*:/i.test(token) ? token : `https://${token}`;
   try {
     const u = new URL(t);

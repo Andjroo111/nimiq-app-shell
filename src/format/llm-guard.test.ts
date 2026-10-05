@@ -34,6 +34,9 @@ describe('enforceLinkAllowlist', () => {
     ];
     for (const [i, o] of cases) expect(L(i)).toBe(o);
   });
+  test('a backslash in a URL is refused (renderer and URL() disagree on the host)', () => {
+    expect(L('[x](https://nimiq.com\\@evil.com)')).toBe('x');
+  });
   test('code is scrubbed too: a code span is still a copyable link', () => {
     expect(L('`[x](https://evil.com)`')).toBe('`x`');
     expect(L('```\ncurl https://evil.example\n```')).toBe('```\ncurl \n```');
@@ -64,6 +67,13 @@ describe('stripUnverifiedNqAddresses', () => {
       'NQ１２ 3456 7890 ABCD EFGH JKLM NPQR STUV XY00',
       'NQ12 3456 7890 ABCD EFGH JKLM NPQR STUV XY0',
       'x' + FAKE,
+      'NQ12&#32;3456 7890 ABCD EFGH JKLM NPQR STUV XY00',
+      'NQ12&#8203;3456 7890 ABCD EFGH JKLM NPQR STUV XY00',
+      'N&#81;12 3456 7890 ABCD EFGH JKLM NPQR STUV XY00',
+      'NQ12&amp;#32;3456 7890 ABCD EFGH JKLM NPQR STUV XY00',
+      '<td>NQ12 3456 7890 ABCD</td><td>EFGH JKLM NPQR STUV XY00</td>',
+      'NQ12 3456 7890 ABCD<br>EFGH JKLM NPQR STUV XY00',
+      '<b>NQ12 3456 7890 ABCD</b><i>EFGH JKLM NPQR STUV XY00</i>',
     ]) {
       expect(N(t)).not.toMatch(/3456|ABCD/);
     }
