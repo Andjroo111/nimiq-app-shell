@@ -16,8 +16,9 @@ function setup(over: Record<string, unknown> = {}) {
     calls.push({ url, auth: new Headers(init?.headers).get('authorization') });
     return new Response('ok');
   }) as typeof fetch;
-  const s = createSessionTokenStore({ storage: mem(), pageOrigin: 'https://app.nimiq.sale', fetchImpl, now: () => t, ...over });
-  return { s, calls, advance: (ms: number) => (t += ms) };
+  let wallet: string | null = A;
+  const s = createSessionTokenStore({ storage: mem(), pageOrigin: 'https://app.nimiq.sale', fetchImpl, now: () => t, currentAddress: () => wallet, ...over });
+  return { s, calls, advance: (ms: number) => (t += ms), connect: (w: string | null) => void (wallet = w) };
 }
 
 describe('createSessionTokenStore', () => {
@@ -58,5 +59,23 @@ describe('createSessionTokenStore', () => {
     const { s } = setup({ storage: bad });
     s.set('tok', A, 9e15);
     expect(s.get(A)).toBe('tok');
+  });
+
+  test('fetch follows the CONNECTED wallet: switching to B stops A\'s token', async () => {
+    const { s, calls, connect } = setup();
+    s.set('tok', A, 9e15);
+    await s.fetch('/api/x');
+    connect(B);
+    await s.fetch('/api/x');
+    connect(A);
+    await s.fetch('/api/x');
+    expect(calls.map((c) => c.auth)).toEqual(['Bearer tok', null, null]);
+  });
+
+  test('without currentAddress, fetch never attaches a token', async () => {
+    const { s, calls } = setup({ currentAddress: undefined });
+    s.set('tok', A, 9e15);
+    await s.fetch('/api/x');
+    expect(calls[0]!.auth).toBe(null);
   });
 });

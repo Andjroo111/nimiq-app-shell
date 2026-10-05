@@ -34,6 +34,12 @@ export interface SessionTokenOptions {
   pageOrigin?: string;
   fetchImpl?: typeof fetch;
   now?: () => number;
+  /**
+   * The wallet connected right now. REQUIRED for the bearer to be attached:
+   * without it the store cannot tell a token issued to wallet A from a
+   * session that has moved to wallet B, so fetch sends no token at all.
+   */
+  currentAddress?: () => string | null | undefined;
 }
 
 const compact = (a: string) => a.replace(/\s+/g, '').toUpperCase();
@@ -108,7 +114,9 @@ export function createSessionTokenStore(o: SessionTokenOptions = {}): SessionTok
       } catch {
         origin = null;
       }
-      const token = api.get();
+      const addr = o.currentAddress?.();
+      // No connected wallet known: never attach. A different wallet: get() clears it.
+      const token = addr ? api.get(addr) : null;
       if (!token || !origin || !allowed.has(origin)) return baseFetch(input, init);
       const headers = new Headers(init?.headers ?? (input instanceof Request ? input.headers : undefined));
       if (!headers.has('authorization')) headers.set('authorization', `Bearer ${token}`);
