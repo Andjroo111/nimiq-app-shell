@@ -64,6 +64,8 @@ export {
 export { queryNetwork, parseNetwork, explorerUrl, type ShellNetwork } from './format/network';
 // ---- live updates by version token ----
 export { startLivePoll, type LivePoll, type LivePollOptions } from './live/poll';
+// ---- device-local, wallet-scoped history ----
+export { createDeviceHistory, type DeviceHistory, type HistoryEntry } from './history/device';
 // ---- address checksum ----
 // Zero-dep IBAN check for NQ addresses; matches @nimiq/utils isValidAddress.
 export {
