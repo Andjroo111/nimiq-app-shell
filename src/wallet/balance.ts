@@ -51,7 +51,7 @@ interface RpcAccount {
  *  host pointing this at a proxy of its own is not forced to mimic the
  *  envelope. */
 interface RpcEnvelope {
-  result?: RpcAccount | { data?: RpcAccount };
+  result?: RpcAccount | { data?: RpcAccount; metadata?: { blockNumber?: unknown } };
   error?: { message?: string };
 }
 
@@ -81,7 +81,7 @@ export function createNimBalanceReader(
   const timeoutMs = Number.isFinite(t0) ? Math.min(Math.max(1, t0), 2_147_483_647) : 4000;
   const doFetch = options.fetchImpl ?? ((...args: Parameters<typeof fetch>) => fetch(...args));
 
-  const readOne = async (url: string, spaced: string): Promise<RpcAccount> => {
+  const readOne = async (url: string, spaced: string): Promise<{ account: RpcAccount; height: number | null }> => {
     const ctrl = new AbortController();
     const timer = setTimeout(() => ctrl.abort(), timeoutMs);
     try {
@@ -115,7 +115,9 @@ export function createNimBalanceReader(
       if (typeof account.balance === 'number' && !(Number.isFinite(account.balance) && account.balance >= 0)) {
         throw new Error(`nim balance: ${url} answered an invalid balance`);
       }
-      return account;
+      const meta = (body.result as { metadata?: { blockNumber?: unknown } } | undefined)?.metadata;
+      const h = meta?.blockNumber;
+      return { account, height: typeof h === 'number' && Number.isFinite(h) ? h : null };
     } finally {
       clearTimeout(timer);
     }
@@ -123,17 +125,20 @@ export function createNimBalanceReader(
 
   return async function getBalanceLuna(address: string): Promise<number> {
     const spaced = address.replace(/\s+/g, '').toUpperCase().replace(/(.{4})(?=.)/g, '$1 ');
-    let account: RpcAccount | null = null;
+    // Every node at once; the answer from the HIGHEST block wins, so a lagging
+    // node cannot show a stale balance as current. Ties keep list order.
+    const settled = await Promise.allSettled(urls.map((u) => readOne(u, spaced)));
+    let best: { account: RpcAccount; height: number | null } | null = null;
     let last: unknown = null;
-    for (const url of urls) {
-      try {
-        account = await readOne(url, spaced);
-        break;
-      } catch (e) {
-        last = e;
+    for (const r of settled) {
+      if (r.status === 'rejected') {
+        last = r.reason;
+        continue;
       }
+      if (!best || (r.value.height ?? -1) > (best.height ?? -1)) best = r.value;
     }
-    if (!account) throw last instanceof Error ? last : new Error('nim balance: every node failed');
+    if (!best) throw last instanceof Error ? last : new Error('nim balance: every node failed');
+    const account = best.account;
     // A valid address the chain has never seen answers `balance: 0` rather than
     // erroring (verified against the live node), so a brand-new account reads
     // as zero and not as a failure. That matters: on failure the corner KEEPS

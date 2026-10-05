@@ -143,3 +143,16 @@ describe('createNimBalanceReader rejects wrong answers and fails over', () => {
     }
   });
 });
+
+describe('createNimBalanceReader prefers the freshest node', () => {
+  const at = (balance: number, blockNumber?: number) =>
+    new Response(JSON.stringify({ jsonrpc: '2.0', id: 1, result: { data: { balance }, ...(blockNumber ? { metadata: { blockNumber } } : {}) } }));
+  test('a lagging first node loses to a node at a higher block', async () => {
+    const impl = (async (url: string) => (url === 'https://lagging' ? at(100, 1000) : at(40, 1500))) as unknown as typeof fetch;
+    expect(await createNimBalanceReader({ rpc: ['https://lagging', 'https://fresh'], fetchImpl: impl })(A_SPACED)).toBe(40);
+  });
+  test('no metadata anywhere: list order decides; one failing node does not matter', async () => {
+    const impl = (async (url: string) => (url === 'https://a' ? at(1) : url === 'https://b' ? at(2) : new Response('', { status: 502 }))) as unknown as typeof fetch;
+    expect(await createNimBalanceReader({ rpc: ['https://down', 'https://a', 'https://b'], fetchImpl: impl })(A_SPACED)).toBe(1);
+  });
+});
