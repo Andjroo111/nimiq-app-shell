@@ -41,6 +41,9 @@ export {
   type WalletResolvedVia,
 } from './detect';
 export { withTimeout } from './timeout';
+export { waitForSendReady, type SendReadiness, type ConsensusProvider } from './send-ready';
+export { payThenConfirm, type ConfirmAttempt, type PayThenConfirmResult } from './pay-then-confirm';
+export { createDemoProvider, DEMO_ADDRESS, type DemoProvider, type DemoProviderOptions } from './demo-provider';
 export {
   matchNetworkByHeight,
   walletMatchesNetwork,

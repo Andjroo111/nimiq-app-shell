@@ -25,6 +25,8 @@ export {
   isNimiqPayUserAgent,
   walletDiagnostics,
   withTimeout,
+  waitForSendReady,
+  payThenConfirm,
   matchNetworkByHeight,
   walletMatchesNetwork,
   readWalletHeight,
@@ -62,7 +64,10 @@ export {
   DEFAULT_NIM_RPC,
   type NimBalanceReaderOptions,
 } from './wallet/balance';
+export { createNimAccountReader, parseNimAccount, type NimAccount, type NimAccountType } from './wallet/account';
 
+// ---- rate-limit-tolerant price cache (fetcher injected) ----
+export { createPriceCache, PriceRateLimitError, type PriceCache, type PriceCacheOptions } from './prices/cache';
 // ---- network override + explorer links ----
 export { queryNetwork, parseNetwork, explorerUrl, type ShellNetwork } from './format/network';
 // ---- live updates by version token ----
@@ -240,6 +245,9 @@ export {
   PLAY_STORE_URL,
   NIMIQ_PAY_PACKAGE,
   IOS_STORE_FALLBACK_MS,
+  autoOpenInNimiqPayOnce,
+  type AutoOpenResult,
+  type SessionStorageLike,
   type OpenInPayUrls,
   type BuildOpenInPayOptions,
   type MobilePlatform,

@@ -246,3 +246,5 @@ export {
   type OpenInPayGateHandle,
   type GateVariant,
 } from './gate';
+
+export { autoOpenInNimiqPayOnce, type AutoOpenResult, type SessionStorageLike } from './once';
