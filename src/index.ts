@@ -108,6 +108,7 @@ export {
   type RestoreResult,
   type SaveResult,
 } from './session/backup';
+export { nimiqBackupVerifier } from './session/backup-verifier';
 // ---- address checksum ----
 // Zero-dep IBAN check for NQ addresses; matches @nimiq/utils isValidAddress.
 export {

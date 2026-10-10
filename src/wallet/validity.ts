@@ -5,7 +5,7 @@
 // fails with a "validity end" error. Pass the max of the wallet's height and
 // an independent RPC head explicitly; either may be missing.
 
-import { RPC_ENDPOINTS } from 'nimiq-settlement';
+import { RPC_ENDPOINTS } from '../vendor/settlement/rpc-endpoints';
 import { readWalletHeight } from './network-gate';
 import { describeWalletError } from './outcome';
 
