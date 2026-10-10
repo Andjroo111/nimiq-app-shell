@@ -60,19 +60,31 @@ jobs:
 
           bad=0
           for c in $commits; do
-            for e in $(git show -s --format='%ae%n%ce' "$c"); do
-              case "$e" in
+            # Author, committer, AND every Co-authored-by / Signed-off-by trailer:
+            # a GitHub squash-merge writes each squashed author into a trailer, and
+            # on 2026-10-05 that put a personal address on main past an author-only check.
+            pairs=$( { git show -s --format='author %ae%ncommitter %ce' "$c"
+                       git show -s --format='%B' "$c" \
+                         | grep -iE '^[[:space:]]*(co-authored-by|signed-off-by):' \
+                         | sed -n 's/.*<\([^>]*\)>.*/trailer \1/p'; } )
+            while read -r field e; do
+              [ -n "${e:-}" ] || continue
+              case "$(printf '%s' "$e" | tr 'A-Z' 'a-z')" in
                 # noreply@github.com is GitHub itself: the committer on web squash-merges.
-                *@users.noreply.github.com|noreply@github.com|noreply@nimiq.kids) ;;
+                # noreply@*/no-reply@* covers bot and Claude attribution trailers.
+                *@users.noreply.github.com|noreply@*|no-reply@*) ;;
                 *)
+                  # The address itself is never printed: these logs are public.
                   if [ "$STRICT" = "true" ]; then
-                    echo "::error::$(git rev-parse --short "$c") commits as $e; the public repo takes noreply identities only"
+                    echo "::error::$(git rev-parse --short "$c") has a non-noreply $field address; the public repo takes noreply identities only"
                   else
-                    echo "::warning::$(git rev-parse --short "$c") commits as $e; this would be blocked on the public repo"
+                    echo "::warning::$(git rev-parse --short "$c") has a non-noreply $field address; this would be blocked on the public repo"
                   fi
                   bad=1 ;;
               esac
-            done
+            done <<EOF_PAIRS
+          $pairs
+          EOF_PAIRS
           done
           if [ "$bad" = 1 ] && [ "$STRICT" = "true" ]; then
             echo "Fix: git config --global user.email Andjroo111@users.noreply.github.com, then rewrite the offending commits."
