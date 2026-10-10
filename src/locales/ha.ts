@@ -63,4 +63,8 @@ export default {
   "shell.fbErrType": "Zaɓi nau’i.",
   "shell.fbErrTitle": "Rubuta taƙaitawa na aƙalla haruffa 5.",
   "shell.fbErrDetails": "Ƙara bayani kaɗan, aƙalla haruffa 10.",
+  'shell.fullscreenAsk': 'Buɗe a cikakken allo?',
+  'shell.fullscreenYes': 'Cikakken allo',
+  'shell.notNow': 'Ba yanzu ba',
+  'shell.dontAskAgain': 'Kada a sake tambaya',
 } as const;

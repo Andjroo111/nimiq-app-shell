@@ -66,4 +66,8 @@ export default {
   "shell.fbErrType": "请选择类型。",
   "shell.fbErrTitle": "摘要至少需要 5 个字符。",
   "shell.fbErrDetails": "请再补充一些细节，至少 10 个字符。",
+  'shell.fullscreenAsk': '以全屏打开？',
+  'shell.fullscreenYes': '全屏',
+  'shell.notNow': '以后再说',
+  'shell.dontAskAgain': '不再询问',
 } as const;

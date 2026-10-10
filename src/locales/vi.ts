@@ -63,4 +63,8 @@ export default {
   "shell.fbErrType": "Hãy chọn một loại.",
   "shell.fbErrTitle": "Tóm tắt cần ít nhất 5 ký tự.",
   "shell.fbErrDetails": "Hãy mô tả thêm, ít nhất 10 ký tự.",
+  'shell.fullscreenAsk': 'Mở toàn màn hình?',
+  'shell.fullscreenYes': 'Toàn màn hình',
+  'shell.notNow': 'Để sau',
+  'shell.dontAskAgain': 'Không hỏi lại',
 } as const;

@@ -66,4 +66,8 @@ export default {
   "shell.fbErrType": "Pumili ng uri.",
   "shell.fbErrTitle": "Maglagay ng buod na hindi bababa sa 5 karakter.",
   "shell.fbErrDetails": "Magdagdag ng kaunting detalye, hindi bababa sa 10 karakter.",
+  'shell.fullscreenAsk': 'Buksan sa buong screen?',
+  'shell.fullscreenYes': 'Buong screen',
+  'shell.notNow': 'Hindi muna',
+  'shell.dontAskAgain': 'Huwag nang itanong',
 } as const;

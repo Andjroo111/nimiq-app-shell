@@ -98,7 +98,7 @@ options (used by the tests).
 
 | Unified call | miniapp backend | hub backend |
 | --- | --- | --- |
-| `connect()` | `provider.listAccounts()[0]` → `{address, label:''}` | `hub.chooseAddress()` → `{address, label}` |
+| `connect()` | first **basic** account of `provider.listAccounts()` → `{address, label:''}` | `hub.chooseAddress()` → `{address, label}` |
 | `signAndSend({…, data})` | `sendBasicTransactionWithData` (data hex-encoded) | `signTransaction` (basic transfer, `extraData` bytes) |
 | `signAndSend({…})` | `sendBasicTransaction` | `signTransaction` |
 | result | `{ txHash: serializedTx, serializedTx }` | `{ txHash: hash, serializedTx }` |
@@ -113,6 +113,29 @@ verifier's canonical challenge string **unmodified**.
 The mini-app SDK returns the serialized transaction (not a hash), so in miniapp
 mode `txHash` carries that serialized form and `serializedTx` is set too, callers
 always get a non-empty handle.
+
+Inside Nimiq Pay (SDK 0.2.4) the miniapp backend also:
+
+| guard | what it does |
+| --- | --- |
+| HTLC filter | with several listed addresses, only a `basic` one (RPC `getAccountByAddress`) can be the identity; none basic means not connected; RPC unreachable keeps Pay's order |
+| consensus wait | a send waits up to 20s (`miniApp.consensusTimeoutMs`) for consensus; still syncing throws before anything is sent |
+| validity height | `validityStartHeight` = max(Pay height, RPC head) on the host's declared network; an RPC head from another chain is ignored |
+| error shapes | a thrown `NimiqProviderError` and a returned `{ error }` become the same `Nimiq Pay: …` Error; declines classify as `cancelled` |
+
+### Fullscreen in Nimiq Pay
+
+Pay 0.2.4 hosts expose native fullscreen, and Pay shows no prompt of its own,
+so the app must ask. `offerPayFullscreen` does nothing on older hosts, asks once
+per launch, remembers "Don't ask again", and never throws.
+
+```ts
+import { offerPayFullscreen, askPayFullscreen, watchPayFullscreen } from 'nimiq-app-shell';
+
+watchPayFullscreen();  // sets html[data-pay-fullscreen] for your inset CSS
+await offerPayFullscreen({ ask: () => askPayFullscreen(document, i18n) });
+// → 'entered' | 'declined' | 'muted' | 'asked' | 'already' | 'unsupported' | 'failed'
+```
 
 ---
 

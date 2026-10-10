@@ -63,4 +63,8 @@ export default {
   "shell.fbErrType": "एक प्रकार चुनें।",
   "shell.fbErrTitle": "सारांश कम से कम 5 अक्षरों का दें।",
   "shell.fbErrDetails": "थोड़ा और विवरण दें, कम से कम 10 अक्षर।",
+  'shell.fullscreenAsk': 'फ़ुल स्क्रीन में खोलें?',
+  'shell.fullscreenYes': 'फ़ुल स्क्रीन',
+  'shell.notNow': 'अभी नहीं',
+  'shell.dontAskAgain': 'फिर से न पूछें',
 } as const;

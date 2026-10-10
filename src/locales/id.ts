@@ -63,4 +63,8 @@ export default {
   "shell.fbErrType": "Pilih jenis.",
   "shell.fbErrTitle": "Beri ringkasan minimal 5 karakter.",
   "shell.fbErrDetails": "Tambahkan sedikit detail, minimal 10 karakter.",
+  'shell.fullscreenAsk': 'Buka dalam layar penuh?',
+  'shell.fullscreenYes': 'Layar penuh',
+  'shell.notNow': 'Nanti saja',
+  'shell.dontAskAgain': 'Jangan tanya lagi',
 } as const;

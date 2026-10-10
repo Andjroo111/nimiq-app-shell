@@ -63,4 +63,8 @@ export default {
   "shell.fbErrType": "유형을 선택하세요.",
   "shell.fbErrTitle": "요약을 5자 이상 입력하세요.",
   "shell.fbErrDetails": "조금 더 자세히, 10자 이상 적어 주세요.",
+  'shell.fullscreenAsk': '전체 화면으로 열까요?',
+  'shell.fullscreenYes': '전체 화면',
+  'shell.notNow': '나중에',
+  'shell.dontAskAgain': '다시 묻지 않기',
 } as const;

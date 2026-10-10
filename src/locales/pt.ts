@@ -62,4 +62,8 @@ export default {
   'shell.fbErrType': 'Escolha um tipo.',
   'shell.fbErrTitle': 'Escreva um resumo com pelo menos 5 caracteres.',
   'shell.fbErrDetails': 'Acrescente mais detalhes, pelo menos 10 caracteres.',
+  'shell.fullscreenAsk': 'Abrir em tela cheia?',
+  'shell.fullscreenYes': 'Tela cheia',
+  'shell.notNow': 'Agora não',
+  'shell.dontAskAgain': 'Não perguntar de novo',
 } as const;

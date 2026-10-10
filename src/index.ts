@@ -34,6 +34,11 @@ export {
   type NetworkMatch,
   pickValidityStartHeight,
   isValidityWindowError,
+  resolveValidityStartHeight,
+  createRpcHeadReader,
+  MAX_HEIGHT_DISAGREEMENT,
+  type ResolveValidityOptions,
+  type RpcHeadReaderOptions,
   createPendingTxStore,
   verifyWithRetry,
   classifyVerifyMessage,
@@ -56,6 +61,7 @@ export {
   type WalletMode,
   type WalletBackend,
   type MiniAppProvider,
+  type MiniAppBackendOptions,
   type HubClient,
   type DetectModeOptions,
   type WalletDiagnostics,
@@ -219,6 +225,21 @@ export {
 // host that wants the same tokens on a surface of its own, or wants to read the
 // expansion (a docs page, a theme picker) without mounting anything.
 export { applyTheme, themeVars, type ShellTheme } from './ui/theme';
+// Nimiq Pay native fullscreen (SDK 0.2.4 host API): detect, ask first, fail quietly.
+export {
+  getPayFullscreenHost,
+  isPayFullscreenSupported,
+  getPayFullscreen,
+  enterPayFullscreen,
+  exitPayFullscreen,
+  watchPayFullscreen,
+  offerPayFullscreen,
+  askPayFullscreen,
+  type PayFullscreenHost,
+  type FullscreenAnswer,
+  type FullscreenOffer,
+  type OfferPayFullscreenOptions,
+} from './ui/fullscreen';
 // The corner mounts this itself from `assets`; exported for hosts that want the
 // balance stack on a page of their own (a wallet screen, a funding view).
 export {

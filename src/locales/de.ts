@@ -62,4 +62,8 @@ export default {
   'shell.fbErrType': 'Bitte eine Art wählen.',
   'shell.fbErrTitle': 'Bitte eine Kurzfassung mit mindestens 5 Zeichen.',
   'shell.fbErrDetails': 'Bitte etwas mehr Details, mindestens 10 Zeichen.',
+  'shell.fullscreenAsk': 'Im Vollbild öffnen?',
+  'shell.fullscreenYes': 'Vollbild',
+  'shell.notNow': 'Nicht jetzt',
+  'shell.dontAskAgain': 'Nicht mehr fragen',
 } as const;

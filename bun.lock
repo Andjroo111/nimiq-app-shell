@@ -6,7 +6,7 @@
       "name": "nimiq-app-shell",
       "dependencies": {
         "@nimiq/hub-api": "^1.14.0",
-        "@nimiq/mini-app-sdk": "^0.1.0",
+        "@nimiq/mini-app-sdk": "^0.2.4",
         "nimiq-settlement": "github:Andjroo111/nimiq-settlement#v0.4.0",
         "qr-creator": "^1.0.0",
       },
@@ -38,7 +38,7 @@
 
     "@nimiq/hub-api": ["@nimiq/hub-api@1.14.0", "", { "dependencies": { "@nimiq/core": "^2.4.0", "@nimiq/fastspot-api": "^1.10.3", "@nimiq/rpc": "^0.4.1", "@nimiq/utils": "^0.11.7", "big-integer": "^1.6.52" } }, "sha512-KwosYfGvNYMtg47N7tElnPNgrrom54jmjUxVqMQrl4sAi5iuQBr/GfI8K081TG/7cFevwsUac7ZpmlEmx0oymw=="],
 
-    "@nimiq/mini-app-sdk": ["@nimiq/mini-app-sdk@0.1.0", "", {}, "sha512-QR5GGrL25U5xRkWdDhDMqY6npRXMtIu07Fe0cTXon5dLLlAuPhIaJU2egwASYITwFH1RXpYCE0JnufO88SleKA=="],
+    "@nimiq/mini-app-sdk": ["@nimiq/mini-app-sdk@0.2.4", "", {}, "sha512-gDumiC+5OiN5rIaWXS2moNmDKTav8evrAvs2qLMfcSyTVgIKtX7Prmcgj7k9PXrMyGk0JMmIKaG1lbPkSg8/Ew=="],
 
     "@nimiq/rpc": ["@nimiq/rpc@0.4.1", "", {}, "sha512-aQigD21o7S1+J9kfWBA9sDPjtQ+K1keL02eahc6UjSL/+9SVMY+zetSDdjq6d4zNBLRnVayjw0G2hc/yKUMZ0Q=="],
 

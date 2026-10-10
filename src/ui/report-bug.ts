@@ -448,7 +448,8 @@ export const BUG_ICON =
   'M16.2 12.2 18.4 10.8 19 8.9M17 15h3.6M16.2 17.8 18.4 19.2 19 21.1"/>' +
   '<path d="M10.8 7.6 9.5 5.9 8 5.3M13.2 7.6 14.5 5.9 16 5.3"/></g></svg>';
 
-function ensureSheetStyles(doc: Document): void {
+/** @internal Shared with the fullscreen prompt so both sheets look alike. */
+export function ensureSheetStyles(doc: Document): void {
   if (doc.getElementById(SHEET_STYLE_ID)) return;
   const style = doc.createElement('style');
   style.id = SHEET_STYLE_ID;

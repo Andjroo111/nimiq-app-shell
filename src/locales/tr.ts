@@ -66,4 +66,8 @@ export default {
   "shell.fbErrType": "Bir tür seçin.",
   "shell.fbErrTitle": "En az 5 karakterlik bir özet yazın.",
   "shell.fbErrDetails": "Biraz daha ayrıntı ekleyin, en az 10 karakter.",
+  'shell.fullscreenAsk': 'Tam ekranda açılsın mı?',
+  'shell.fullscreenYes': 'Tam ekran',
+  'shell.notNow': 'Şimdi değil',
+  'shell.dontAskAgain': 'Bir daha sorma',
 } as const;

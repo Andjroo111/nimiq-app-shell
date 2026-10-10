@@ -52,11 +52,19 @@ export {
   type NetworkMatch,
   type NetworkName,
 } from './network-gate';
-export { pickValidityStartHeight, isValidityWindowError } from './validity';
+export {
+  pickValidityStartHeight,
+  isValidityWindowError,
+  resolveValidityStartHeight,
+  createRpcHeadReader,
+  MAX_HEIGHT_DISAGREEMENT,
+  type ResolveValidityOptions,
+  type RpcHeadReaderOptions,
+} from './validity';
 export { createPendingTxStore, verifyWithRetry, classifyVerifyMessage, type PendingTx, type VerifyAnswer, type VerifyOutcome } from './pending-tx';
 export { createSendLock, type SendLock, type SendLockRecord, type SendLockState, type SendLockStatus, type StorageEventSource } from './send-lock';
 export { resumablePay, type ResumablePayResult, type ResumablePayStatus } from './resumable-pay';
-export { MiniAppBackend, type MiniAppProvider } from './miniapp-backend';
+export { MiniAppBackend, type MiniAppProvider, type MiniAppBackendOptions } from './miniapp-backend';
 export { HubBackend, type HubClient } from './hub-backend';
 export type { WalletBackend } from './backend';
 
