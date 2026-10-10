@@ -84,6 +84,19 @@ export { createDeviceHistory, type DeviceHistory, type HistoryEntry } from './hi
 export { guardModelText, stripForgedLines } from './format/llm-guard';
 // ---- session token as a header (WebViews drop cookies) ----
 export { createSessionTokenStore, type SessionTokenStore, type SessionTokenOptions } from './session/token';
+export {
+  createStateBackup,
+  checkBackupEnvelope,
+  backupMessage,
+  canonicalJson,
+  type StateBackup,
+  type BackupEnvelope,
+  type BackupTransport,
+  type BackupSignatureVerifier,
+  type BackupCheck,
+  type RestoreResult,
+  type SaveResult,
+} from './session/backup';
 // ---- address checksum ----
 // Zero-dep IBAN check for NQ addresses; matches @nimiq/utils isValidAddress.
 export {
