@@ -30,7 +30,8 @@
 //   - a commit is confirmed by re-reading HEAD, never by the fact the call returned
 
 import { $ } from 'bun';
-import { existsSync, readFileSync, writeFileSync } from 'node:fs';
+import { copyFileSync, existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { FLEET, SALE_VENDOR, type App } from './fleet';
 
@@ -91,12 +92,64 @@ function readPin(dir: string, model: App['model']): string {
   if (model === 'vendor-file') return 'vendored';
   if (model === 'dep') {
     const pkg = Bun.spawnSync(['git', 'show', 'origin/main:package.json'], { cwd: dir }).stdout.toString();
-    return pkg.match(/nimiq-app-shell#(v[\d.]+)/)?.[1] ?? '?';
+    return pkg.match(/nimiq-app-shell#(v[\d.]+)/)?.[1]
+      ?? pkg.match(/nimiq-app-shell-([\d.]+)\.tgz/)?.[1]?.replace(/^/, 'v')
+      ?? '?';
   }
   const hit = Bun.spawnSync(['sh', '-c',
     `git grep -h -o "cdn\\.jsdelivr\\.net/gh/Andjroo111/nimiq-app-shell@v[0-9.]*" origin/main 2>/dev/null | head -1`,
   ], { cwd: dir }).stdout.toString().trim();
   return hit ? `v${hit.split('@v')[1]!}` : '?';
+}
+
+// ---- vendored tarball --------------------------------------------------------
+// While app-shell was private (2026-09-17 to 2026-10-10) six dep apps swapped the
+// github: pin for file:./vendor/nimiq-app-shell-X.tgz, sha256-checked in CI and
+// copied by Docker before install. Rewriting a github: pin cannot move those, so
+// the bump re-vendors instead: one `bun pm pack` of the tag, shared by every app.
+
+let packed: { tgz: string; sha: string; commit: string } | null = null;
+
+async function packTag(): Promise<{ tgz: string; sha: string; commit: string }> {
+  if (packed) return packed;
+  const dir = mkdtempSync(join(tmpdir(), 'bump-fleet-pack-'));
+  const src = join(dir, 'src');
+  const add = await sh(ROOT, `git worktree add -q --detach ${src} ${version}`);
+  if (!add.ok) throw new Error(`pack worktree: ${add.out}`);
+  const pack = await sh(src, `bun pm pack --quiet --destination ${dir}`);
+  const commit = (await sh(src, 'git rev-parse --short HEAD')).out;
+  await sh(ROOT, `git worktree remove --force ${src}`);
+  const tgz = join(dir, `nimiq-app-shell-${bare}.tgz`);
+  if (!pack.ok || !existsSync(tgz)) throw new Error(`bun pm pack: ${pack.out.slice(-200)}`);
+  const sha = (await sh(dir, `shasum -a 256 nimiq-app-shell-${bare}.tgz`)).out.split(/\s+/)[0]!;
+  packed = { tgz, sha, commit };
+  return packed;
+}
+
+/** Swap vendor/nimiq-app-shell-<old>.tgz for the target, and every file that names it. */
+async function revendor(work: string, old: string): Promise<void> {
+  const { tgz, sha, commit } = await packTag();
+  const oldName = `nimiq-app-shell-${old}.tgz`;
+  const newName = `nimiq-app-shell-${bare}.tgz`;
+  for (const f of [oldName, `${oldName}.sha256`]) rmSync(join(work, 'vendor', f), { force: true });
+  copyFileSync(tgz, join(work, 'vendor', newName));
+  writeFileSync(join(work, 'vendor', `${newName}.sha256`), `${sha}  ${newName}\n`);
+  const named = await sh(work,
+    `git grep -l -F "${oldName}" -- . ':!bun.lock' ':!CHANGELOG.md' ':!vendor/*.tgz' || true`);
+  for (const f of named.out.split('\n').map((x) => x.trim()).filter(Boolean)) {
+    const p = join(work, f);
+    let s = readFileSync(p, 'utf8').split(oldName).join(newName);
+    if (f === 'vendor/README.md') {
+      s = s.replace(new RegExp(`tag v${old.replace(/\./g, '\\.')} at commit \`[0-9a-f]+\``),
+        `tag ${version} at commit \`${commit}\``);
+    }
+    writeFileSync(p, s);
+  }
+  // A stale name anywhere but the lockfile (bun install rewrites that) is a CI
+  // sha256 step or a Docker COPY that will fail after merge, not before.
+  const left = await sh(work,
+    `git grep -n -F "${oldName}" -- . ':!bun.lock' ':!CHANGELOG.md' || true`);
+  if (left.out) throw new Error(`${oldName} still named in: ${left.out.slice(0, 200)}`);
 }
 
 /** Bump the patch and return the new string. Apps version independently of the shell. */
@@ -199,7 +252,11 @@ for (const app of apps) {
       if (!add.ok) throw new Error(`worktree: ${add.out}`);
       work = wt;
     } else {
-      const co = await sh(app.dir, `git checkout -q main && git pull -q --ff-only && git checkout -q -B ${branch}`);
+      // Branch off origin/main, not the local main. The 2026-09-17 identity scrub
+      // rewrote these repos on GitHub, so a checkout still holding the old history
+      // can never fast-forward; on 2026-10-10 eight apps failed right here. The
+      // local main is left as it is, so nothing on it is lost.
+      const co = await sh(app.dir, `git checkout -q -B ${branch} origin/main`);
       if (!co.ok) throw new Error(`checkout: ${co.out}`);
     }
 
@@ -219,7 +276,9 @@ for (const app of apps) {
       console.log(`${label}${from} → ${version}  (${list.length} file${list.length > 1 ? 's' : ''})`);
     } else if (app.model === 'dep') {
       const p = join(work, 'package.json');
-      writeFileSync(p, readFileSync(p, 'utf8').replace(/(nimiq-app-shell#)v[\d.]+/, `$1${version}`));
+      const vendored = readFileSync(p, 'utf8').match(/file:\.\/vendor\/nimiq-app-shell-([\d.]+)\.tgz/);
+      if (vendored) await revendor(work, vendored[1]!);
+      else writeFileSync(p, readFileSync(p, 'utf8').replace(/(nimiq-app-shell#)v[\d.]+/, `$1${version}`));
       const inst = await sh(work, 'bun install');
       if (!inst.ok) throw new Error(`bun install: ${inst.out.slice(-300)}`);
       // Assert RESOLUTION, not the string we just wrote. A dep can be pinned to a
