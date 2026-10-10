@@ -67,4 +67,7 @@ export default {
   'shell.fullscreenYes': 'Full screen',
   'shell.notNow': 'Not now',
   'shell.dontAskAgain': 'Don\'t ask again',
+  'shell.hintUnconfirmed': 'Part of your balance is still confirming. Wait a few minutes and try again.',
+  'shell.hintSyncing': 'Your wallet is still syncing. Try again in a moment.',
+  'shell.hintExpired': 'The payment expired before it was sent. Nothing left your wallet. Try again.',
 } as const;

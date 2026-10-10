@@ -66,4 +66,7 @@ export default {
   'shell.fullscreenYes': 'Tela cheia',
   'shell.notNow': 'Agora não',
   'shell.dontAskAgain': 'Não perguntar de novo',
+  'shell.hintUnconfirmed': 'Parte do seu saldo ainda está sendo confirmada. Aguarde alguns minutos e tente de novo.',
+  'shell.hintSyncing': 'Sua carteira ainda está sincronizando. Tente de novo em instantes.',
+  'shell.hintExpired': 'O pagamento expirou antes de ser enviado. Nada saiu da sua carteira. Tente de novo.',
 } as const;

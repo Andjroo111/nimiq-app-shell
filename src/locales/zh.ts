@@ -70,4 +70,7 @@ export default {
   'shell.fullscreenYes': '全屏',
   'shell.notNow': '以后再说',
   'shell.dontAskAgain': '不再询问',
+  'shell.hintUnconfirmed': '你的部分余额仍在确认中。请等几分钟后再试。',
+  'shell.hintSyncing': '你的钱包仍在同步。请稍后再试。',
+  'shell.hintExpired': '付款在发送前已过期。你的钱包没有任何资金转出。请再试一次。',
 } as const;

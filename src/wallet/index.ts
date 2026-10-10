@@ -177,3 +177,4 @@ export function createWallet(
 
   return wallet;
 }
+export { describeSendFailure, SEND_HINT_KEYS, SEND_DETAIL_MAX, type SendFailure, type SendFailureReason } from './send-hint';

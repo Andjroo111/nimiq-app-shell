@@ -67,4 +67,7 @@ export default {
   'shell.fullscreenYes': 'Toàn màn hình',
   'shell.notNow': 'Để sau',
   'shell.dontAskAgain': 'Không hỏi lại',
+  'shell.hintUnconfirmed': 'Một phần số dư của bạn vẫn đang được xác nhận. Hãy đợi vài phút rồi thử lại.',
+  'shell.hintSyncing': 'Ví của bạn vẫn đang đồng bộ. Hãy thử lại sau giây lát.',
+  'shell.hintExpired': 'Khoản thanh toán đã hết hạn trước khi được gửi. Không có gì rời khỏi ví của bạn. Hãy thử lại.',
 } as const;

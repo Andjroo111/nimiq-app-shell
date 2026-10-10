@@ -70,4 +70,7 @@ export default {
   'shell.fullscreenYes': 'Tam ekran',
   'shell.notNow': 'Şimdi değil',
   'shell.dontAskAgain': 'Bir daha sorma',
+  'shell.hintUnconfirmed': 'Bakiyenin bir kısmı hâlâ onaylanıyor. Birkaç dakika bekleyip tekrar dene.',
+  'shell.hintSyncing': 'Cüzdanın hâlâ senkronize oluyor. Birazdan tekrar dene.',
+  'shell.hintExpired': 'Ödeme gönderilmeden süresi doldu. Cüzdanından hiçbir şey çıkmadı. Tekrar dene.',
 } as const;

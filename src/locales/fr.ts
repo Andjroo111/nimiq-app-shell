@@ -66,4 +66,7 @@ export default {
   'shell.fullscreenYes': 'Plein écran',
   'shell.notNow': 'Pas maintenant',
   'shell.dontAskAgain': 'Ne plus demander',
+  'shell.hintUnconfirmed': 'Une partie de ton solde est encore en cours de confirmation. Attends quelques minutes et réessaie.',
+  'shell.hintSyncing': 'Ton portefeuille se synchronise encore. Réessaie dans un instant.',
+  'shell.hintExpired': 'Le paiement a expiré avant l\'envoi. Rien n\'a quitté ton portefeuille. Réessaie.',
 } as const;

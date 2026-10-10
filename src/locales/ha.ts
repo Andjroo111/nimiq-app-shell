@@ -67,4 +67,7 @@ export default {
   'shell.fullscreenYes': 'Cikakken allo',
   'shell.notNow': 'Ba yanzu ba',
   'shell.dontAskAgain': 'Kada a sake tambaya',
+  'shell.hintUnconfirmed': 'Wani ɓangare na ma\'aunin ku yana ci gaba da tabbatarwa. Jira \'yan mintuna ka sake gwadawa.',
+  'shell.hintSyncing': 'Walat ɗinka tana ci gaba da daidaitawa. Sake gwadawa nan da ɗan lokaci.',
+  'shell.hintExpired': 'Biyan ya ƙare kafin a aika shi. Babu abin da ya fita daga walat ɗinka. Sake gwadawa.',
 } as const;

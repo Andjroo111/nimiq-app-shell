@@ -66,4 +66,7 @@ export default {
   'shell.fullscreenYes': 'Pantalla completa',
   'shell.notNow': 'Ahora no',
   'shell.dontAskAgain': 'No volver a preguntar',
+  'shell.hintUnconfirmed': 'Parte de tu saldo aún se está confirmando. Espera unos minutos y vuelve a intentarlo.',
+  'shell.hintSyncing': 'Tu billetera aún se está sincronizando. Inténtalo de nuevo en un momento.',
+  'shell.hintExpired': 'El pago caducó antes de enviarse. No salió nada de tu billetera. Vuelve a intentarlo.',
 } as const;

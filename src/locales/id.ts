@@ -67,4 +67,7 @@ export default {
   'shell.fullscreenYes': 'Layar penuh',
   'shell.notNow': 'Nanti saja',
   'shell.dontAskAgain': 'Jangan tanya lagi',
+  'shell.hintUnconfirmed': 'Sebagian saldo Anda masih dikonfirmasi. Tunggu beberapa menit lalu coba lagi.',
+  'shell.hintSyncing': 'Dompet Anda masih menyinkronkan. Coba lagi sebentar lagi.',
+  'shell.hintExpired': 'Pembayaran kedaluwarsa sebelum terkirim. Tidak ada yang keluar dari dompet Anda. Coba lagi.',
 } as const;

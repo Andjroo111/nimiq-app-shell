@@ -70,4 +70,7 @@ export default {
   'shell.fullscreenYes': 'Buong screen',
   'shell.notNow': 'Hindi muna',
   'shell.dontAskAgain': 'Huwag nang itanong',
+  'shell.hintUnconfirmed': 'May bahagi ng iyong balanse na kinukumpirma pa. Maghintay ng ilang minuto at subukan ulit.',
+  'shell.hintSyncing': 'Nagsi-sync pa ang iyong wallet. Subukan ulit maya-maya.',
+  'shell.hintExpired': 'Nag-expire ang bayad bago naipadala. Walang lumabas sa iyong wallet. Subukan ulit.',
 } as const;
