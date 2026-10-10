@@ -24,6 +24,7 @@
 
 import type { I18n } from '../i18n';
 import type { Wallet } from '../wallet';
+import { describeSendFailure } from '../wallet/send-hint';
 import { FEATURED_LANGUAGES, type ShellLanguage } from '../locales';
 import { buildFlagHex } from './flag-hex';
 import { fmtNim, fmtFiat, lunaToNim, nimToLuna } from '../format/nim';
@@ -2293,10 +2294,13 @@ export function mountMiniWallet(
         closeSend();
       }
     } catch (err) {
-      // a user closing the wallet dialog is a normal outcome, not an error
-      if (!/cancel|denied|rejected|closed|dismiss/i.test(String(err))) {
-        sendError.textContent = i18n.t('shell.sendFailed');
-      }
+      // A user closing the wallet dialog is a normal outcome, not an error.
+      // A failure with a known, harmless cause (balance still confirming,
+      // wallet syncing, expired window) says what to do (recon W-261009-97).
+      const f = describeSendFailure(err);
+      // The hint replaces the generic line: it already says what went wrong,
+      // and joining two sentences breaks punctuation in zh, ko and hi.
+      if (f.kind !== 'cancelled') sendError.textContent = i18n.t(f.hintKey ?? 'shell.sendFailed');
     } finally {
       sendConfirm.textContent = i18n.t('shell.send');
       messageInput.value = '';

@@ -1306,7 +1306,7 @@ describe('send is the wallet\'s two sheets', () => {
   const ADDRESS = 'NQ34 248H 8MB8 8QK2 5RVK EM8Q QJ8N 2Q5R 3XRK';
   const OTHER = 'NQ07 0000 0000 0000 0000 0000 0000 0000 0000';
 
-  function mount(opts: Partial<CornerControlOptions> = {}) {
+  function mount(opts: Partial<CornerControlOptions> = {}, payImpl?: (args: unknown) => Promise<unknown>) {
     const w = new Window();
     for (const key of ['document', 'HTMLElement', 'navigator', 'localStorage',
                        'getComputedStyle', 'Event', 'TextEncoder']) {
@@ -1320,7 +1320,7 @@ describe('send is the wallet\'s two sheets', () => {
       account: { address: ADDRESS, label: 'Test' },
       connect: async () => null,
       signAndSend: async () => ({ txHash: '' }),
-      pay: async (args: unknown) => { paid.push(args); return { txHash: 'x' }; },
+      pay: payImpl ?? (async (args: unknown) => { paid.push(args); return { txHash: 'x' }; }),
       signMessage: async () => ({ address: '', message: '', publicKeyHex: '', signatureHex: '' }),
       onAccountChange: () => () => {},
       disconnect: () => {},
@@ -1447,6 +1447,36 @@ describe('send is the wallet\'s two sheets', () => {
     (host.querySelector('.nq-cc-send-confirm') as HTMLElement).click();
     await settle();
     expect((paid[0] as { data?: string })?.data).toBe('coffee');
+  });
+
+  async function failSend(err: unknown): Promise<string> {
+    const { host } = mount({}, async () => { throw err; });
+    openSend(host);
+    await settle();
+    type(host, OTHER);
+    const amount = host.querySelector(
+      '.nq-cc-view-send .nq-cc-amount-row .nq-cc-input') as HTMLInputElement;
+    amount.value = '1';
+    amount.dispatchEvent(
+      new (globalThis as unknown as { Event: typeof Event }).Event('input', { bubbles: true }));
+    (host.querySelector('.nq-cc-send-confirm') as HTMLElement).click();
+    await settle();
+    return host.querySelector('.nq-cc-send-error')?.textContent ?? '';
+  }
+
+  // Pay's "exceeds balance" means a balance still confirming. Shown as a bare
+  // failure it reads as an empty wallet and the user writes to support.
+  test('a send failure with a known cause says what to do', async () => {
+    const text = await failSend(new Error('Nimiq Pay: Transaction value exceeds balance'));
+    expect(text).toBe('Part of your balance is still confirming. Wait a few minutes and try again.');
+  });
+
+  test('an unknown failure stays the one generic line', async () => {
+    expect(await failSend(new Error('Nimiq Pay: boom'))).toBe('Something went wrong');
+  });
+
+  test('closing the wallet sheet shows nothing', async () => {
+    expect(await failSend(Object.assign(new Error('Nimiq Pay: User closed the sheet'), { type: 'USER_REJECTED' }))).toBe('');
   });
 
   test('no message means no data field at all', async () => {
