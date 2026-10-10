@@ -1475,6 +1475,44 @@ describe('send is the wallet\'s two sheets', () => {
     expect(await failSend(new Error('Nimiq Pay: boom'))).toBe('Something went wrong');
   });
 
+  // PENDING means the payment is real and propagating. An error line beside a
+  // live Send button is how a user pays twice.
+  test('a PENDING answer shows the sent view, never the error, and disarms Send', async () => {
+    const { host } = mount({}, async () => { throw new Error('PENDING: tx abc still propagating'); });
+    openSend(host);
+    await settle();
+    type(host, OTHER);
+    const amount = host.querySelector(
+      '.nq-cc-view-send .nq-cc-amount-row .nq-cc-input') as HTMLInputElement;
+    amount.value = '1';
+    amount.dispatchEvent(
+      new (globalThis as unknown as { Event: typeof Event }).Event('input', { bubbles: true }));
+    (host.querySelector('.nq-cc-send-confirm') as HTMLElement).click();
+    await settle();
+    expect(host.querySelector('.nq-cc-send-error')?.textContent).toBe('');
+    expect(host.querySelector('.nq-cc-view-send')?.classList.contains('nq-cc-sent')).toBe(true);
+    const pending = host.querySelector('.nq-cc-send-pending') as HTMLElement;
+    expect(pending.hidden).toBe(false);
+    expect(pending.textContent).toContain("don't send it again");
+    expect(amount.value).toBe('');
+    expect((host.querySelector('.nq-cc-send-confirm') as HTMLButtonElement).disabled).toBe(true);
+  });
+
+  test('a plain success shows Sent, not the pending line', async () => {
+    const { host } = mount();
+    openSend(host);
+    await settle();
+    type(host, OTHER);
+    const amount = host.querySelector(
+      '.nq-cc-view-send .nq-cc-amount-row .nq-cc-input') as HTMLInputElement;
+    amount.value = '1';
+    amount.dispatchEvent(
+      new (globalThis as unknown as { Event: typeof Event }).Event('input', { bubbles: true }));
+    (host.querySelector('.nq-cc-send-confirm') as HTMLElement).click();
+    await settle();
+    expect((host.querySelector('.nq-cc-send-pending') as HTMLElement).hidden).toBe(true);
+  });
+
   test('closing the wallet sheet shows nothing', async () => {
     expect(await failSend(Object.assign(new Error('Nimiq Pay: User closed the sheet'), { type: 'USER_REJECTED' }))).toBe('');
   });

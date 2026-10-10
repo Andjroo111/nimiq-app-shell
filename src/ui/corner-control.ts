@@ -835,6 +835,7 @@ button.nq-cc-name:focus-visible { outline:2px solid var(--nq-cc-accent, #0582ca)
   padding:16px 0 10px; color:var(--nq-cc-success, #13b59d); font-size:14px; font-weight:700; }
 .nq-cc-view-send.nq-cc-sent .nq-cc-send-body { display:none; }
 .nq-cc-view-send.nq-cc-sent .nq-cc-send-done { display:flex; }
+.nq-cc-send-pending { max-width:240px; text-align:center; }
 /* Sub-view header: back chevron left, the view's name CENTRED in the card.
    Three columns and not a flex row, so the title is centred on the menu rather
    than on whatever is left over beside the button. The third column is the
@@ -2135,6 +2136,12 @@ export function mountMiniWallet(
   );
   const sendDoneLabel = el('span', undefined, sendDone);
   tNode(sendDoneLabel, 'shell.sent');
+  // A PENDING answer is a real payment still propagating. It gets the sent
+  // view with its own line, never the error line: "Something went wrong"
+  // next to a live Send button is how a user pays twice.
+  const sendPendingLabel = el('span', 'nq-cc-send-pending', sendDone);
+  tNode(sendPendingLabel, 'shell.sendPending');
+  sendPendingLabel.hidden = true;
 
   // 36 chars in Nimiq's base32 alphabet (no I, O, W, Z), NQ + check + 8 blocks
   const NIM_ADDRESS_RE = /^NQ\d{2}[0-9A-HJ-NP-VXY]{32}$/;
@@ -2241,6 +2248,8 @@ export function mountMiniWallet(
     if (!wallet?.account) return;
     sendError.textContent = '';
     viewSend.classList.remove('nq-cc-sent');
+    sendDoneLabel.hidden = false;
+    sendPendingLabel.hidden = true;
     availableHint.textContent =
       balanceLuna !== null ? `${i18n.t('shell.available')}: ${fmtNim(balanceLuna)} NIM` : '';
     validateSend();
@@ -2261,6 +2270,27 @@ export function mountMiniWallet(
     root.classList.remove('nq-cc-show-sendto');
   }
 
+  /** The money moved (or is moving): show the done view, clear the fields so
+   *  the button cannot fire again, and close. `pending` keeps the sheet up
+   *  longer, with a line saying not to send again. */
+  function markSent(spaced: string, pending: boolean): void {
+    sendDoneLabel.hidden = pending;
+    sendPendingLabel.hidden = !pending;
+    viewSend.classList.add('nq-cc-sent');
+    // Offer to save BEFORE the fields are cleared, and only for an address
+    // the book does not already hold. Asked after the send rather than
+    // before it, because a prompt between "Send" and the money moving is an
+    // obstacle at the worst possible moment.
+    void offerToSave(spaced);
+    recipientInput.value = '';
+    amountInput.value = '';
+    balanceFetchedAt = 0; // the balance just changed — refetch on next look
+    window.setTimeout(() => {
+      closeSend();
+      void refreshBalance(true);
+    }, pending ? 4000 : 1800);
+  }
+
   sendConfirm.addEventListener('click', async () => {
     if (!wallet) return; // language-only: the send view is never reachable
     const compact = compactRecipient();
@@ -2276,19 +2306,7 @@ export function mountMiniWallet(
         ...(message ? { data: message } : {}),
       });
       if (result) {
-        viewSend.classList.add('nq-cc-sent');
-        // Offer to save BEFORE the fields are cleared, and only for an address
-        // the book does not already hold. Asked after the send rather than
-        // before it, because a prompt between "Send" and the money moving is an
-        // obstacle at the worst possible moment.
-        void offerToSave(spaced);
-        recipientInput.value = '';
-        amountInput.value = '';
-        balanceFetchedAt = 0; // the balance just changed — refetch on next look
-        window.setTimeout(() => {
-          closeSend();
-          void refreshBalance(true);
-        }, 1800);
+        markSent(spaced, false);
       } else {
         // mobile redirect flow: the page is navigating to the wallet
         closeSend();
@@ -2300,7 +2318,8 @@ export function mountMiniWallet(
       const f = describeSendFailure(err);
       // The hint replaces the generic line: it already says what went wrong,
       // and joining two sentences breaks punctuation in zh, ko and hi.
-      if (f.kind !== 'cancelled') sendError.textContent = i18n.t(f.hintKey ?? 'shell.sendFailed');
+      if (f.kind === 'pending') markSent(spaced, true);
+      else if (f.kind !== 'cancelled') sendError.textContent = i18n.t(f.hintKey ?? 'shell.sendFailed');
     } finally {
       sendConfirm.textContent = i18n.t('shell.send');
       messageInput.value = '';

@@ -73,4 +73,5 @@ export default {
   'shell.hintUnconfirmed': 'Bakiyenin bir kısmı hâlâ onaylanıyor. Birkaç dakika bekleyip tekrar dene.',
   'shell.hintSyncing': 'Cüzdanın hâlâ senkronize oluyor. Birazdan tekrar dene.',
   'shell.hintExpired': 'Ödeme gönderilmeden süresi doldu. Cüzdanından hiçbir şey çıkmadı. Tekrar dene.',
+  'shell.sendPending': 'Gönderildi. Hâlâ onaylanıyor, tekrar gönderme.',
 } as const;

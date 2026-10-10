@@ -69,4 +69,5 @@ export default {
   'shell.hintUnconfirmed': 'Ein Teil deines Guthabens wird noch bestätigt. Warte ein paar Minuten und versuche es erneut.',
   'shell.hintSyncing': 'Deine Wallet synchronisiert noch. Versuche es gleich noch einmal.',
   'shell.hintExpired': 'Die Zahlung ist abgelaufen, bevor sie gesendet wurde. Nichts hat deine Wallet verlassen. Versuche es erneut.',
+  'shell.sendPending': 'Gesendet. Wird noch bestätigt, also nicht erneut senden.',
 } as const;

@@ -70,4 +70,5 @@ export default {
   'shell.hintUnconfirmed': 'Part of your balance is still confirming. Wait a few minutes and try again.',
   'shell.hintSyncing': 'Your wallet is still syncing. Try again in a moment.',
   'shell.hintExpired': 'The payment expired before it was sent. Nothing left your wallet. Try again.',
+  'shell.sendPending': 'Sent. Still confirming, so don\'t send it again.',
 } as const;

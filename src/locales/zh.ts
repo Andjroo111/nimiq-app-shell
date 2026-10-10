@@ -73,4 +73,5 @@ export default {
   'shell.hintUnconfirmed': '你的部分余额仍在确认中。请等几分钟后再试。',
   'shell.hintSyncing': '你的钱包仍在同步。请稍后再试。',
   'shell.hintExpired': '付款在发送前已过期。你的钱包没有任何资金转出。请再试一次。',
+  'shell.sendPending': '已发送。仍在确认中，请勿重复发送。',
 } as const;

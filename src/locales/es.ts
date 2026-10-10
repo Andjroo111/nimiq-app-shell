@@ -69,4 +69,5 @@ export default {
   'shell.hintUnconfirmed': 'Parte de tu saldo aún se está confirmando. Espera unos minutos y vuelve a intentarlo.',
   'shell.hintSyncing': 'Tu billetera aún se está sincronizando. Inténtalo de nuevo en un momento.',
   'shell.hintExpired': 'El pago caducó antes de enviarse. No salió nada de tu billetera. Vuelve a intentarlo.',
+  'shell.sendPending': 'Enviado. Aún se está confirmando, así que no lo envíes de nuevo.',
 } as const;

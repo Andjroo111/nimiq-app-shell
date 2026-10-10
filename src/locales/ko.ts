@@ -70,4 +70,5 @@ export default {
   'shell.hintUnconfirmed': '잔액 일부가 아직 확인 중입니다. 몇 분 후 다시 시도하세요.',
   'shell.hintSyncing': '지갑이 아직 동기화 중입니다. 잠시 후 다시 시도하세요.',
   'shell.hintExpired': '결제가 전송 전에 만료되었습니다. 지갑에서 빠져나간 금액은 없습니다. 다시 시도하세요.',
+  'shell.sendPending': '전송됨. 아직 확인 중이니 다시 보내지 마세요.',
 } as const;

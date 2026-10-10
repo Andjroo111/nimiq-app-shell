@@ -70,4 +70,5 @@ export default {
   'shell.hintUnconfirmed': 'Wani ɓangare na ma\'aunin ku yana ci gaba da tabbatarwa. Jira \'yan mintuna ka sake gwadawa.',
   'shell.hintSyncing': 'Walat ɗinka tana ci gaba da daidaitawa. Sake gwadawa nan da ɗan lokaci.',
   'shell.hintExpired': 'Biyan ya ƙare kafin a aika shi. Babu abin da ya fita daga walat ɗinka. Sake gwadawa.',
+  'shell.sendPending': 'An aika. Ana ci gaba da tabbatarwa, don haka kada ka sake aikawa.',
 } as const;

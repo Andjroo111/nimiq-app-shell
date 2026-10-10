@@ -69,4 +69,5 @@ export default {
   'shell.hintUnconfirmed': 'Parte do seu saldo ainda está sendo confirmada. Aguarde alguns minutos e tente de novo.',
   'shell.hintSyncing': 'Sua carteira ainda está sincronizando. Tente de novo em instantes.',
   'shell.hintExpired': 'O pagamento expirou antes de ser enviado. Nada saiu da sua carteira. Tente de novo.',
+  'shell.sendPending': 'Enviado. Ainda confirmando, então não envie de novo.',
 } as const;

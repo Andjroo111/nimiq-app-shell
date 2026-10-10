@@ -73,4 +73,5 @@ export default {
   'shell.hintUnconfirmed': 'May bahagi ng iyong balanse na kinukumpirma pa. Maghintay ng ilang minuto at subukan ulit.',
   'shell.hintSyncing': 'Nagsi-sync pa ang iyong wallet. Subukan ulit maya-maya.',
   'shell.hintExpired': 'Nag-expire ang bayad bago naipadala. Walang lumabas sa iyong wallet. Subukan ulit.',
+  'shell.sendPending': 'Naipadala na. Kinukumpirma pa, kaya huwag nang ipadala ulit.',
 } as const;
