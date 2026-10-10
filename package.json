@@ -8,7 +8,8 @@
     "./wallet": "./src/wallet/index.ts",
     "./memo": "./src/format/memo.ts",
     "./address": "./src/format/address.ts",
-    "./deeplink": "./src/deeplink/index.ts"
+    "./deeplink": "./src/deeplink/index.ts",
+    "./usage": "./src/usage/index.ts"
   },
   "scripts": {
     "check": "bun tsc --noEmit",
