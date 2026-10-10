@@ -1,0 +1,109 @@
+{
+ "$comment": "Generated with @nimiq/core 2.21.0 (nimiq-edge devDependency) on 2026-10-04. Throwaway deterministic test keys.",
+ "keys": [
+  {
+   "publicKey": "e4030998cfd5ad1723c169f956aa0b9eb8619b5992bd612c2af428ebc79f8df0",
+   "address": "NQ45 78MF K2AA NREJ B39U YLRH C8B3 7S1X MH44"
+  },
+  {
+   "publicKey": "0360edf1a07c2925df03f78df48e545f6d12f64e76a0957bd38d08092e1a04fe",
+   "address": "NQ02 FCGC CB5D E9FU 9SPP 1N6A 8XQL L7QG EME6"
+  },
+  {
+   "publicKey": "bf530b2238c62b5f2af0f7fd9315320f2817f70bfd4f1b29e0f5d96b68d420c3",
+   "address": "NQ84 H1NG EMG1 4K0N 2AAS UKXN B214 G1SG 0J0Q"
+  },
+  {
+   "publicKey": "c2301f8e1229aec39d373d5ab91afad238cdccc74a6433024a388a7fb4556004",
+   "address": "NQ39 HKGH 9XYM LS6D T4E1 5MY7 K98U 0CMD UK75"
+  },
+  {
+   "publicKey": "dd88c22510f0b82f42d2c0a7458be787b5fb7945e4f136df00800196f30adfa7",
+   "address": "NQ13 KBT3 4JML QVKK 95KR JUGY LY1M 8NCQ JB2A"
+  },
+  {
+   "publicKey": "3c3b290f9f866c466e6f762ec45382e2d92b993075c7c5e1610eafd9dc3e6a8e",
+   "address": "NQ35 BY62 RYCP VESD E2VL G2DN SHML RNY7 8KAM"
+  },
+  {
+   "publicKey": "eb323a8b9e41f4442c17c460cbb6f3b28b33cdb757a457fdc03c457d8502e00b",
+   "address": "NQ22 KPXE U8DF SX80 D5PX TU24 N55R 8J6P PRUR"
+  },
+  {
+   "publicKey": "e0c532c43669d187828acafb9f13443c6c999309d533283a453a652e0ae5c52b",
+   "address": "NQ42 EQ88 4YNP 8VNX Y62F 2RKA QJFE QVYX 7ERV"
+  },
+  {
+   "publicKey": "af1ba529522f1279568971b518ecd84fd2f8f62938464983ddb0d5222cc5cb70",
+   "address": "NQ39 KGM6 0AKK NDUD CD3X 0GF5 32ML PF30 6YL5"
+  },
+  {
+   "publicKey": "26509cc64e7fd17d7caf66878f6312d517b783d2a7b3c97e450e3a13e827421d",
+   "address": "NQ25 G78J LFXG XYM3 0E5G RS88 TV65 0XP2 BSJN"
+  },
+  {
+   "publicKey": "6d791c3acf804bf0bfa1f52848aa47e36ba9294a08908cd3275b3a8410298a1f",
+   "address": "NQ08 NR47 3NGL 4YXQ QVUC J665 E3N6 8F1P F0CU"
+  },
+  {
+   "publicKey": "e91abc97a8ff375af47d1809d43c8351ba42e04bb1ced47980610103329660f9",
+   "address": "NQ09 T8R5 R7YB G5HQ 7H3Q 5DYV VC1S 14LM 2BTX"
+  },
+  {
+   "publicKey": "f80a8374c4a5911551ec55ce59c9c765c803d6efb08fa681f4592468f0b0dbef",
+   "address": "NQ58 J028 JA75 3314 7VG8 TSJS ACND 4ST9 GEPR"
+  },
+  {
+   "publicKey": "0f865bb6f9af0cd359a056500b92522d2181b6000ae0fb6fa4ab100ec09a8bd5",
+   "address": "NQ14 CFA8 84MG AL0X L30K 3SE9 R8QU U8PV X11H"
+  },
+  {
+   "publicKey": "4cc11eabf6fe048fa7bb3a781b6b2523c79b96a947ba3f4ccec27d6bb8d00c93",
+   "address": "NQ72 AN00 THAA D8RX HRNJ LT0B JTXV C80L 65KM"
+  },
+  {
+   "publicKey": "429106e396d6f59317698cc7a015d0f45e592ff9dc9cd6ae2bdec94b1120faeb",
+   "address": "NQ66 PC8K ABF7 0JLH LL63 U60Q XELS TDNJ V83Q"
+  },
+  {
+   "publicKey": "ca81099e08e1638f0a93aa9c84a9b11c0ab66e33ab6d368a3bb43c9092cd5f09",
+   "address": "NQ80 FPX4 3TCL G69J 16YF S3QH PT7S H9HE 9NJH"
+  },
+  {
+   "publicKey": "c8d7b768831f8ddceb36b5a10b3f96cc1bc5531e2ac99f31697560ad5eb64c4e",
+   "address": "NQ16 TYQX 1JVC DRUQ AXYJ 2YSC JMAY GXGY YFVU"
+  },
+  {
+   "publicKey": "9f7a43543152c2245bf0a79ad1f5ed323b43e4570dd3661f56e78a11fb5d42d4",
+   "address": "NQ03 SYEL 3BLL GXM7 EXEK BBA4 4CB9 LLND 3PY7"
+  },
+  {
+   "publicKey": "e4e65641cf921b4a5934f6435a2634d5f92be1c6e62384780d25ed58cba72716",
+   "address": "NQ14 UM78 N0X5 Y3LB QD9J QJQC F8MM G0XX 9U1J"
+  },
+  {
+   "publicKey": "f56f10c4d5c433f7fcb23521f1c86fbb99bc517a8ff93a8488296ff731f4df2f",
+   "address": "NQ46 7L3R 4432 5BY1 S3BT MJM2 FAC7 AHVM 8MYN"
+  },
+  {
+   "publicKey": "7381d88b2104b2f7ddd0e9e6067589300c80c5dfd524ff6c38c4e647636edaef",
+   "address": "NQ25 SRUM VH09 816A 3CJL RH0N Q58X SAJ6 A6VP"
+  },
+  {
+   "publicKey": "6c4a5a357bda4b1987c0efd5876ed1d2092071150bee7dd461035bee4240a620",
+   "address": "NQ23 YSM7 1A6T QH3N JCGM ABJ2 3HCB QUEB G73F"
+  },
+  {
+   "publicKey": "db7e8f71b01dd5b0721ab19085b722919e95279ae7abfde8cc6bf6649048a8a8",
+   "address": "NQ40 7S7C 96KH 6EH8 RUY0 0KQ3 9BA9 JRSR YSH0"
+  }
+ ],
+ "sigs": {
+  "message": "login to nimiq.vote café 🎉",
+  "publicKey": "ea4a6c63e29c520abef5507b132ec5f9954776aebebe7b92421eea691446d22c",
+  "address": "NQ27 HLNH Q9G1 4Y3L 8VMJ E4TC BQUC 00VN DE49",
+  "signedMessage": "d666d7ae90291a635c40905c47a37220540fe428cfee8bd184cbde151f54fb8556f265ddb398eb381cb5709ec1041189ef52ca4773744f71416f024148aff709",
+  "connectChallenge": "c7f62f1dc8001098c94afdd8692679cea8cc8da5003cc52dab27010ee690bf901f8073a01e0a09a7b84a9c2c20ad38f2a06107bb62e762876f88b7e95d63760a",
+  "utf16LengthBug": "e2c5e4cfda27e3fff6b51ec15267646440ef95679ebc0c5fb0f3629dc4208c6ee8a8baab0a29bd8879a21c073d8b820c96af351f232dd04fccf937269668d101"
+ }
+}

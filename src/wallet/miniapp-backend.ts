@@ -23,7 +23,7 @@ import { withTimeout } from './timeout';
 import { waitForSendReady } from './send-ready';
 import { resolveValidityStartHeight } from './validity';
 import { createNimAccountReader, type NimAccount } from './account';
-import { RPC_ENDPOINTS } from 'nimiq-settlement';
+import { RPC_ENDPOINTS } from '../vendor/settlement/rpc-endpoints';
 
 /** The slice of the SDK provider this backend depends on. window.nimiq from
  *  @nimiq/mini-app-sdk satisfies it; tests inject a fake of the same shape. */

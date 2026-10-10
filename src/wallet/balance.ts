@@ -19,7 +19,7 @@
 // moment this file wants a second RPC METHOD, that is settlement asking to be
 // used for real, and the answer is still no.
 
-import { RPC_ENDPOINTS } from 'nimiq-settlement';
+import { RPC_ENDPOINTS } from '../vendor/settlement/rpc-endpoints';
 
 /** Public read-only Albatross RPC, the first of settlement's mainnet
  *  endpoints. Answers `access-control-allow-origin: *`,
