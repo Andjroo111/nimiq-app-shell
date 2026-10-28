@@ -2549,7 +2549,9 @@ export function mountMiniWallet(
   function onKeydown(e: KeyboardEvent): void {
     if (e.key === 'Escape') setOpen(false);
   }
-  const toggle = (): void => setOpen(menu.hidden);
+  // TS 6's lib.dom types `hidden` as boolean | 'until-found', so it is compared, not passed:
+  // anything but an explicit false is a closed menu, and a click opens it.
+  const toggle = (): void => setOpen(menu.hidden !== false);
   face.addEventListener('click', toggle);
   faceFlag.addEventListener('click', toggle);
 
