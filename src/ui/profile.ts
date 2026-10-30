@@ -185,13 +185,19 @@ export function mountProfileWidget(
         copy.type = 'button';
         copy.className = 'nq-profile__btn';
         copy.textContent = i18n.t('shell.copyAddress');
+        // The label to restore is fixed, not read back at click time: a second
+        // click inside the 1.2 s window would read "Copied" and restore that.
+        let restore: ReturnType<typeof setTimeout> | undefined;
         copy.addEventListener('click', async () => {
           try {
-            await navigator.clipboard?.writeText(account.address);
-            const prev = copy.textContent;
+            // No Clipboard API (plain http, older WebViews) is a failure too;
+            // `clipboard?.writeText` resolved undefined and claimed "Copied".
+            if (!navigator.clipboard) return;
+            await navigator.clipboard.writeText(account.address);
             copy.textContent = i18n.t('shell.copied');
-            setTimeout(() => {
-              copy.textContent = prev;
+            clearTimeout(restore);
+            restore = setTimeout(() => {
+              copy.textContent = i18n.t('shell.copyAddress');
             }, 1200);
           } catch {
             // clipboard blocked — no-op
