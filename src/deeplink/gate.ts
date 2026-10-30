@@ -59,9 +59,9 @@ function ensureStyles(doc: Document): void {
   style.textContent = `
 .nq-payopen { display:flex; flex-direction:column; align-items:center; gap:14px; text-align:center; font-family:'Mulish',system-ui,sans-serif; }
 .nq-payopen__btn { display:inline-flex; align-items:center; justify-content:center; height:48px; padding:0 24px;
-  border:none; border-radius:999px; background:var(--nq-payopen-bg, #0582ca); color:var(--nq-payopen-fg, #fff);
+  border:none; border-radius:999px; background:var(--nq-payopen-bg, var(--nimiq-light-blue, #0582ca)); color:var(--nq-payopen-fg, #fff);
   font:inherit; font-size:16px; font-weight:700; cursor:pointer; }
-.nq-payopen__btn:focus-visible { outline:2px solid var(--nq-payopen-bg, #0582ca); outline-offset:3px; }
+.nq-payopen__btn:focus-visible { outline:2px solid var(--nq-payopen-bg, var(--nimiq-light-blue, #0582ca)); outline-offset:3px; }
 .nq-payopen__qr { padding:12px; border-radius:12px; background:var(--nq-cc-qr-plate, #fff); line-height:0; }
 .nq-payopen__caption { margin:0; font-size:15px; font-weight:700; }
 `;

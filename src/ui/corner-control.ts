@@ -396,20 +396,20 @@ function ensureStyles(): void {
   background:transparent; color:inherit; font:inherit; font-size:14px; font-weight:700; line-height:1; cursor:pointer;
   transition:border-color .15s var(--nimiq-ease, cubic-bezier(.25,0,0,1)), background-color .15s var(--nimiq-ease, cubic-bezier(.25,0,0,1)); }
 .nq-cc-face:hover { border-color: color-mix(in srgb, currentColor 45%, transparent); background: color-mix(in srgb, currentColor 6%, transparent); }
-.nq-cc-face:focus-visible { outline:2px solid var(--nq-cc-accent, #0582ca); outline-offset:3px; }
+.nq-cc-face:focus-visible { outline:2px solid var(--nq-cc-accent, var(--nimiq-light-blue, #0582ca)); outline-offset:3px; }
 /* 8px left: the identicon needs air off the pill edge (Andjroo, phone review) */
 .nq-cc[data-connected] .nq-cc-face { padding:4px 12px 4px 8px; font-size:13px; }
 .nq-cc-face-icon { width:28px; height:28px; flex:none; border-radius:50%; overflow:hidden; display:inline-flex; }
 .nq-cc-face-icon > * { width:100%; height:100%; display:block; }
 .nq-cc-face-label { white-space:nowrap; }
-.nq-cc[data-connected] .nq-cc-face-label { font-family:ui-monospace,'Fira Mono',monospace; letter-spacing:.02em; }
+.nq-cc[data-connected] .nq-cc-face-label { font-family:'Fira Mono',ui-monospace,monospace; letter-spacing:.02em; }
 
 /* face (mini-app mode): flag only, the wallet is ambient */
 .nq-cc-face-flag { display:none; align-items:center; gap:7px; height:38px; padding:0 10px;
   border:none; border-radius:8px; background:none; cursor:pointer; color:inherit;
   transition:background .2s var(--nimiq-ease, cubic-bezier(.25,0,0,1)); }
 .nq-cc-face-flag:hover { background: color-mix(in srgb, currentColor 8%, transparent); }
-.nq-cc-face-flag:focus-visible { outline:2px solid var(--nq-cc-accent, #0582ca); outline-offset:2px; }
+.nq-cc-face-flag:focus-visible { outline:2px solid var(--nq-cc-accent, var(--nimiq-light-blue, #0582ca)); outline-offset:2px; }
 .nq-cc[data-mode="miniapp"] .nq-cc-face { display:none; }
 .nq-cc[data-mode="miniapp"] .nq-cc-face-flag { display:inline-flex; }
 
@@ -436,7 +436,7 @@ function ensureStyles(): void {
 .nq-cc[data-face="lang"] .nq-cc-face-flag { height:40px; padding:0 12px;
   border:none; border-radius:999px;
   background:var(--nq-cc-face-bg, #fff);
-  color:var(--nq-cc-face-fg, #1f2348);
+  color:var(--nq-cc-face-fg, var(--nimiq-blue, #1f2348));
   box-shadow:var(--nq-cc-face-shadow,
     0 2px 2.5px rgba(31,35,72,.02), 0 7px 8.5px rgba(31,35,72,.04), 0 18px 38px rgba(31,35,72,.07));
   transition:box-shadow .15s var(--nimiq-ease, cubic-bezier(.25,0,0,1)), background-color .15s var(--nimiq-ease, cubic-bezier(.25,0,0,1)); }
@@ -460,7 +460,7 @@ function ensureStyles(): void {
   overflow-y:auto; overscroll-behavior:contain;
   background:var(--nq-cc-menu-bg, #fff); border:var(--nq-cc-menu-border, none); border-radius:10px;
   box-shadow:var(--nq-cc-menu-shadow, 0 4px 28px rgba(0,0,0,.16));
-  color:var(--nq-cc-menu-fg, #1f2348); text-align:left; }
+  color:var(--nq-cc-menu-fg, var(--nimiq-blue, #1f2348)); text-align:left; }
 .nq-cc-menu[hidden] { display:none; }
 .nq-cc-divider { height:1px; margin:6px 4px; background:var(--nq-cc-menu-line, rgba(31,35,72,.08)); }
 .nq-cc-section { padding:6px 4px; position:relative; }
@@ -469,18 +469,18 @@ function ensureStyles(): void {
 .nq-cc-connect { position:relative; width:100%; height:36px; border:none; border-radius:500px;
   display:flex; align-items:center; justify-content:center; font-family:inherit; font-size:14px;
   font-weight:700; color:var(--nq-cc-connect-fg, #fff); cursor:pointer;
-  background-color:var(--nq-cc-connect-bg, #1f2348);
+  background-color:var(--nq-cc-connect-bg, var(--nimiq-blue, #1f2348));
   background-image:var(--nq-cc-connect-image,
-    radial-gradient(100% 100% at 100% 100%, #260133, #1f2348)); }
+    radial-gradient(100% 100% at 100% 100%, #260133, var(--nimiq-blue, #1f2348))); }
 .nq-cc-connect:hover { background-image:var(--nq-cc-connect-image-hover,
   radial-gradient(100% 100% at 100% 100%, #180021, #151833)); }
-.nq-cc-connect:focus-visible { outline:2px solid var(--nq-cc-accent, #0582ca); outline-offset:2px; }
+.nq-cc-connect:focus-visible { outline:2px solid var(--nq-cc-accent, var(--nimiq-light-blue, #0582ca)); outline-offset:2px; }
 .nq-cc-connect:disabled { opacity:.7; cursor:default; }
 .nq-cc-onboard { width:100%; margin-top:2px; padding:10px 4px; border:none; background:none; cursor:pointer;
   font-family:inherit; font-size:13px; font-weight:600; color:var(--nq-cc-menu-muted, rgba(31,35,72,.6));
   border-radius:6px; transition:color .15s var(--nimiq-ease, cubic-bezier(.25,0,0,1)); }
-.nq-cc-onboard:hover { color:var(--nq-cc-accent, #0582ca); }
-.nq-cc-onboard:focus-visible { outline:2px solid var(--nq-cc-accent, #0582ca); outline-offset:2px; }
+.nq-cc-onboard:hover { color:var(--nq-cc-accent, var(--nimiq-light-blue, #0582ca)); }
+.nq-cc-onboard:focus-visible { outline:2px solid var(--nq-cc-accent, var(--nimiq-light-blue, #0582ca)); outline-offset:2px; }
 
 /* state gates: the driver stamps data-connected / data-mode / data-testnet */
 .nq-cc[data-connected] .nq-cc-when-out { display:none; }
@@ -498,17 +498,17 @@ function ensureStyles(): void {
   transition:background .15s var(--nimiq-ease, cubic-bezier(.25,0,0,1)); }
 button.nq-cc-name { cursor:pointer; }
 button.nq-cc-name:hover { background:var(--nq-cc-menu-hover, rgba(31,35,72,.06)); }
-button.nq-cc-name:focus-visible { outline:2px solid var(--nq-cc-accent, #0582ca); outline-offset:-2px; }
+button.nq-cc-name:focus-visible { outline:2px solid var(--nq-cc-accent, var(--nimiq-light-blue, #0582ca)); outline-offset:-2px; }
 .nq-cc-name-input { width:100%; min-width:0; border:none; border-radius:6px; padding:2px 4px;
   font-family:inherit; font-size:14px; font-weight:600;
-  color:var(--nq-cc-input-fg, var(--nq-cc-menu-fg, #1f2348));
+  color:var(--nq-cc-input-fg, var(--nq-cc-menu-fg, var(--nimiq-blue, #1f2348)));
   background:var(--nq-cc-input-bg, var(--nq-cc-card-bg, #fff));
-  box-shadow:inset 0 0 0 2px color-mix(in srgb, var(--nq-cc-menu-fg, #1f2348) 10%, transparent); }
+  box-shadow:inset 0 0 0 2px color-mix(in srgb, var(--nq-cc-menu-fg, var(--nimiq-blue, #1f2348)) 10%, transparent); }
 .nq-cc-name-input:focus { outline:none;
-  box-shadow:inset 0 0 0 2px var(--nq-cc-accent, #0582ca); }
+  box-shadow:inset 0 0 0 2px var(--nq-cc-accent, var(--nimiq-light-blue, #0582ca)); }
 .nq-cc-balance { margin-left:auto; display:flex; flex-direction:column; align-items:flex-end; gap:1px; flex:none; }
 .nq-cc-balance[hidden] { display:none; }
-.nq-cc-balance-nim { font-size:13px; font-weight:700; color:var(--nq-cc-menu-fg, #1f2348); }
+.nq-cc-balance-nim { font-size:13px; font-weight:700; color:var(--nq-cc-menu-fg, var(--nimiq-blue, #1f2348)); }
 .nq-cc-balance-fiat { font-size:12px; font-weight:600; color:var(--nq-cc-menu-muted, rgba(31,35,72,.5)); }
 
 /* action bar = the wallet's MobileActionBar verbatim: Receive quiet LEFT ↓,
@@ -516,25 +516,25 @@ button.nq-cc-name:focus-visible { outline:2px solid var(--nq-cc-accent, #0582ca)
 .nq-cc-actions { display:flex; align-items:center; gap:6px; margin-top:8px; position:relative; }
 .nq-cc-receive { flex:1; display:inline-flex; align-items:center; justify-content:center; gap:7px; height:32px;
   border:none; border-radius:500px; background:var(--nq-cc-menu-hover, rgba(31,35,72,.07)); font-family:inherit;
-  font-size:13px; font-weight:700; color:var(--nq-cc-menu-fg, #1f2348); cursor:pointer;
+  font-size:13px; font-weight:700; color:var(--nq-cc-menu-fg, var(--nimiq-blue, #1f2348)); cursor:pointer;
   transition:background .2s var(--nimiq-ease, cubic-bezier(.25,0,0,1)); }
 .nq-cc-receive:hover, .nq-cc-receive:focus-visible {
-  background:color-mix(in srgb, var(--nq-cc-menu-fg, #1f2348) 12%, transparent); }
-.nq-cc-receive:focus-visible { outline:2px solid var(--nq-cc-accent, #0582ca); outline-offset:2px; }
+  background:color-mix(in srgb, var(--nq-cc-menu-fg, var(--nimiq-blue, #1f2348)) 12%, transparent); }
+.nq-cc-receive:focus-visible { outline:2px solid var(--nq-cc-accent, var(--nimiq-light-blue, #0582ca)); outline-offset:2px; }
 .nq-cc-send { flex:1; display:inline-flex; align-items:center; justify-content:center; gap:7px; height:32px;
   border:none; border-radius:500px; cursor:pointer; font-family:inherit; font-size:13px; font-weight:700;
-  color:var(--nq-cc-send-fg, #fff); background-color:var(--nq-cc-send-bg, #0582ca);
+  color:var(--nq-cc-send-fg, #fff); background-color:var(--nq-cc-send-bg, var(--nimiq-light-blue, #0582ca));
   background-image:var(--nq-cc-send-image,
-    radial-gradient(100% 100% at 100% 100%, #265dd7, #0582ca)); }
+    radial-gradient(100% 100% at 100% 100%, #265dd7, var(--nimiq-light-blue, #0582ca))); }
 .nq-cc-send:hover { background-image:var(--nq-cc-send-image-hover,
   radial-gradient(100% 100% at 100% 100%, #1f4fbc, #0473b3)); }
-.nq-cc-send:focus-visible { outline:2px solid var(--nq-cc-accent, #0582ca); outline-offset:3px; }
+.nq-cc-send:focus-visible { outline:2px solid var(--nq-cc-accent, var(--nimiq-light-blue, #0582ca)); outline-offset:3px; }
 .nq-cc-arrow-up { transform:rotate(-90deg); width:11px; height:8px; }
 .nq-cc-arrow-down { transform:rotate(90deg); width:11px; height:8px; }
-.nq-cc-scan { flex:none; padding:4px; border:none; background:none; cursor:pointer; color:var(--nq-cc-menu-fg, #1f2348);
+.nq-cc-scan { flex:none; padding:4px; border:none; background:none; cursor:pointer; color:var(--nq-cc-menu-fg, var(--nimiq-blue, #1f2348));
   opacity:.4; border-radius:6px; transition:opacity .2s var(--nimiq-ease, cubic-bezier(.25,0,0,1)); }
 .nq-cc-scan:hover, .nq-cc-scan:focus-visible { opacity:.7; }
-.nq-cc-scan:focus-visible { outline:2px solid var(--nq-cc-accent, #0582ca); outline-offset:1px; }
+.nq-cc-scan:focus-visible { outline:2px solid var(--nq-cc-accent, var(--nimiq-light-blue, #0582ca)); outline-offset:1px; }
 .nq-cc-scan-glyph { display:block; width:24px; height:24px; }
 
 /* receive view: the address lives BEHIND Receive, like the wallet */
@@ -576,7 +576,7 @@ button.nq-cc-name:focus-visible { outline:2px solid var(--nq-cc-accent, #0582ca)
    the wallet's sheet, and stretch would end it at whichever column happens to
    be tallest. */
 .nq-cc-contacts-rule { flex:none; width:1px; height:74px; margin-top:2px;
-  background:color-mix(in srgb, var(--nq-cc-menu-fg, #1f2348) 12%, transparent); }
+  background:color-mix(in srgb, var(--nq-cc-menu-fg, var(--nimiq-blue, #1f2348)) 12%, transparent); }
 .nq-cc-contacts { display:flex; flex-wrap:nowrap; justify-content:flex-start; gap:10px; }
 .nq-cc-contacts[hidden] { display:none; }
 /* A face and a name, which is what a saved recipient IS. */
@@ -587,8 +587,8 @@ button.nq-cc-name:focus-visible { outline:2px solid var(--nq-cc-accent, #0582ca)
 .nq-cc-contact-name { max-width:100%; font-size:10px; font-weight:600; text-align:center;
   overflow:hidden; text-overflow:ellipsis; white-space:nowrap;
   color:var(--nq-cc-menu-muted, rgba(31,35,72,.6)); }
-.nq-cc-contact:hover .nq-cc-contact-name { color:var(--nq-cc-accent, #0582ca); }
-.nq-cc-contact:focus-visible { outline:2px solid var(--nq-cc-accent, #0582ca); outline-offset:2px;
+.nq-cc-contact:hover .nq-cc-contact-name { color:var(--nq-cc-accent, var(--nimiq-light-blue, #0582ca)); }
+.nq-cc-contact:focus-visible { outline:2px solid var(--nq-cc-accent, var(--nimiq-light-blue, #0582ca)); outline-offset:2px;
   border-radius:6px; }
 /* A short GREY uppercase section label, which is the one uppercase nimiq-ui
    allows (rule 17) and exactly what the wallet ships here. */
@@ -606,7 +606,7 @@ button.nq-cc-name:focus-visible { outline:2px solid var(--nq-cc-accent, #0582ca)
   width:38px; height:38px; padding:0; border:none; border-radius:8px; background:none;
   color:var(--nq-cc-menu-muted, rgba(31,35,72,.6)); cursor:pointer; }
 .nq-cc-sendto-foot .nq-cc-scan-open:hover { background:var(--nq-cc-menu-hover, rgba(31,35,72,.06)); }
-.nq-cc-sendto-foot .nq-cc-scan-open:focus-visible { outline:2px solid var(--nq-cc-accent, #0582ca);
+.nq-cc-sendto-foot .nq-cc-scan-open:focus-visible { outline:2px solid var(--nq-cc-accent, var(--nimiq-light-blue, #0582ca));
   outline-offset:-2px; }
 .nq-cc-sendto-foot .nq-cc-scan-glyph { display:block; width:22px; height:22px; }
 /* Both parties, faces first, with the wallet's hairline dash between them.
@@ -622,7 +622,7 @@ button.nq-cc-name:focus-visible { outline:2px solid var(--nq-cc-accent, #0582ca)
   color:var(--nq-cc-menu-muted, rgba(31,35,72,.6)); }
 .nq-cc-party-name.nq-cc-mono { font-family:'Fira Mono',ui-monospace,monospace; font-size:10px; }
 .nq-cc-party-dash { align-self:center; height:1px; margin-top:-14px;
-  background:color-mix(in srgb, var(--nq-cc-menu-fg, #1f2348) 18%, transparent); }
+  background:color-mix(in srgb, var(--nq-cc-menu-fg, var(--nimiq-blue, #1f2348)) 18%, transparent); }
 
 /* The QR gets its own sheet, the way the wallet's "NIM Address" does. It sits
    UNDER receive rather than beside it: receive is what the corner opens, and
@@ -643,7 +643,7 @@ button.nq-cc-name:focus-visible { outline:2px solid var(--nq-cc-accent, #0582ca)
    chat and a link you cannot see before you send it is a link you have to
    trust. Wraps, because an address is 36 characters and this is 272px. */
 .nq-cc-request-link { margin:2px 0 0; padding:9px 10px; border-radius:6px;
-  background:color-mix(in srgb, var(--nq-cc-menu-fg, #1f2348) 4%, transparent);
+  background:color-mix(in srgb, var(--nq-cc-menu-fg, var(--nimiq-blue, #1f2348)) 4%, transparent);
   font-family:'Fira Mono',ui-monospace,monospace; font-size:11px; line-height:1.45;
   overflow-wrap:anywhere; color:var(--nq-cc-menu-muted, rgba(31,35,72,.6)); }
 .nq-cc-request-hint { margin:0; font-size:12px; font-weight:600;
@@ -656,7 +656,7 @@ button.nq-cc-name:focus-visible { outline:2px solid var(--nq-cc-accent, #0582ca)
   letter-spacing:.02em; text-align:center; white-space:nowrap;
   color:var(--nq-cc-menu-muted, rgba(31,35,72,.5)); }
 .nq-cc-qr-scan { margin:51px 4px 2px; text-align:center; font-size:13px; font-weight:600;
-  line-height:1.35; color:var(--nq-cc-accent, #0582ca); }
+  line-height:1.35; color:var(--nq-cc-accent, var(--nimiq-light-blue, #0582ca)); }
 /* The identicon hero. 120px, not the wallet's ~150: the same share of a 272px
    card that theirs is of a 390px one. */
 .nq-cc-receive-hero { display:block; width:100px; height:100px; margin:34px 0 0; }
@@ -680,19 +680,19 @@ button.nq-cc-name:focus-visible { outline:2px solid var(--nq-cc-accent, #0582ca)
   color:var(--nq-cc-menu-muted, rgba(31,35,72,.6)); cursor:pointer;
   transition:background .15s var(--nimiq-ease, cubic-bezier(.25,0,0,1)); }
 .nq-cc-qr-open:hover { background:var(--nq-cc-menu-hover, rgba(31,35,72,.06)); }
-.nq-cc-qr-open:focus-visible { outline:2px solid var(--nq-cc-accent, #0582ca); outline-offset:-2px; }
+.nq-cc-qr-open:focus-visible { outline:2px solid var(--nq-cc-accent, var(--nimiq-light-blue, #0582ca)); outline-offset:-2px; }
 .nq-cc-qr-glyph { display:block; width:22px; height:22px; }
 /* The wallet's secondary pill: a grey capsule, never a coloured one. The one
    coloured button in this menu is Send, and a second would make neither read
    as the primary. */
 .nq-cc-request-open { min-height:38px; padding:0 16px; border:none; border-radius:500px;
   font-family:inherit; font-size:14px; font-weight:700; cursor:pointer;
-  color:var(--nq-cc-menu-fg, #1f2348);
-  background:color-mix(in srgb, var(--nq-cc-menu-fg, #1f2348) 6%, transparent);
+  color:var(--nq-cc-menu-fg, var(--nimiq-blue, #1f2348));
+  background:color-mix(in srgb, var(--nq-cc-menu-fg, var(--nimiq-blue, #1f2348)) 6%, transparent);
   transition:background .15s var(--nimiq-ease, cubic-bezier(.25,0,0,1)); }
 .nq-cc-request-open:hover {
-  background:color-mix(in srgb, var(--nq-cc-menu-fg, #1f2348) 11%, transparent); }
-.nq-cc-request-open:focus-visible { outline:2px solid var(--nq-cc-accent, #0582ca); outline-offset:2px; }
+  background:color-mix(in srgb, var(--nq-cc-menu-fg, var(--nimiq-blue, #1f2348)) 11%, transparent); }
+.nq-cc-request-open:focus-visible { outline:2px solid var(--nq-cc-accent, var(--nimiq-light-blue, #0582ca)); outline-offset:2px; }
 .nq-cc-send-body { display:flex; flex-direction:column; gap:10px; padding:16px 8px 8px; }
 /* display is DECLARED, not inherited from the host. A page with a global
    label{display:flex} (the playground had exactly that, for its own control
@@ -731,9 +731,9 @@ button.nq-cc-name:focus-visible { outline:2px solid var(--nq-cc-accent, #0582ca)
 .nq-cc-addr-field { position:relative; border-radius:8px; padding:7px 0;
   width:100%; max-width:204px; margin-inline:auto; box-sizing:border-box;
   background:var(--nq-cc-input-bg, var(--nq-cc-card-bg, #fff));
-  box-shadow:inset 0 0 0 2px color-mix(in srgb, var(--nq-cc-menu-fg, #1f2348) 12%, transparent);
+  box-shadow:inset 0 0 0 2px color-mix(in srgb, var(--nq-cc-menu-fg, var(--nimiq-blue, #1f2348)) 12%, transparent);
   transition:box-shadow .15s var(--nimiq-ease, cubic-bezier(.25,0,0,1)); }
-.nq-cc-addr-field:focus-within { box-shadow:inset 0 0 0 2px var(--nq-cc-accent, #0582ca); }
+.nq-cc-addr-field:focus-within { box-shadow:inset 0 0 0 2px var(--nq-cc-accent, var(--nimiq-light-blue, #0582ca)); }
 /* A formatted line is 14 characters plus two block gaps. The gap is
    WORD-SPACING rather than a bigger font or letter-spacing, because the
    reference is tight four-character blocks separated by air: widening the
@@ -750,7 +750,7 @@ button.nq-cc-name:focus-visible { outline:2px solid var(--nq-cc-accent, #0582ca)
      were wrong: the wallet's "NQ" sits at the start of the first cell and ours
      floated in the middle of the box. */
   text-transform:uppercase; text-align:left;
-  color:var(--nq-cc-input-fg, var(--nq-cc-menu-fg, #1f2348)); }
+  color:var(--nq-cc-input-fg, var(--nq-cc-menu-fg, var(--nimiq-blue, #1f2348))); }
 .nq-cc-addr-input::placeholder { opacity:.32; }
 /* The separators, drawn on ONE element behind the text so the textarea keeps a
    single caret and a single selection.
@@ -763,7 +763,7 @@ button.nq-cc-name:focus-visible { outline:2px solid var(--nq-cc-accent, #0582ca)
    backtick. Writing ch in code quotes here is what broke the build once. */
 .nq-cc-addr-rules { position:absolute; inset:7px 0; pointer-events:none;
   font-family:'Fira Mono',ui-monospace,monospace; font-size:14px;
-  --nq-cc-addr-rule:color-mix(in srgb, var(--nq-cc-menu-fg, #1f2348) 10%, transparent);
+  --nq-cc-addr-rule:color-mix(in srgb, var(--nq-cc-menu-fg, var(--nimiq-blue, #1f2348)) 10%, transparent);
   --nq-cc-addr-gap:4.9ch;
   /* Block 1 ends at char 4 and block 2 starts at char 5 plus the gap, so the
      gap centre is 2.5ch + half a gap either side of the line's centre. Derived
@@ -786,12 +786,12 @@ button.nq-cc-name:focus-visible { outline:2px solid var(--nq-cc-accent, #0582ca)
 /* inputs: inset box-shadow border, never border (rule 1) */
 .nq-cc-input { width:100%; border:none; border-radius:8px; padding:11px 12px; font-family:inherit; font-size:18px;
   font-size:14px; font-weight:600;
-  color:var(--nq-cc-input-fg, var(--nq-cc-menu-fg, #1f2348));
+  color:var(--nq-cc-input-fg, var(--nq-cc-menu-fg, var(--nimiq-blue, #1f2348)));
   background:var(--nq-cc-input-bg, var(--nq-cc-card-bg, #fff));
-  box-shadow:inset 0 0 0 2px color-mix(in srgb, var(--nq-cc-menu-fg, #1f2348) 12%, transparent); }
-.nq-cc-input:focus { outline:none; box-shadow:inset 0 0 0 2px var(--nq-cc-accent, #0582ca); }
+  box-shadow:inset 0 0 0 2px color-mix(in srgb, var(--nq-cc-menu-fg, var(--nimiq-blue, #1f2348)) 12%, transparent); }
+.nq-cc-input:focus { outline:none; box-shadow:inset 0 0 0 2px var(--nq-cc-accent, var(--nimiq-light-blue, #0582ca)); }
 .nq-cc-input::placeholder { font-weight:600;
-  color:color-mix(in srgb, var(--nq-cc-menu-fg, #1f2348) 30%, transparent); }
+  color:color-mix(in srgb, var(--nq-cc-menu-fg, var(--nimiq-blue, #1f2348)) 30%, transparent); }
 /* The amount is a small centred box with the ticker BESIDE it, which is the
    wallet's arrangement (its box is 30.4% of the sheet). A full-bleed input
    with the ticker inside it is what a settings form looks like. */
@@ -799,7 +799,7 @@ button.nq-cc-name:focus-visible { outline:2px solid var(--nq-cc-accent, #0582ca)
 .nq-cc-amount-row .nq-cc-input { width:auto; max-width:112px; padding:9px 10px;
   text-align:center; }
 .nq-cc-amount-suffix { flex:none; font-size:16px; font-weight:700; pointer-events:none;
-  color:color-mix(in srgb, var(--nq-cc-menu-fg, #1f2348) 45%, transparent); }
+  color:color-mix(in srgb, var(--nq-cc-menu-fg, var(--nimiq-blue, #1f2348)) 45%, transparent); }
 /* Centred, because the field it labels is centred. */
 .nq-cc-send-body .nq-cc-field-label, .nq-cc-request-body .nq-cc-field-label { text-align:center; }
 .nq-cc-send-fiat, .nq-cc-request-hint { text-align:center; }
@@ -808,9 +808,9 @@ button.nq-cc-name:focus-visible { outline:2px solid var(--nq-cc-accent, #0582ca)
    here would read as a second required field next to the amount. */
 .nq-cc-message { width:100%; margin-top:4px; padding:6px 4px; border:none; background:none;
   font-family:inherit; font-size:13px; text-align:center; outline:none;
-  color:var(--nq-cc-menu-fg, #1f2348); }
-.nq-cc-message::placeholder { color:color-mix(in srgb, var(--nq-cc-menu-fg, #1f2348) 40%, transparent); }
-.nq-cc-message:focus { box-shadow:inset 0 -1px 0 0 var(--nq-cc-accent, #0582ca); }
+  color:var(--nq-cc-menu-fg, var(--nimiq-blue, #1f2348)); }
+.nq-cc-message::placeholder { color:color-mix(in srgb, var(--nq-cc-menu-fg, var(--nimiq-blue, #1f2348)) 40%, transparent); }
+.nq-cc-message:focus { box-shadow:inset 0 -1px 0 0 var(--nq-cc-accent, var(--nimiq-light-blue, #0582ca)); }
 .nq-cc-send-hint { font-size:12px; font-weight:600; color:var(--nq-cc-menu-muted, rgba(31,35,72,.5)); }
 .nq-cc-send-hint:empty { display:none; }
 /* Right-aligned, under the NIM suffix rather than under the digits: it belongs
@@ -820,13 +820,13 @@ button.nq-cc-name:focus-visible { outline:2px solid var(--nq-cc-accent, #0582ca)
   color:var(--nq-cc-menu-muted, rgba(31,35,72,.5)); }
 .nq-cc-send-confirm, .nq-cc-request-copy { width:100%; height:52px; border:none; border-radius:500px; margin-top:4px;
   font-family:inherit; font-size:16px; font-weight:700; cursor:pointer;
-  color:var(--nq-cc-send-fg, #fff); background-color:var(--nq-cc-send-bg, #0582ca);
+  color:var(--nq-cc-send-fg, #fff); background-color:var(--nq-cc-send-bg, var(--nimiq-light-blue, #0582ca));
   background-image:var(--nq-cc-send-image,
-    radial-gradient(100% 100% at 100% 100%, #265dd7, #0582ca)); }
+    radial-gradient(100% 100% at 100% 100%, #265dd7, var(--nimiq-light-blue, #0582ca))); }
 .nq-cc-send-confirm:hover:not(:disabled), .nq-cc-request-copy:hover { background-image:var(--nq-cc-send-image-hover,
   radial-gradient(100% 100% at 100% 100%, #1f4fbc, #0473b3)); }
 .nq-cc-send-confirm:focus-visible, .nq-cc-request-copy:focus-visible {
-  outline:2px solid var(--nq-cc-accent, #0582ca); outline-offset:3px; }
+  outline:2px solid var(--nq-cc-accent, var(--nimiq-light-blue, #0582ca)); outline-offset:3px; }
 .nq-cc-send-confirm:disabled { opacity:.4; cursor:default; }
 .nq-cc-send-error { font-size:12px; font-weight:600; text-align:center;
   color:var(--nq-cc-danger, #d94432); }
@@ -849,7 +849,7 @@ button.nq-cc-name:focus-visible { outline:2px solid var(--nq-cc-accent, #0582ca)
    Every size below is the wallet's share of its own sheet, measured off the
    real screenshots and applied to 272px. Scale is 272/390 = 0.697. */
 .nq-cc-view-title { grid-column:2; min-width:0; text-align:center; font-size:19px; font-weight:700;
-  line-height:1.2; text-wrap:balance; color:var(--nq-cc-menu-fg, #1f2348); }
+  line-height:1.2; text-wrap:balance; color:var(--nq-cc-menu-fg, var(--nimiq-blue, #1f2348)); }
 .nq-cc-view-sub { margin:2px 12px 0; text-align:center; font-size:12px; font-weight:600;
   line-height:1.35; color:var(--nq-cc-menu-muted, rgba(31,35,72,.5)); }
 .nq-cc-back, .nq-cc-shut { grid-column:1; display:inline-flex; align-items:center; justify-content:center;
@@ -857,7 +857,7 @@ button.nq-cc-name:focus-visible { outline:2px solid var(--nq-cc-accent, #0582ca)
   font-family:inherit; color:var(--nq-cc-menu-muted, rgba(31,35,72,.6)); cursor:pointer;
   transition:background .15s var(--nimiq-ease, cubic-bezier(.25,0,0,1)); }
 .nq-cc-back:hover { background:var(--nq-cc-menu-hover, rgba(31,35,72,.06)); }
-.nq-cc-back:focus-visible, .nq-cc-shut:focus-visible { outline:2px solid var(--nq-cc-accent, #0582ca); outline-offset:-2px; }
+.nq-cc-back:focus-visible, .nq-cc-shut:focus-visible { outline:2px solid var(--nq-cc-accent, var(--nimiq-light-blue, #0582ca)); outline-offset:-2px; }
 /* The X is a FILLED DISC, which is what the wallet ships and what a bare
    stroke glyph on a white card was not: the disc is what makes it read as a
    button at all. 26px inside the 34px hit area, so the target stays a finger's
@@ -867,11 +867,11 @@ button.nq-cc-name:focus-visible { outline:2px solid var(--nq-cc-accent, #0582ca)
 .nq-cc-shut { width:34px; height:34px; }
 .nq-cc-shut-disc { display:inline-flex; align-items:center; justify-content:center;
   width:26px; height:26px; border-radius:50%;
-  background:color-mix(in srgb, var(--nq-cc-menu-fg, #1f2348) 10%, transparent);
+  background:color-mix(in srgb, var(--nq-cc-menu-fg, var(--nimiq-blue, #1f2348)) 10%, transparent);
   color:var(--nq-cc-card-bg, #fff);
   transition:background .15s var(--nimiq-ease, cubic-bezier(.25,0,0,1)); }
 .nq-cc-shut:hover .nq-cc-shut-disc {
-  background:color-mix(in srgb, var(--nq-cc-menu-fg, #1f2348) 18%, transparent); }
+  background:color-mix(in srgb, var(--nq-cc-menu-fg, var(--nimiq-blue, #1f2348)) 18%, transparent); }
 .nq-cc-chevron { display:block; width:8px; height:13px; }
 /* The X shares every pixel of the chevron button but its column, so it shares
    the rule too rather than restating it and drifting from it. */
@@ -890,15 +890,15 @@ button.nq-cc-name:focus-visible { outline:2px solid var(--nq-cc-accent, #0582ca)
   text-align:center; }
 .nq-cc-address { display:grid; grid-template-columns:repeat(var(--nq-cc-addr-cols, 3), 1fr); gap:10px 0; justify-items:center;
   width:100%; max-width:var(--nq-cc-addr-plate, 169px); margin-inline:auto; padding:14px 6px; border:none; border-radius:6px; cursor:pointer;
-  background:color-mix(in srgb, var(--nq-cc-menu-fg, #1f2348) 4%, transparent);
+  background:color-mix(in srgb, var(--nq-cc-menu-fg, var(--nimiq-blue, #1f2348)) 4%, transparent);
   font-family:'Fira Mono',ui-monospace,monospace; font-size:16px; line-height:1.11;
   color:var(--nq-cc-menu-muted, rgba(31,35,72,.7));
   transition:background .15s var(--nimiq-ease, cubic-bezier(.25,0,0,1)), color .15s var(--nimiq-ease, cubic-bezier(.25,0,0,1)); }
 .nq-cc-address:hover, .nq-cc-address:focus,
 .nq-cc-copy-wrap.nq-cc-copied .nq-cc-address, .nq-cc-copy-wrap.nq-cc-copied-hold .nq-cc-address {
-  background:color-mix(in srgb, var(--nq-cc-accent, #0582ca) 8%, transparent);
-  color:var(--nq-cc-accent, #0582ca); }
-.nq-cc-address:focus-visible { outline:2px solid var(--nq-cc-accent, #0582ca); outline-offset:2px; }
+  background:color-mix(in srgb, var(--nq-cc-accent, var(--nimiq-light-blue, #0582ca)) 8%, transparent);
+  color:var(--nq-cc-accent, var(--nimiq-light-blue, #0582ca)); }
+.nq-cc-address:focus-visible { outline:2px solid var(--nq-cc-accent, var(--nimiq-light-blue, #0582ca)); outline-offset:2px; }
 /* The wrong-chain guard. Orange because it is a WARNING: red would read as an
    error that already happened, and grey would read as fine print, which is
    exactly what this must not be.
@@ -929,7 +929,7 @@ button.nq-cc-name:focus-visible { outline:2px solid var(--nq-cc-accent, #0582ca)
 .nq-cc-copy-tooltip { position:absolute; left:50%; bottom:calc(100% + 10px);
   transform:translateX(-50%) translateY(4px); padding:8px 12px; border-radius:4px;
   background-image:var(--nq-cc-send-image,
-    radial-gradient(100% 100% at 100% 100%, #265dd7, #0582ca));
+    radial-gradient(100% 100% at 100% 100%, #265dd7, var(--nimiq-light-blue, #0582ca)));
   color:var(--nq-cc-send-fg, #fff); font-size:13px;
   font-weight:600; line-height:1.1; white-space:nowrap; pointer-events:none; opacity:0; z-index:30;
   box-shadow:0 2px 2.5px rgba(31,35,72,.02), 0 7px 8.5px rgba(31,35,72,.04), 0 18px 38px rgba(31,35,72,.07);
@@ -938,7 +938,7 @@ button.nq-cc-name:focus-visible { outline:2px solid var(--nq-cc-accent, #0582ca)
 .nq-cc-copy-tooltip::after { content:''; position:absolute; left:50%; top:calc(100% - 1px); width:14px; height:7px;
   margin-left:-7px; transform:scaleY(-1);
   background-image:var(--nq-cc-send-image,
-    radial-gradient(100% 100% at 100% 100%, #265dd7, #0582ca));
+    radial-gradient(100% 100% at 100% 100%, #265dd7, var(--nimiq-light-blue, #0582ca)));
   -webkit-mask-image:url('data:image/svg+xml,<svg viewBox="0 0 18 16" xmlns="http://www.w3.org/2000/svg"><path d="M9 7.12c-.47 0-.93.2-1.23.64L3.2 14.29A4 4 0 0 1 0 16h18a4 4 0 0 1-3.2-1.7l-4.57-6.54c-.3-.43-.76-.64-1.23-.64z" fill="white"/></svg>');
   mask-image:url('data:image/svg+xml,<svg viewBox="0 0 18 16" xmlns="http://www.w3.org/2000/svg"><path d="M9 7.12c-.47 0-.93.2-1.23.64L3.2 14.29A4 4 0 0 1 0 16h18a4 4 0 0 1-3.2-1.7l-4.57-6.54c-.3-.43-.76-.64-1.23-.64z" fill="white"/></svg>');
   -webkit-mask-size:100% 100%; mask-size:100% 100%; }
@@ -949,17 +949,17 @@ button.nq-cc-name:focus-visible { outline:2px solid var(--nq-cc-accent, #0582ca)
   border:none; border-radius:6px; background:none; font-family:inherit; text-align:left; cursor:pointer;
   transition:background .15s var(--nimiq-ease, cubic-bezier(.25,0,0,1)); }
 .nq-cc-row:hover { background:var(--nq-cc-menu-hover, rgba(31,35,72,.06)); }
-.nq-cc-row:focus-visible { outline:2px solid var(--nq-cc-accent, #0582ca); outline-offset:-2px; }
+.nq-cc-row:focus-visible { outline:2px solid var(--nq-cc-accent, var(--nimiq-light-blue, #0582ca)); outline-offset:-2px; }
 .nq-cc-label { font-size:13px; font-weight:600; color:var(--nq-cc-menu-muted, rgba(31,35,72,.6)); white-space:nowrap; }
-.nq-cc-strong { font-size:14px; font-weight:600; color:var(--nq-cc-menu-fg, #1f2348); }
-.nq-cc-cashlink-slot { display:block; width:24px; height:24px; flex:none; color:var(--nq-cc-menu-fg, #1f2348); }
+.nq-cc-strong { font-size:14px; font-weight:600; color:var(--nq-cc-menu-fg, var(--nimiq-blue, #1f2348)); }
+.nq-cc-cashlink-slot { display:block; width:24px; height:24px; flex:none; color:var(--nq-cc-menu-fg, var(--nimiq-blue, #1f2348)); }
 .nq-cc-cashlink-slot svg { display:block; width:100%; height:100%; }
 .nq-cc-hexlogo { display:block; width:20px; height:18px; flex:none; }
 .nq-cc-acc { display:flex; align-items:center; justify-content:space-between; gap:8px; width:100%;
   padding:7px 10px; border:none; border-radius:6px; background:none; font-family:inherit; text-align:left;
   cursor:pointer; transition:background .15s var(--nimiq-ease, cubic-bezier(.25,0,0,1)); }
 .nq-cc-acc:hover { background:var(--nq-cc-menu-hover, rgba(31,35,72,.06)); }
-.nq-cc-acc:focus-visible { outline:2px solid var(--nq-cc-accent, #0582ca); outline-offset:-2px; }
+.nq-cc-acc:focus-visible { outline:2px solid var(--nq-cc-accent, var(--nimiq-light-blue, #0582ca)); outline-offset:-2px; }
 .nq-cc-acc-value { display:inline-flex; align-items:center; gap:7px; margin-left:auto; }
 .nq-cc-acc[aria-expanded="true"] .nq-cc-caret { transform:rotate(180deg); }
 .nq-cc-acc-body { display:none; }
@@ -990,38 +990,38 @@ button.nq-cc-name:focus-visible { outline:2px solid var(--nq-cc-accent, #0582ca)
 .nq-cc-grid-more { position:absolute; left:50%; bottom:5px; transform:translateX(-50%);
   display:flex; align-items:center; justify-content:center; width:22px; height:22px;
   border-radius:50%; background:var(--nq-cc-menu-bg, #fff); pointer-events:none;
-  box-shadow:0 1px 4px color-mix(in srgb, var(--nq-cc-menu-fg, #1f2348) 18%, transparent); opacity:1;
+  box-shadow:0 1px 4px color-mix(in srgb, var(--nq-cc-menu-fg, var(--nimiq-blue, #1f2348)) 18%, transparent); opacity:1;
   transition:opacity .15s var(--nimiq-ease, cubic-bezier(.25,0,0,1)); }
-.nq-cc-grid-more svg { width:11px; height:11px; color:var(--nq-cc-menu-fg, #1f2348); opacity:.75; }
+.nq-cc-grid-more svg { width:11px; height:11px; color:var(--nq-cc-menu-fg, var(--nimiq-blue, #1f2348)); opacity:.75; }
 .nq-cc-grid-wrap[data-at-end]::after, .nq-cc-grid-wrap[data-no-scroll]::after,
 .nq-cc-grid-wrap[data-at-end] .nq-cc-grid-more,
 .nq-cc-grid-wrap[data-no-scroll] .nq-cc-grid-more { opacity:0; }
 /* A real track on pointer devices. iOS ignores this entirely, which is why the
    chevron above is the primary signal rather than the fallback. */
 .nq-cc-grid { scrollbar-width:thin;
-  scrollbar-color:color-mix(in srgb, var(--nq-cc-menu-fg, #1f2348) 28%, transparent) transparent; }
+  scrollbar-color:color-mix(in srgb, var(--nq-cc-menu-fg, var(--nimiq-blue, #1f2348)) 28%, transparent) transparent; }
 .nq-cc-grid { display:grid; gap:4px; padding:4px; padding-right:8px; max-height:196px; overflow-y:auto;
-  background:color-mix(in srgb, var(--nq-cc-menu-fg, #1f2348) 4%, transparent); border-radius:6px; }
+  background:color-mix(in srgb, var(--nq-cc-menu-fg, var(--nimiq-blue, #1f2348)) 4%, transparent); border-radius:6px; }
 .nq-cc-grid.nq-cc-cols-2 { grid-template-columns:1fr 1fr; }
 .nq-cc-grid.nq-cc-cols-3 { grid-template-columns:repeat(3, 1fr); }
 .nq-cc-grid::-webkit-scrollbar { width:11px; }
 .nq-cc-grid::-webkit-scrollbar-track { background:transparent; margin:4px 0; }
 .nq-cc-grid::-webkit-scrollbar-thumb { border-radius:500px;
-  background:color-mix(in srgb, var(--nq-cc-menu-fg, #1f2348) 28%, transparent);
+  background:color-mix(in srgb, var(--nq-cc-menu-fg, var(--nimiq-blue, #1f2348)) 28%, transparent);
   border:3px solid transparent; background-clip:padding-box; }
 .nq-cc-grid::-webkit-scrollbar-thumb:hover {
-  background-color:color-mix(in srgb, var(--nq-cc-menu-fg, #1f2348) 45%, transparent); }
+  background-color:color-mix(in srgb, var(--nq-cc-menu-fg, var(--nimiq-blue, #1f2348)) 45%, transparent); }
 @supports (-moz-appearance: none) {
   .nq-cc-grid { scrollbar-width:thin;
-    scrollbar-color:color-mix(in srgb, var(--nq-cc-menu-fg, #1f2348) 28%, transparent) transparent; }
+    scrollbar-color:color-mix(in srgb, var(--nq-cc-menu-fg, var(--nimiq-blue, #1f2348)) 28%, transparent) transparent; }
 }
 .nq-cc-card { display:flex; align-items:center; justify-content:flex-start; gap:7px; height:42px; padding:0 8px;
   border:none; border-radius:6px; background:none; cursor:pointer; font-family:inherit;
   color:var(--nq-cc-menu-muted, rgba(31,35,72,.6)); min-width:0;
   transition:background .3s var(--nimiq-ease, cubic-bezier(.25,0,0,1)), color .3s var(--nimiq-ease, cubic-bezier(.25,0,0,1)), box-shadow .3s var(--nimiq-ease, cubic-bezier(.25,0,0,1)); }
-.nq-cc-card:hover { background:var(--nq-cc-menu-hover, rgba(31,35,72,.06)); color:var(--nq-cc-menu-fg, #1f2348); }
-.nq-cc-card:focus-visible { outline:2px solid var(--nq-cc-accent, #0582ca); outline-offset:-2px; }
-.nq-cc-card.nq-cc-current { background:var(--nq-cc-card-bg, #fff); color:var(--nq-cc-menu-fg, #1f2348);
+.nq-cc-card:hover { background:var(--nq-cc-menu-hover, rgba(31,35,72,.06)); color:var(--nq-cc-menu-fg, var(--nimiq-blue, #1f2348)); }
+.nq-cc-card:focus-visible { outline:2px solid var(--nq-cc-accent, var(--nimiq-light-blue, #0582ca)); outline-offset:-2px; }
+.nq-cc-card.nq-cc-current { background:var(--nq-cc-card-bg, #fff); color:var(--nq-cc-menu-fg, var(--nimiq-blue, #1f2348));
   box-shadow:0 .3px 2px rgba(0,0,0,.025), 0 1.5px 3px rgba(0,0,0,.05), 0 4px 16px rgba(0,0,0,.07); }
 .nq-cc-card-art { display:block; width:26px; height:24px; flex:none; }
 .nq-cc-card-art:empty { display:none; }
@@ -1038,10 +1038,10 @@ button.nq-cc-name:focus-visible { outline:2px solid var(--nq-cc-accent, #0582ca)
   font-family:inherit; font-size:12px; font-weight:600; color:var(--nq-cc-menu-muted, rgba(31,35,72,.45));
   transition:color .15s var(--nimiq-ease, cubic-bezier(.25,0,0,1)); }
 .nq-cc-disconnect:hover { color:var(--nq-cc-danger, #d94432); }
-.nq-cc-disconnect:focus-visible { outline:2px solid var(--nq-cc-accent, #0582ca); outline-offset:2px; border-radius:3px; }
+.nq-cc-disconnect:focus-visible { outline:2px solid var(--nq-cc-accent, var(--nimiq-light-blue, #0582ca)); outline-offset:2px; border-radius:3px; }
 .nq-cc-badge { font-size:12px; line-height:1; font-weight:700; letter-spacing:.09em; text-transform:uppercase;
   color:var(--nq-cc-warning, #fc8702);
-  background:color-mix(in srgb, var(--nq-cc-menu-fg, #1f2348) 7%, transparent);
+  background:color-mix(in srgb, var(--nq-cc-menu-fg, var(--nimiq-blue, #1f2348)) 7%, transparent);
   padding:5px 8px; border-radius:4px; }
 /* no footer at all when there is nothing to show */
 .nq-cc:not([data-testnet]):not([data-connected]) .nq-cc-footer,

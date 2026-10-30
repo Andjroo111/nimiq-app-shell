@@ -48,17 +48,17 @@ function ensureStyles(): void {
 .nq-connect:hover { border-color: color-mix(in srgb, currentColor 45%, transparent); background: color-mix(in srgb, currentColor 6%, transparent); transform:translateY(-1px); }
 .nq-connect:active { transform:translateY(0); }
 .nq-connect:disabled { opacity:.7; cursor:default; transform:none; }
-.nq-connect:focus-visible { outline:2px solid var(--nq-walletpill-accent, #0582ca); outline-offset:3px; }
+.nq-connect:focus-visible { outline:2px solid var(--nq-walletpill-accent, var(--nimiq-light-blue, #0582ca)); outline-offset:3px; }
 .nq-connect__icon { width:18px; height:18px; flex-shrink:0; opacity:.85; }
 .nq-wallet__btn { display:inline-flex; align-items:center; gap:8px; height:40px; padding:4px 12px 4px 5px;
   border:1px solid color-mix(in srgb, currentColor 22%, transparent); border-radius:999px;
   background:transparent; color:inherit; font:inherit; font-size:13px; font-weight:700; cursor:pointer;
   transition:border-color .15s var(--nimiq-ease, cubic-bezier(.25,0,0,1)), background-color .15s var(--nimiq-ease, cubic-bezier(.25,0,0,1)); }
 .nq-wallet__btn:hover { border-color: color-mix(in srgb, currentColor 40%, transparent); background: color-mix(in srgb, currentColor 6%, transparent); }
-.nq-wallet__btn:focus-visible { outline:2px solid var(--nq-walletpill-accent, #0582ca); outline-offset:3px; }
+.nq-wallet__btn:focus-visible { outline:2px solid var(--nq-walletpill-accent, var(--nimiq-light-blue, #0582ca)); outline-offset:3px; }
 .nq-wallet__icon { width:28px; height:28px; flex-shrink:0; border-radius:50%; overflow:hidden; display:inline-flex; background: color-mix(in srgb, currentColor 12%, transparent); }
 .nq-wallet__icon img, .nq-wallet__icon > * { width:100%; height:100%; display:block; }
-.nq-wallet__label { white-space:nowrap; font-family:ui-monospace,'Fira Mono',monospace; letter-spacing:.02em; }
+.nq-wallet__label { white-space:nowrap; font-family:'Fira Mono',ui-monospace,monospace; letter-spacing:.02em; }
 .nq-wallet__caret { width:10px; height:6px; flex-shrink:0; color:currentColor; opacity:.6; }
 .nq-wallet__menu { position:absolute; top:calc(100% + 10px); right:0; z-index:40; min-width:280px; max-width:92vw;
   padding:16px; background:var(--nq-walletpill-menu-bg, #fff); border:var(--nq-walletpill-menu-border, none);
