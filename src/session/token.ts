@@ -57,9 +57,14 @@ export function createSessionTokenStore(o: SessionTokenOptions = {}): SessionTok
       store = null;
     }
   }
+  // Once a write fails, memory is the truth for the rest of the page: a storage
+  // that reads fine but refuses writes (quota, Safari private mode) would
+  // otherwise hand back nothing after a set, or a token that clear() removed.
+  let memOnly = false;
   const read = (): string | null => {
+    if (!store || memOnly) return mem;
     try {
-      return store ? store.getItem(key) : mem;
+      return store.getItem(key);
     } catch {
       return mem;
     }
@@ -71,7 +76,7 @@ export function createSessionTokenStore(o: SessionTokenOptions = {}): SessionTok
       if (v === null) store.removeItem(key);
       else store.setItem(key, v);
     } catch {
-      /* memory copy already holds it */
+      memOnly = true;
     }
   };
 
