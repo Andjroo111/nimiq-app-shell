@@ -248,6 +248,13 @@ face collapses to the current-language flag and the menu keeps language alone.
 Omit `wallet` and you get the same pill in language-only form, for pages with no
 wallet concept at all.
 
+> **Fonts are the host page's job.** The shell names Mulish (and Fira Mono for
+> addresses) in its font stacks but never loads a font file: it is a library
+> inside your page, and a second copy of a font your page already loads is
+> wasted bytes. Load them in your `<head>` as `playground/index.html` does, or
+> the controls fall back to `system-ui`. To use your own face instead, pass
+> `theme.font` (see [Wearing your brand](#wearing-your-brand-v0190)).
+
 > **Naming.** The component is the **mini wallet** and every doc here calls it
 > that. `mountCornerControl` is its original name, kept as an alias so a version
 > bump never costs an app an edit. `MiniWalletOptions` / `MiniWalletHandle`
