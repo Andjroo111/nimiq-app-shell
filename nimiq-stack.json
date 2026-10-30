@@ -1,0 +1,46 @@
+{
+  "$schema": "https://nimiq.tech/schemas/nimiq-stack.v1.json",
+  "schemaVersion": 1,
+  "name": "nimiq-app-shell",
+  "chainApp": false,
+  "exempt": false,
+  "exemptReason": null,
+  "stack": {
+    "framework": "vanilla-pwa",
+    "server": "none",
+    "runtime": "bun",
+    "build": "none",
+    "packageManager": "bun",
+    "notes": "A library, not an app: fleet apps consume src/ as raw TypeScript; dist/app-shell.js is a prebuilt ESM bundle (bun build) for no-bundler pages."
+  },
+  "styling": {
+    "source": "self-contained",
+    "notes": "Each UI module injects its own scoped <style> once (nq-cc-*, nq-fb-* classes and --nq-cc-* tokens). No @nimiq/style import; the host page owns fonts and global CSS."
+  },
+  "settlement": {
+    "pattern": "noop",
+    "lib": "inline",
+    "coreRole": "none",
+    "notes": "Does not settle. Vendors excerpts of nimiq-settlement (signed-message verify, RPC endpoint list) under src/vendor/settlement; balance and validity reads go over public RPC."
+  },
+  "deploy": {
+    "target": "unknown",
+    "region": null,
+    "storage": null,
+    "autoDeploy": null,
+    "edge": {
+      "provider": null,
+      "proxied": null,
+      "access": null
+    },
+    "notes": "Not deployed. Consumers pin a git tag; jsdelivr serves dist/ from the tag. CI runs typecheck, tests and the bundle build only."
+  },
+  "config": {
+    "tsconfig": "local-strict",
+    "lint": "none",
+    "fileSizeGuard": false,
+    "ci": true,
+    "notes": "fileSizeGuard stays off: src/ui/corner-control.ts is 2,633 lines, so an 800-line guard would fail on main."
+  },
+  "canonicalVersion": "0.1.0"
+}
