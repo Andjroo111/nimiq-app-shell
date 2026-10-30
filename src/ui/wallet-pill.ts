@@ -142,11 +142,16 @@ export function mountWalletPill(
     btn.addEventListener('click', async () => {
       btn.disabled = true;
       btn.innerHTML = WALLET_ICON + `<span>${i18n.t('shell.connecting')}</span>`;
+      // Reset in `finally`, as corner-control does: a connect() that resolves
+      // null without an account change (a cancelled pick) left this button
+      // disabled on "Connecting" with nothing to re-render it.
       try {
         await wallet.connect();
+        btn.innerHTML = WALLET_ICON + `<span>${i18n.t('shell.connectWallet')}</span>`;
       } catch {
-        btn.disabled = false;
         btn.innerHTML = WALLET_ICON + `<span>${i18n.t('shell.retry')}</span>`;
+      } finally {
+        btn.disabled = false;
       }
     });
     root.appendChild(btn);
