@@ -32,7 +32,7 @@ permissions:
 jobs:
   identity:
     name: commit identity
-    runs-on: ubuntu-latest
+    runs-on: [self-hosted, linux, mini]
     steps:
       - uses: actions/checkout@v4
         with:
@@ -95,7 +95,7 @@ jobs:
 
   content:
     name: no private terms
-    runs-on: ubuntu-latest
+    runs-on: [self-hosted, linux, mini]
     steps:
       - uses: actions/checkout@v4
 
