@@ -153,11 +153,11 @@ function ensureStyles(): void {
 .nq-al { display:flex; flex-direction:column; gap:1px; }
 .nq-al-row { display:flex; align-items:center; gap:9px; width:100%; padding:6px 8px;
   border:none; border-radius:6px; background:none; font-family:inherit; text-align:left;
-  color:var(--nq-cc-menu-fg, #1f2348); }
+  color:var(--nq-cc-menu-fg, var(--nimiq-blue, #1f2348)); }
 button.nq-al-row { cursor:pointer;
   transition:background .15s var(--nimiq-ease, cubic-bezier(.25,0,0,1)); }
 button.nq-al-row:hover { background:var(--nq-cc-menu-hover, rgba(31,35,72,.06)); }
-button.nq-al-row:focus-visible { outline:2px solid var(--nq-cc-accent, #0582ca); outline-offset:-2px; }
+button.nq-al-row:focus-visible { outline:2px solid var(--nq-cc-accent, var(--nimiq-light-blue, #0582ca)); outline-offset:-2px; }
 .nq-al-art { display:block; width:26px; height:26px; flex:none; }
 .nq-al-art:empty { display:none; }
 .nq-al-art > * { display:block; width:100%; height:100%; }

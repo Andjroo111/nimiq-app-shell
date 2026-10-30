@@ -38,7 +38,7 @@
      `currentColor`). Two strips side by side is how you falsify it in one
      glance instead of trusting the README. */
   .strip {
-    display: flex; align-items: center; justify-content: space-between;
+    display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between;
     gap: 16px; padding: 14px 20px; min-height: 68px;
   }
   .strip-navy  { background: var(--navy); color: #fff; }
@@ -47,11 +47,12 @@
 
   main { max-width: 1180px; margin: 0 auto; padding: 28px 20px 80px; }
   h1 { font-size: 20px; margin: 0 0 4px; }
-  .sub { color: var(--muted); font-size: 13px; margin: 0 0 24px; line-height: 1.5; max-width: 78ch; }
+  .sub { color: var(--muted); font-size: 13px; margin: 0 0 24px; line-height: 1.5; max-width: 65ch; }
   .sub code, .hint code { background: #e9ebf3; padding: 1px 5px; border-radius: 4px; font-size: 12px; }
 
   .cols { display: grid; grid-template-columns: 300px 1fr; gap: 24px; align-items: start; }
-  @media (max-width: 860px) { .cols { grid-template-columns: 1fr; } }
+  @media (max-width: 860px) { .cols { grid-template-columns: minmax(0, 1fr); } }
+  .cols > * { min-width: 0; }
 
   .panel {
     background: #fff; border: 1px solid var(--line); border-radius: 12px; padding: 16px 18px;
@@ -62,7 +63,7 @@
   .panel h2 {
     font-size: 13px; color: var(--ink); margin: 0 0 12px; font-weight: 700;
   }
-  fieldset { border: 0; padding: 0; margin: 0 0 16px; }
+  fieldset { border: 0; padding: 0; margin: 0 0 16px; min-width: 0; }
   fieldset:last-child { margin-bottom: 0; }
   legend { font-size: 12px; font-weight: 700; margin-bottom: 7px; padding: 0; }
   /* SCOPED to the control panel. As a bare element selector this leaked into
@@ -70,7 +71,7 @@
      playground was restyling the component it exists to show, and a centred
      label rendered left here while being correct in every real app. */
   .panel label { display: flex; align-items: center; gap: 8px; font-size: 13px; padding: 3px 0; cursor: pointer; }
-  label input { accent-color: var(--blue); margin: 0; width: 18px; height: 18px; flex: none; }
+  label input { accent-color: var(--blue); margin: 0; width: 24px; height: 24px; flex: none; }
   .hint { color: var(--muted); font-size: 12px; margin: 4px 0 0; line-height: 1.45; }
 
   /* Event log: the only way to see that a SEAM actually fired. */
@@ -109,6 +110,7 @@
     color: var(--muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .ab-row .mini { margin-left: auto; flex: none; }
   .ab-add { display: grid; grid-template-columns: 1fr 1.6fr auto; gap: 6px; }
+  .ab-add > * { min-width: 0; }
   .ab-empty { color: var(--muted); font-size: 12px; font-style: italic; }
 
   /* Standalone asset list: the same stack, mounted outside the corner. */
