@@ -562,8 +562,9 @@ instead and file them themselves; the payload is flat JSON and a non-2xx with a
 `fallbackMailto` in the body becomes an "email instead" link.
 
 **Page context comes for free.** `installReportCapture()` runs at mount and rings
-the last 20 console errors, unhandled rejections and failed requests, which ship
-with the report and land as their own sections in the issue. At mount, not at
+console errors, unhandled rejections and failed requests; the newest 12 errors and
+10 failures ship with the report and land as their own sections in the issue.
+URLs are cut to the path: no query, no fragment, and no origin on request lines. At mount, not at
 open: by the time someone taps the row, the error they are reporting happened
 minutes ago and nobody can retype a stack. Whatever you put in `context` rides
 along too, as a line under the report, since the service has no field for it.
