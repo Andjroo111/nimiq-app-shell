@@ -1,0 +1,110 @@
+{
+  "title": "App shell looks, round 1",
+  "lede": "Six look calls from the 10-30 nq alignment pass, NOW on origin/main beside NEW with the change injected, at 390px. Yes opens a follow-up code PR, No keeps today's look.",
+  "brand": "neutral",
+  "url": "https://claude.ai/artifact/UJsse7tPiMFQqdheuqmVav",
+  "items": [
+    {
+      "id": "align-nimiq-app-shell-mulish",
+      "before": "art/mulish-before.png",
+      "file": "art/mulish-after.png",
+      "label": "Menu font",
+      "change": "Shell loads Mulish itself instead of falling back to the system font",
+      "meta": "rec No: #8 made fonts the host's job; a shell font request double-loads in hosts"
+    },
+    {
+      "id": "align-nimiq-app-shell-address-font",
+      "before": "art/addrfont-before.png",
+      "file": "art/addrfont-after.png",
+      "label": "Pill and profile address",
+      "change": "Fira Mono first in the address stack, so iPhones stop drawing SF Mono",
+      "meta": "rec Yes: one address face on every device"
+    },
+    {
+      "id": "align-nimiq-app-shell-hex-tokens",
+      "before": "art/hextokens-before.png",
+      "file": "art/hextokens-after.png",
+      "label": "Menu colours on a tokened host",
+      "change": "Raw navy and light-blue read the host's --nimiq-* tokens first (this host brightens light-blue)",
+      "meta": "rec Yes: 0 px change on hosts whose tokens match",
+      "rect": [
+        [
+          425,
+          215,
+          245,
+          70
+        ]
+      ]
+    },
+    {
+      "id": "align-nimiq-app-shell-address-display",
+      "before": "art/addrdisplay-before.png",
+      "file": "art/addrdisplay-after.png",
+      "label": "Receive address grid",
+      "change": "Registry address-display: 24px grey chunks, no tinted plate",
+      "meta": "rec No: grid grows 16px to 24px and loses the copy plate"
+    },
+    {
+      "id": "align-nimiq-app-shell-qr-code",
+      "before": "art/qrcode-before.png",
+      "file": "art/qrcode-after.png",
+      "label": "Receive QR",
+      "change": "Registry qr-code: light-blue modules instead of wallet navy",
+      "meta": "rec No: the live wallet receive sheet ships navy"
+    },
+    {
+      "id": "align-nimiq-app-shell-playground",
+      "before": "art/playground-before.png",
+      "file": "art/playground-after.png",
+      "label": "Playground page",
+      "change": "Controls column fits the phone; 24px checkboxes",
+      "meta": "rec Yes: dev page only, 26px sideways scroll gone"
+    }
+  ],
+  "table": {
+    "head": [
+      "",
+      "now",
+      "new",
+      "rec"
+    ],
+    "rows": [
+      [
+        "Menu font",
+        "system font unless host loads Mulish",
+        "Mulish from the shell",
+        "No"
+      ],
+      [
+        "Address font",
+        "SF Mono on Apple, Fira elsewhere",
+        "Fira Mono everywhere",
+        "Yes"
+      ],
+      [
+        "Raw hex",
+        "54 navy + 47 light-blue literals, sealed",
+        "same literals as token fallbacks",
+        "Yes"
+      ],
+      [
+        "Address grid",
+        "16px, tinted plate",
+        "24px, no plate",
+        "No"
+      ],
+      [
+        "QR",
+        "navy radial",
+        "light-blue radial",
+        "No"
+      ],
+      [
+        "Playground",
+        "page 416px wide at 360/390/414",
+        "fits, 0px overflow",
+        "Yes"
+      ]
+    ]
+  }
+}
