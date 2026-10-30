@@ -61,6 +61,22 @@ describe('createSessionTokenStore', () => {
     expect(s.get(A)).toBe('tok');
   });
 
+  test('a storage that reads but refuses writes (quota) still holds the token', () => {
+    const quota: StorageLike = { getItem: () => null, setItem: () => { throw new Error('QuotaExceededError'); }, removeItem: () => {} };
+    const { s } = setup({ storage: quota });
+    s.set('tok', A, 9e15);
+    expect(s.get(A)).toBe('tok');
+  });
+
+  test('a clear() the storage refuses does not bring the old token back', () => {
+    const m = mem();
+    const stuck: StorageLike = { ...m, removeItem: () => { throw new Error('x'); } };
+    const { s } = setup({ storage: stuck });
+    s.set('tok', A, 9e15);
+    s.clear();
+    expect(s.get(A)).toBe(null);
+  });
+
   test('fetch follows the CONNECTED wallet: switching to B stops A\'s token', async () => {
     const { s, calls, connect } = setup();
     s.set('tok', A, 9e15);
