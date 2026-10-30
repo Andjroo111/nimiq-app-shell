@@ -38,14 +38,15 @@ function shortStack(s?: string): string {
   return s ? '\n' + String(s).split('\n').slice(0, 4).join('\n') : '';
 }
 
-/** Path + query only. An absolute URL would carry the origin into every line for
- *  no benefit, and third-party origins are not ours to log. */
+/** Path only. An absolute URL would carry the origin into every line for no
+ *  benefit, and third-party origins are not ours to log. The query goes for the
+ *  reason `withoutQuery` gives: `GET /api/session?token=… → 401` is exactly the
+ *  failure line a broken login produces. */
 function shortUrl(u: string): string {
   try {
-    const x = new URL(u, location.href);
-    return x.pathname + x.search;
+    return new URL(u, location.href).pathname;
   } catch {
-    return String(u).slice(0, 120);
+    return withoutQuery(String(u)).slice(0, 120);
   }
 }
 
@@ -88,7 +89,7 @@ export function installReportCapture(ignoreOrigin?: string): void {
   installed = true;
 
   window.addEventListener('error', (e: ErrorEvent) => {
-    const where = e.filename ? `\n  at ${e.filename}:${e.lineno}:${e.colno}` : '';
+    const where = e.filename ? `\n  at ${withoutQuery(e.filename)}:${e.lineno}:${e.colno}` : '';
     push(consoleErrors, (e.message || 'Error') + where + shortStack(e.error?.stack), MAX_ERRORS);
   });
 
