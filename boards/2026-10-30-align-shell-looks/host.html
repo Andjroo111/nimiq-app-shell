@@ -1,0 +1,46 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>shell look host</title>
+<!-- A bare host page: it loads NO fonts and NO @nimiq/style, so whatever the
+     shell itself brings is all that renders. render.mjs adds the rest per card. -->
+<style>
+  html, body { margin: 0; }
+  body { background: #fafafa; color: #1f2348; font-family: system-ui, sans-serif; }
+  header { display: flex; justify-content: space-between; align-items: center; padding: 12px 16px;
+    background: #fff; border-bottom: 1px solid #e4e6f0; min-height: 64px; box-sizing: border-box; }
+  .brand { font-weight: 700; font-size: 15px; }
+  #profile { margin: 16px; padding: 16px; background: #fff; border-radius: 10px; }
+</style>
+</head>
+<body>
+<header><span class="brand">Host app</span><div id="corner"></div></header>
+<div id="profile"></div>
+<script type="module">
+import { createI18n, mergeLocales, shellLocales, mountMiniWallet, mountProfileWidget } from '../../dist/app-shell.js';
+const ADDRESS = 'NQ07 0000 0000 0000 0000 0000 0000 0000 0000';
+const account = { address: ADDRESS, label: 'Playground' };
+const wallet = { mode: 'hub', get account() { return account; }, async connect() { return account; },
+  onAccountChange() { return () => {}; }, disconnect() {} };
+const i18n = createI18n({ locales: mergeLocales(shellLocales), fallback: 'en' });
+let iq;
+function identicon(address, size) {
+  const el = document.createElement('div');
+  el.style.cssText = `width:${size}px;height:${size}px`;
+  iq ??= import('https://cdn.jsdelivr.net/npm/@nimiq/iqons@1.6.0/dist/iqons.min.js').then((m) => { const l = m.default ?? m;
+    l.svgPath = 'https://cdn.jsdelivr.net/npm/@nimiq/iqons@1.6.0/dist/iqons.min.svg'; return l; });
+  iq.then(async (l) => { el.style.background = `center/contain no-repeat url("${await l.toDataUrl(address)}")`;
+    el.dataset.ready = '1'; });
+  return el;
+}
+const q = new URLSearchParams(location.search);
+mountMiniWallet(document.getElementById('corner'), { wallet, i18n, identicon,
+  getBalanceLuna: async () => 4_218_37500, reportBug: false });
+if (q.get('profile') !== '0') mountProfileWidget(document.getElementById('profile'), { wallet, i18n,
+  identicon, getBalance: () => '42 183.75 NIM' });
+window.__ready = true;
+</script>
+</body>
+</html>
