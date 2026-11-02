@@ -78,6 +78,7 @@ export {
   type WalletOutcome,
 } from './outcome';
 export { classifySendResult, type SendHandle } from './send-handle';
+export { checkSendSender, DIFFERENT_ACCOUNT_MESSAGE, type SenderCheck, type SenderDecoder } from './send-sender';
 
 /** Extra (test/advanced) knobs forwarded to the chosen backend. Not part of the
  *  public happy path — apps generally only need CreateWalletOptions. */
