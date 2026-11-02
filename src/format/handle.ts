@@ -9,6 +9,16 @@
 // any RPC, interoperating with NimConnect and NimFeed instead of minting its own
 // namespace. This module builds and reads; it never signs or sends.
 //
+// PARITY: parsing and resolution mirror NimConnect's canonical backend
+// (backend/handles.go parseClaimData, handles_registry.go Rebuild) on purpose: a
+// client that disagrees with the registry everyone else reads forks the namespace.
+// So, like the backend: a display name after a 0x00 is ignored; Nimiq Pay's
+// double-hex form is read; RELEASE (type 0x07) frees a handle when sent by its
+// owner at or after `releaseActivationHeight` (off unless given, as in the backend
+// with RELEASE_ACTIVATION_HEIGHT unset); and a tx that FAILED to apply still counts.
+// That last one differs from what the chain moved; it is kept because the backend
+// does not filter on executionResult, and agreeing with it is the point.
+//
 // Not handled here: a Nimiq Pay claim can come from an HTLC, and its real owner is
 // the HTLC's creator. Pass `ownerOf` to attribute those; without it the claim is
 // credited to the address the chain shows as sender.
@@ -56,21 +66,62 @@ export function buildHandleClaimPayload(handle: string): HandleClaimPayload {
   return { recipient: HANDLE_REGISTRY_ADDRESS, handle: h, rawHex, extraData: `${TEXT_PREFIX}${rawHex}` };
 }
 
-/** The username a tx's data claims, or null. `dataHex` is the tx data as the node returns it (hex). */
-export function parseHandleClaim(dataHex: string | null | undefined): string | null {
-  if (typeof dataHex !== 'string') return null;
-  let bytes = fromHex(dataHex);
-  if (bytes === null) return null;
-  // Nimiq Pay: the data is the TEXT "NFH:<hex>", itself hex-encoded by the node.
+export interface HandleAction {
+  handle: string;
+  /** RELEASE (type 0x07): gives the handle up. Otherwise a claim. */
+  release: boolean;
+}
+
+const TYPE_CLAIM = 0x01;
+const TYPE_RELEASE = 0x07;
+
+/** The binary payload: "NF" 0x01 <type> <username> [0x00 <display name>]. */
+function actionFromBinary(bytes: number[]): HandleAction | null {
+  if (bytes.length < 4 || bytes[0] !== 0x4e || bytes[1] !== 0x46 || bytes[2] !== 0x01) return null;
+  if (bytes[3] !== TYPE_CLAIM && bytes[3] !== TYPE_RELEASE) return null;
+  let rest = bytes.slice(4);
+  // The username runs to a 0x00 separator (a display name follows on claims) or the end.
+  const nul = rest.indexOf(0);
+  if (nul >= 0) rest = rest.slice(0, nul);
+  const name = String.fromCharCode(...rest);
+  // Exact: uppercase or a stray byte is not a claim, never "fixed up".
+  return HANDLE_RE.test(name) ? { handle: name, release: bytes[3] === TYPE_RELEASE } : null;
+}
+
+/** The binary form, or the "NFH:" text envelope around it. */
+function actionFromRaw(bytes: number[]): HandleAction | null {
   const text = String.fromCharCode(...bytes);
   if (text.startsWith(TEXT_PREFIX)) {
-    bytes = fromHex(text.slice(TEXT_PREFIX.length));
-    if (bytes === null) return null;
+    const inner = fromHex(text.slice(TEXT_PREFIX.length).trim());
+    return inner === null ? null : actionFromBinary(inner);
   }
-  if (bytes.length < MAGIC.length || MAGIC.some((b, i) => bytes![i] !== b)) return null;
-  const name = String.fromCharCode(...bytes.slice(MAGIC.length));
-  // Exact: a claim with uppercase or a stray byte is not a claim, never "fixed up".
-  return HANDLE_RE.test(name) ? name : null;
+  return actionFromBinary(bytes);
+}
+
+/**
+ * What a tx's data does to the registry, or null. `dataHex` is the tx data as the
+ * node returns it (hex). Accepts the binary form (Hub), the "NFH:" text envelope
+ * (Nimiq Pay), and Nimiq Pay's double hex (hex of the ASCII hex of either), as the
+ * canonical backend does.
+ */
+export function parseHandleAction(dataHex: string | null | undefined): HandleAction | null {
+  if (typeof dataHex !== 'string') return null;
+  const raw = fromHex(dataHex);
+  if (raw === null || raw.length === 0) return null;
+  const direct = actionFromRaw(raw);
+  if (direct) return direct;
+  const ascii = String.fromCharCode(...raw);
+  if (ascii.length > 0 && ascii.length % 2 === 0 && /^[0-9a-f]+$/i.test(ascii)) {
+    const inner = fromHex(ascii);
+    if (inner) return actionFromRaw(inner);
+  }
+  return null;
+}
+
+/** The username a tx's data CLAIMS (not releases), or null. */
+export function parseHandleClaim(dataHex: string | null | undefined): string | null {
+  const a = parseHandleAction(dataHex);
+  return a && !a.release ? a.handle : null;
 }
 
 /** A registry tx as any RPC returns it, reduced to what resolution needs. */
@@ -81,9 +132,9 @@ export interface RegistryTx {
   /** Hex, as the node returns it. */
   recipientData: string | null;
   blockNumber: number;
-  /** Position in the block; ties at one height break on it. */
-  txIndex: number;
-  /** A tx that failed to apply claims nothing. Unknown (undefined) is accepted. */
+  /** Position in the block; ties at one height break on it. Missing reads as 0, as in the backend. */
+  txIndex?: number | null;
+  /** Ignored on purpose: the canonical backend counts failed txs too (see the header). */
   executionResult?: boolean | null;
 }
 
@@ -96,25 +147,39 @@ export interface HandleClaim {
 }
 
 /**
- * Replay the registry's txs: the earliest (blockNumber, txIndex) claim of each
- * handle wins. Order of `txs` does not matter. `ownerOf` maps a sender to its real
- * owner (an HTLC to its creator); it returns null when unknown, and the sender stands.
+ * Replay the registry's txs in chain order, exactly as the canonical backend does:
+ * a claim takes a handle only while it is unowned; a release frees it only when
+ * sent by its current owner, at or after `releaseActivationHeight` (releases are
+ * ignored without it). Order of `txs` does not matter. `ownerOf` maps a sender to
+ * its real owner (an HTLC to its creator); null when unknown, and the sender stands.
  */
 export function resolveHandleRegistry(
   txs: readonly RegistryTx[],
   ownerOf?: (sender: string) => string | null,
+  opts: { releaseActivationHeight?: number } = {},
 ): Map<string, HandleClaim> {
   const registry = compactNimAddress(HANDLE_REGISTRY_ADDRESS);
-  const sorted = [...txs].sort((a, b) => a.blockNumber - b.blockNumber || a.txIndex - b.txIndex);
+  const idx = (t: RegistryTx) => (Number.isSafeInteger(t.txIndex) ? (t.txIndex as number) : 0);
+  // Filter BEFORE sorting: a tx with no usable height must not sit between two
+  // claims and reorder them (#17 review).
+  const usable = txs.filter(
+    (tx) => Number.isSafeInteger(tx.blockNumber) && compactNimAddress(tx.recipient ?? '') === registry,
+  );
+  const sorted = usable.sort((a, b) => a.blockNumber - b.blockNumber || idx(a) - idx(b));
+  const activation = opts.releaseActivationHeight;
   const out = new Map<string, HandleClaim>();
   for (const tx of sorted) {
-    if (tx.executionResult === false) continue;
-    if (!Number.isSafeInteger(tx.blockNumber) || !Number.isSafeInteger(tx.txIndex)) continue;
-    if (compactNimAddress(tx.recipient ?? '') !== registry) continue;
-    const handle = parseHandleClaim(tx.recipientData);
-    if (handle === null || out.has(handle)) continue;
+    const action = parseHandleAction(tx.recipientData);
+    if (action === null) continue;
     const owner = ownerOf?.(tx.sender) ?? tx.sender;
-    out.set(handle, { handle, owner, hash: tx.hash, blockNumber: tx.blockNumber, txIndex: tx.txIndex });
+    if (action.release) {
+      if (activation === undefined || tx.blockNumber < activation) continue;
+      const held = out.get(action.handle);
+      if (held && compactNimAddress(held.owner) === compactNimAddress(owner)) out.delete(action.handle);
+      continue;
+    }
+    if (out.has(action.handle)) continue;
+    out.set(action.handle, { handle: action.handle, owner, hash: tx.hash, blockNumber: tx.blockNumber, txIndex: idx(tx) });
   }
   return out;
 }
