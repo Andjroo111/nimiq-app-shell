@@ -8,6 +8,7 @@
     "./wallet": "./src/wallet/index.ts",
     "./memo": "./src/format/memo.ts",
     "./address": "./src/format/address.ts",
+    "./handle": "./src/format/handle.ts",
     "./deeplink": "./src/deeplink/index.ts",
     "./usage": "./src/usage/index.ts"
   },
