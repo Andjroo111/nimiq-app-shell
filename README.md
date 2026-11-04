@@ -564,7 +564,8 @@ A proof shows an answer matches the root sent with it. One host can serve a forg
 tree that is self-consistent, so two independent hosts must agree, and until a
 second one runs `.nim` lookups answer "Could not check" with nothing to tap.
 `names: { nim: { singleOperator: true } }` accepts nimiq.name's proof alone, which
-trusts its operator with where the money goes. `names: { nim: { endpoints } }`
+trusts its operator with where the money goes. That trust is accepted for now, per
+site: a site that wants `.nim` lookup passes this option. `names: { nim: { endpoints } }`
 replaces the host list.
 
 | field state | what the sheet shows |

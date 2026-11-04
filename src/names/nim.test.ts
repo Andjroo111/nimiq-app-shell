@@ -107,6 +107,19 @@ describe('what counts as an answer', () => {
     expect((await one(proofs.alice, false).lookup('alice.nim')).state).toBe('failed');
   });
 
+  test('the option a site passes, and nothing else, makes nimiq.name the sole resolver', async () => {
+    const calls: string[] = [];
+    const fetchOne = hosts({ 'nimiq.name': proofs.alice }, calls);
+    const accepted = createNameResolver({ fetch: fetchOne, nim: { singleOperator: true, now: () => NOW } });
+    expect(await accepted.lookup('alice.nim')).toMatchObject({ state: 'found', address: ALICE, agreed: 1 });
+    expect(calls.map((u) => new URL(u).origin)).toEqual(['https://nimiq.name']);
+
+    calls.length = 0;
+    const byDefault = createNameResolver({ fetch: fetchOne, nim: { now: () => NOW } });
+    expect((await byDefault.lookup('alice.nim')).state).toBe('failed');
+    expect(calls).toEqual([]);
+  });
+
   test('ATTACK: a forged target with a real proof fails, it does not pend', async () => {
     expect((await two(forged(), forged()).lookup('alice.nim')).state).toBe('failed');
     expect((await two(proofs.alice, forged()).lookup('alice.nim')).state).toBe('failed');
