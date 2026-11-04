@@ -1,0 +1,86 @@
+{
+ "alice": {
+  "root": "8bcae8130573065c6a88a07e01696f44199e72e853dead5e5cdf3487af01f6f9",
+  "count": 4,
+  "height": 64800,
+  "leaf": {
+   "name": "alice",
+   "owner": "NQ88 XL24 NHPU MYVX 67AC TXLX NQX1 R471 EGM9",
+   "target": "NQ12 ACQM 28QL U8T2 L9J1 GVN4 NJPL 1P3G ENVG",
+   "expiresAt": 2000000000
+  },
+  "proof": [
+   {
+    "side": "right",
+    "hash": "94f3ad5d03d131388ab53aa020b158e8c896903b349ccfaa66e7bc9a47bdd3c0"
+   },
+   {
+    "side": "right",
+    "hash": "f788b627801b255bdd7fe63761ce4b1c0f9eaba4bf4012f28a95758199d73333"
+   }
+  ]
+ },
+ "bobbo": {
+  "root": "8bcae8130573065c6a88a07e01696f44199e72e853dead5e5cdf3487af01f6f9",
+  "count": 4,
+  "height": 64800,
+  "leaf": {
+   "name": "bobbo",
+   "owner": "NQ12 ACQM 28QL U8T2 L9J1 GVN4 NJPL 1P3G ENVG",
+   "target": "NQ88 XL24 NHPU MYVX 67AC TXLX NQX1 R471 EGM9",
+   "expiresAt": 2000000000
+  },
+  "proof": [
+   {
+    "side": "left",
+    "hash": "b726792849dd79d35fc9d89647ff9f71ec700bf67b970c6d7092d6707279b1eb"
+   },
+   {
+    "side": "right",
+    "hash": "f788b627801b255bdd7fe63761ce4b1c0f9eaba4bf4012f28a95758199d73333"
+   }
+  ]
+ },
+ "carol": {
+  "root": "8bcae8130573065c6a88a07e01696f44199e72e853dead5e5cdf3487af01f6f9",
+  "count": 4,
+  "height": 64800,
+  "leaf": {
+   "name": "carol",
+   "owner": "NQ12 ACQM 28QL U8T2 L9J1 GVN4 NJPL 1P3G ENVG",
+   "target": "NQ12 ACQM 28QL U8T2 L9J1 GVN4 NJPL 1P3G ENVG",
+   "expiresAt": 1700000000
+  },
+  "proof": [
+   {
+    "side": "right",
+    "hash": "7114695ce5ff1523a9ce4d1c908f1195a04c1da82636455807d7cfc752e8deaa"
+   },
+   {
+    "side": "left",
+    "hash": "f668aee441d534fb8568037c59e0f1df439d69cc585312efd0ba28d01d9bd49c"
+   }
+  ]
+ },
+ "zephyr": {
+  "root": "8bcae8130573065c6a88a07e01696f44199e72e853dead5e5cdf3487af01f6f9",
+  "count": 4,
+  "height": 64800,
+  "leaf": {
+   "name": "zephyr",
+   "owner": "NQ88 XL24 NHPU MYVX 67AC TXLX NQX1 R471 EGM9",
+   "target": "NQ88 XL24 NHPU MYVX 67AC TXLX NQX1 R471 EGM9",
+   "expiresAt": 2000000000
+  },
+  "proof": [
+   {
+    "side": "left",
+    "hash": "59d4d47d7acf5e82b74b1bef4605c7341b91c6bbc96294ab628c1185f215d6a4"
+   },
+   {
+    "side": "left",
+    "hash": "f668aee441d534fb8568037c59e0f1df439d69cc585312efd0ba28d01d9bd49c"
+   }
+  ]
+ }
+}

@@ -11,6 +11,7 @@ import { NAME_LOOKUP_DEBOUNCE_MS } from './name-lookup';
 import type { Wallet } from '../wallet';
 import a from '../names/fixtures/gaston.api.nimiqnames.com.json';
 import b from '../names/fixtures/gaston.nns.sonartech.pro.json';
+import nimProofs from '../names/fixtures/nim-proofs.json';
 
 const GASTON_SPACED = 'NQ12 ACQM 28QL U8T2 L9J1 GVN4 NJPL 1P3G ENVG';
 
@@ -138,5 +139,61 @@ describe('names in the recipient field', () => {
     expect(row()).toBeNull();
     expect(field.value).toBe('GAST ON');
     expect(calls).toEqual([]);
+  });
+
+  describe('.nim', () => {
+    const ALICE_SPACED = 'NQ12 ACQM 28QL U8T2 L9J1 GVN4 NJPL 1P3G ENVG';
+    const proofFetch = (body: unknown, calls: string[] = []) => ((url: string) => {
+      calls.push(url);
+      return Promise.resolve(new Response(JSON.stringify(body), { status: body ? 200 : 404 }));
+    }) as typeof fetch;
+    const nim = (body: unknown, calls?: string[]) => mount({
+      names: { fetch: proofFetch(body, calls), nim: { endpoints: ['https://a.test'], singleOperator: true } },
+    });
+
+    test('tapping a proven .nim fills its address and names the recipient, no funds to anyone else', async () => {
+      const calls: string[] = [];
+      const { host, field, type, row, paid } = nim(nimProofs.alice, calls);
+      await type('Alice.nim');
+      expect(field.value).toBe('Alice.nim');
+      expect(calls).toEqual(['https://a.test/api/proof/alice']);
+      const hit = row()!.querySelector('.nq-cc-name-hit') as HTMLElement;
+      expect(hit.querySelector('.nq-cc-name-label')!.textContent).toBe('alice.nim');
+      hit.click();
+      expect(field.value.replace(/\s+/g, ' ')).toBe(ALICE_SPACED);
+      const parties = host.querySelectorAll('.nq-cc-party-name');
+      expect((parties[parties.length - 1] as HTMLElement).textContent).toBe('alice.nim');
+      expect(paid).toEqual([]);
+    });
+
+    test('the shipped default has one host, so it offers nothing to tap and asks nobody', async () => {
+      const calls: string[] = [];
+      const { type, row } = mount({ names: { fetch: proofFetch(nimProofs.alice, calls) } });
+      await type('alice.nim');
+      expect(calls).toEqual([]);
+      expect(row()!.querySelector('.nq-cc-name-hit')).toBeNull();
+      expect(row()!.textContent).toBe('Could not check alice.nim right now');
+    });
+
+    test('a forged address draws one line and no row', async () => {
+      const forged = JSON.parse(JSON.stringify(nimProofs.alice));
+      forged.leaf.target = nimProofs.bobbo.leaf.target;
+      const { type, row } = nim(forged);
+      await type('alice.nim');
+      expect(row()!.querySelector('.nq-cc-name-hit')).toBeNull();
+    });
+
+    test('a name typed one key at a time keeps its dot and stays a name', async () => {
+      const { field, type } = nim(null);
+      for (const c of 'alice.nim') await type(field.value + c, 0);
+      expect(field.value).toBe('alice.nim');
+    });
+
+    test('an NNS name still goes to NNS with .nim configured', async () => {
+      const { type, row, calls } = mount();
+      await type('gaston');
+      expect(calls.length).toBeGreaterThan(0);
+      expect(row()!.querySelector('.nq-cc-name-label')!.textContent).toBe('gaston');
+    });
   });
 });

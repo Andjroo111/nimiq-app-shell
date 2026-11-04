@@ -12,6 +12,10 @@
 // decides WHEN the field is holding a name, and turns their outcomes into the
 // three states the send sheet draws. Restating their rules here is how the two
 // would drift.
+//
+// `alice.nim` is a different registry: Andrew's own, read through ./nim. A `.nim`
+// query goes there and never to NNS, which would read it as a subdomain of `nim`.
+// Both paths only read. Nothing here pays or refers anything to either registry.
 
 import {
   DEFAULT_RESOLVERS,
@@ -20,13 +24,15 @@ import {
   type Verification,
 } from '@nimiqnames/resolver';
 import { parseQuery } from '@nimiqnames/core';
+import { createNimResolver, nimQuery, NIM_RESOLVERS, type NimResolverOptions } from './nim';
 
-export { DEFAULT_RESOLVERS as NNS_RESOLVERS };
+export { DEFAULT_RESOLVERS as NNS_RESOLVERS, NIM_RESOLVERS, nimQuery };
+export type { NimResolverOptions };
 export type { ResolverEndpoint as NnsResolverEndpoint };
 
 /** Where the recipient field stands with respect to a name. */
 export type NameLookup =
-  | { state: 'found'; query: string; address: string; verification: Verification; agreed: number }
+  | { state: 'found'; query: string; address: string; verification: Verification | 'NIM_PROOF'; agreed: number }
   | { state: 'missing'; query: string }
   /** It resolves, but the proof has not caught up with the answer: the owner
    *  repointed it since the last checkpoint, OR every resolver is serving a
@@ -45,6 +51,8 @@ export interface NameResolverOptions {
   timeoutMs?: number;
   /** Inject a fetch (tests, proxies). */
   fetch?: typeof fetch;
+  /** `.nim` lookups. See ./nim for what one host's proof does and does not show. */
+  nim?: NimResolverOptions;
 }
 
 export interface NameResolver {
@@ -60,6 +68,7 @@ export interface NameResolver {
  *  field; none are registered, and the cost is that a sender pastes the
  *  address instead. */
 export function looksLikeAddress(raw: string): boolean {
+  if (/\.nim\s*$/i.test(raw)) return false; // no address ends in .nim, so a pasted `nq1cafe.nim` is a name
   return /^\s*(?:nimiq:)?\s*nq\d/i.test(raw);
 }
 
@@ -75,6 +84,7 @@ export function isNameInput(raw: string): boolean {
 export function nameQuery(raw: string): string | null {
   const text = raw.trim().replace(/^@/, '').toLowerCase();
   if (!text) return null;
+  if (text.endsWith('.nim')) return nimQuery(text);
   if (looksLikeAddress(text)) return null;
   return parseQuery(text).ok ? text : null;
 }
@@ -85,10 +95,12 @@ export function createNameResolver(options: NameResolverOptions = {}): NameResol
     ...(options.timeoutMs ? { timeoutMs: options.timeoutMs } : {}),
     ...(options.fetch ? { fetch: options.fetch as never } : {}),
   });
+  const lookupNim = createNimResolver({ ...(options.fetch ? { fetch: options.fetch } : {}), ...options.nim });
   return {
     async lookup(raw: string): Promise<NameLookup> {
       const query = nameQuery(raw);
       if (!query) return { state: 'missing', query: raw };
+      if (query.endsWith('.nim')) return lookupNim(query);
       try {
         const r = await nns.resolve(query);
         if (r.verification === 'PROOF_PENDING') return { state: 'pending', query };

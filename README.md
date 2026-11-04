@@ -553,6 +553,27 @@ On by default. `names: false` restores the old field; `names: { resolvers }`
 adds resolvers to the shipped two. The pure pieces are exported from
 `nimiq-app-shell/names` (`nameQuery`, `createNameResolver`).
 
+### `.nim` names
+
+`alice.nim` is a separate registry, [nimiq.name](https://nimiq.name), read from
+its `GET /api/proof/:name`. A `.nim` query never reaches NNS and a bare name never
+reaches nimiq.name. The address comes only from the leaf its Merkle proof recombines
+to, and it fills the field through the same row.
+
+A proof shows an answer matches the root sent with it. One host can serve a forged
+tree that is self-consistent, so two independent hosts must agree, and until a
+second one runs `.nim` lookups answer "Could not check" with nothing to tap.
+`names: { nim: { singleOperator: true } }` accepts nimiq.name's proof alone, which
+trusts its operator with where the money goes. `names: { nim: { endpoints } }`
+replaces the host list.
+
+| field state | what the sheet shows |
+|---|---|
+| hosts agree on the address and root | a row to tap |
+| same address, different roots | "alice.nim just changed. Try again in a minute" |
+| different addresses, too few answers, bad proof | "Could not check alice.nim right now" |
+| not registered, or expired past the 90-day grace | "No one holds the name alice.nim" |
+
 ### Report a bug (v0.8.0)
 
 The corner control carries the fleet's bug reporter, as a **Report a bug** row in
