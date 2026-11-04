@@ -10,19 +10,22 @@
     "./address": "./src/format/address.ts",
     "./handle": "./src/format/handle.ts",
     "./deeplink": "./src/deeplink/index.ts",
+    "./names": "./src/names/index.ts",
     "./usage": "./src/usage/index.ts"
   },
   "scripts": {
     "check": "bun tsc --noEmit",
     "test": "bun test",
     "playground": "bun run build:dist && bun run scripts/playground.ts",
-    "build:dist": "bun build src/index.ts --target browser --format esm --minify --outfile dist/app-shell.js",
+    "build:dist": "bun run scripts/build-dist.ts",
     "gen:flags": "node scripts/gen-flags.mjs",
     "bump-fleet": "bun run scripts/bump-fleet.ts"
   },
   "dependencies": {
     "@nimiq/hub-api": "^1.14.0",
     "@nimiq/mini-app-sdk": "^0.2.4",
+    "@nimiqnames/core": "0.1.0",
+    "@nimiqnames/resolver": "0.1.0",
     "qr-creator": "^1.0.0"
   },
   "peerDependencies": {
@@ -34,6 +37,7 @@
     }
   },
   "devDependencies": {
+    "@nimiqnames/anchor": "0.1.0",
     "@types/bun": "^1.2.0",
     "happy-dom": "^20.11.2",
     "typescript": "^5.7.0"

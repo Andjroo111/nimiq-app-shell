@@ -529,6 +529,59 @@ persists.
   moving, and only for an address the book does not already hold.
 - **A failed contacts read renders no chips** rather than breaking the send view.
 
+### Nimiq names (NNS)
+
+The send sheet's recipient field takes a name as well as an address. Type
+`gaston`, and a row appears with the face and first blocks of the address the
+name proves to. Tapping it fills the field with that address and moves to the
+amount step, where the recipient shows as `gaston`.
+
+The registry is [NNS](https://nimiqnames.com) (selfcrypto, MIT), live on
+mainnet. The shell does not run its own. Resolution is their
+`@nimiqnames/resolver`, pinned exactly: two resolvers must agree, and each
+answer's Merkle proof is recombined in the browser. Both resolvers are run by one
+operator, as upstream's `resolver/dist/defaults.js` says, and no anchor publisher
+is configured, so a found answer rests on that operator's honesty. Agreement
+catches a drifted database or a bad deploy, not an operator who lies.
+
+| field state | what the sheet shows |
+|---|---|
+| proven name | a row to tap; no auto-advance, since `gasto` may be registered too |
+| delegated (`shop.gaston`) | the full address and "Address not verified"; only a tap on "Send to this address" continues; the amount sheet shows the first three blocks, not the name, and all nine appear on the row before it |
+| parent has no delegation | "shop.gaston does not exist. Its parent name has no delegation" |
+| unregistered | "No one holds the name gaston" |
+| not a queryable name (`gas`, `@NQ12...`) | "Enter an address without symbols, or a name of at least 5 letters" |
+| repointed since the last checkpoint | "gaston just changed. Try again in a minute" |
+| resolver down, quorum split, bad proof | "Could not check gaston right now" |
+| `NQ..` | the address grid, unchanged, and no lookup |
+
+On by default. `names: false` restores the old field; `names: { resolvers }`
+adds resolvers to the shipped two. The pure pieces are exported from
+`nimiq-app-shell/names` (`nameQuery`, `createNameResolver`).
+
+### `.nim` names
+
+`alice.nim` is a separate registry, [nimiq.name](https://nimiq.name), read from
+its `GET /api/proof/:name`. A `.nim` query never reaches NNS and a bare name never
+reaches nimiq.name. The address comes only from the leaf its Merkle proof recombines
+to, and it fills the field through the same row.
+
+A proof shows an answer matches the root sent with it. One host can serve a forged
+tree that is self-consistent, so two independent hosts must agree, and until a
+second one runs `.nim` lookups answer "This site does not check .nim names" with
+nothing to tap.
+`names: { nim: { singleOperator: true } }` accepts nimiq.name's proof alone, which
+trusts its operator with where the money goes. That trust is accepted for now, per
+site: a site that wants `.nim` lookup passes this option. `names: { nim: { endpoints } }`
+replaces the host list.
+
+| field state | what the sheet shows |
+|---|---|
+| hosts agree on the address and root | a row to tap |
+| same address, different roots | "alice.nim just changed. Try again in a minute" |
+| different addresses, too few answers, bad proof | "Could not check alice.nim right now" |
+| not registered, or expired past the 90-day grace | "No one holds the name alice.nim" |
+
 ### Report a bug (v0.8.0)
 
 The corner control carries the fleet's bug reporter, as a **Report a bug** row in
@@ -958,6 +1011,8 @@ git tag, no install, no bundler, no vendored assets:
 
 Rebuild the bundle with `bun run build:dist` (it's committed so the CDN can serve
 it at the tagged ref). Bundled apps should keep importing the TS source instead.
+The bundle leaves out NNS's published reserved-word list and its anchor contract
+bytecode, which nothing on the read path consults; see `scripts/build-dist.ts`.
 
 ---
 

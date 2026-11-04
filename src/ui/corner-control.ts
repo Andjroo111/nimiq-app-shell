@@ -36,6 +36,8 @@ import { createNimBalanceReader } from '../wallet/balance';
 import { applyTheme, type ShellTheme } from './theme';
 import { nimiqQr } from './qr';
 import { formatAddressBlocks, reformatInPlace, significantChars } from './address-input';
+import { createNameResolver, isNameInput, type NameResolverOptions } from '../names';
+import { mountNameLookup, NAME_LOOKUP_CSS } from './name-lookup';
 
 /** A NIM address: NQ + 2 check digits + 32 base32 chars. */
 const NIM_ADDRESS_SHAPE = /^NQ[0-9]{2}[0-9A-HJ-NP-VXY]{32}$/;
@@ -320,6 +322,14 @@ export interface CornerControlOptions {
    *  your own CSS — they are the same mechanism, and `theme` is stamped inline
    *  so it wins where both are set. */
   theme?: ShellTheme;
+  /** Nimiq names in the send sheet's recipient field: type `gaston`, tap the
+   *  row, pay the address it proves to. ON by default, because a name that
+   *  works in one fleet app and not the next is not a name.
+   *
+   *  The registry is NNS (nimiqnames.com), not ours; see ../names. A lookup
+   *  only runs once someone types a name, so a page that never sends never
+   *  calls it. `false` turns it off; `{ resolvers }` ADDS resolvers. */
+  names?: false | NameResolverOptions;
   /** Inject the component's <style> once. Default true. */
   injectStyles?: boolean;
 }
@@ -382,7 +392,7 @@ function ensureStyles(): void {
   // as a color-mix of that var: identical when untouched, and it follows the
   // foreground the moment a host themes one. Same for the light-blue washes,
   // which are --nq-cc-accent at 8% and 12%.
-  style.textContent = `
+  style.textContent = NAME_LOOKUP_CSS + `
 .nq-cc { position:relative; display:inline-block;
   font-family:var(--nq-cc-font, 'Mulish','Muli',system-ui,sans-serif); }
 .nq-cc-caret { width:10px; height:6px; flex:none; color:currentColor; opacity:.6;
@@ -1945,7 +1955,7 @@ export function mountMiniWallet(
   const recipientHead = el('div', 'nq-cc-field-head', sendToBody);
   const recipientIcon = el('span', 'nq-cc-recipient-icon', recipientHead);
   const recipientLabel = el('label', 'nq-cc-eyebrow', recipientHead);
-  tNode(recipientLabel, 'shell.enterAddress');
+  tNode(recipientLabel, options.names === false ? 'shell.enterAddress' : 'shell.enterAddressOrName');
 
   // Nine four-char blocks in a 3x3 grid, the wallet's own send-modal field.
   const recipientWrap = el('div', 'nq-cc-addr-field', sendToBody);
@@ -1957,7 +1967,20 @@ export function mountMiniWallet(
   recipientInput.spellcheck = false;
   recipientInput.setAttribute('aria-label', i18n.t('shell.recipient'));
   // Format as they type, and after a paste, which is how most addresses arrive.
-  recipientInput.addEventListener('input', () => reformatInPlace(recipientInput));
+  // A name is left as typed: the blocks are an address's shape, and `gaston`
+  // upper-cased into `GAST ON` reads as neither.
+  recipientInput.addEventListener('input', () => {
+    const isName = options.names !== false && isNameInput(recipientInput.value);
+    recipientWrap.classList.toggle('nq-cc-addr-is-name', isName);
+    if (!isName) reformatInPlace(recipientInput);
+  });
+  // The one way code writes this field. Setting .value fires no input event, so
+  // a write that went around this would leave the name row answering for text
+  // the field no longer holds. A test fails on any other write.
+  function writeRecipient(text: string): void {
+    recipientInput.value = text;
+    names?.fieldWritten();
+  }
   // Enter would add a fourth line to a three-line field.
   recipientInput.addEventListener('keydown', (e) => {
     if ((e as KeyboardEvent).key === 'Enter') e.preventDefault();
@@ -2057,7 +2080,7 @@ export function mountMiniWallet(
       const name = el('span', 'nq-cc-contact-name', chip);
       name.textContent = contact.label;
       chip.addEventListener('click', () => {
-        recipientInput.value = formatAddressBlocks(contact.address);
+        writeRecipient(formatAddressBlocks(contact.address));
         validateSend();
         recipientInput.focus();
         // Caret to the START. The grid shows all nine blocks at once now, so
@@ -2166,6 +2189,13 @@ export function mountMiniWallet(
     if (address) recipientIcon.appendChild(options.identicon(address, 36));
   }
   const compactRecipient = (): string => significantChars(recipientInput.value);
+  // Name mode wins over the characters. `@NQ12...` and `NQ12....nim` both spell an
+  // address once the punctuation is stripped, and neither is one the sender typed
+  // as an address, so neither may move toward paying it.
+  // With names off the input handler has already reformatted the text into blocks,
+  // so this reads an address there too.
+  const recipientIsAddress = (): boolean =>
+    !isNameInput(recipientInput.value) && NIM_ADDRESS_RE.test(compactRecipient());
   const amountNim = (): number => {
     const n = Number(amountInput.value.replace(',', '.'));
     return Number.isFinite(n) ? n : 0;
@@ -2198,7 +2228,11 @@ export function mountMiniWallet(
   }
 
   function validateSend(): void {
-    const okAddress = NIM_ADDRESS_RE.test(compactRecipient());
+    // Kept in step with the field on every path that writes it (typing, a
+    // contact chip, a name pick), not only on input events.
+    recipientWrap.classList.toggle('nq-cc-addr-is-name',
+      options.names !== false && isNameInput(recipientInput.value));
+    const okAddress = recipientIsAddress();
     renderRecipientIcon(okAddress ? compactRecipient() : null);
     const nim = amountNim();
     renderSendFiat(nim);
@@ -2220,7 +2254,12 @@ export function mountMiniWallet(
     if (!from) return;
     senderName.textContent = from.label || formatAddressBlocks(from.address).slice(0, 9);
     const blocks = compactRecipient().match(/.{1,4}/g) ?? [];
-    recipientPartyName.textContent = blocks.slice(0, 3).join(' ');
+    // The name when the address came from one, but the blocks stay in the
+    // tooltip: the name is how you recognise them, the address is what pays.
+    const name = names?.nameFor(compactRecipient()) ?? null;
+    recipientPartyName.textContent = name ?? blocks.slice(0, 3).join(' ');
+    recipientPartyName.classList.toggle('nq-cc-is-name', name !== null);
+    recipientPartyName.title = blocks.join(' ');
     if (!options.identicon) return;
     senderIcon.textContent = '';
     senderIcon.appendChild(options.identicon(from.address, 56));
@@ -2235,7 +2274,7 @@ export function mountMiniWallet(
    *  only job is to acknowledge a complete form is a tap for nothing. It fires
    *  on a paste and on a contact chip the same way. */
   function advanceToAmount(): void {
-    if (!NIM_ADDRESS_RE.test(compactRecipient())) return;
+    if (!recipientIsAddress()) return;
     if (root.classList.contains('nq-cc-show-send')) return;
     renderParties();
     root.classList.remove('nq-cc-show-sendto');
@@ -2243,6 +2282,19 @@ export function mountMiniWallet(
     amountInput.focus();
   }
   recipientInput.addEventListener('input', advanceToAmount);
+
+  const names = options.names === false ? null : mountNameLookup({
+    field: recipientInput,
+    after: recipientWrap,
+    resolver: createNameResolver(options.names ?? {}),
+    i18n,
+    ...(options.identicon ? { identicon: options.identicon } : {}),
+    onPick: (address) => {
+      writeRecipient(formatAddressBlocks(address));
+      validateSend();
+      advanceToAmount();
+    },
+  });
 
   function openSend(): void {
     if (!wallet?.account) return;
@@ -2252,6 +2304,7 @@ export function mountMiniWallet(
     sendPendingLabel.hidden = true;
     availableHint.textContent =
       balanceLuna !== null ? `${i18n.t('shell.available')}: ${fmtNim(balanceLuna)} NIM` : '';
+    names?.reset();
     validateSend();
     void refreshSendRate();
     // Step ONE, always. A flow that reopened on the amount sheet would be
@@ -2282,7 +2335,7 @@ export function mountMiniWallet(
     // before it, because a prompt between "Send" and the money moving is an
     // obstacle at the worst possible moment.
     void offerToSave(spaced);
-    recipientInput.value = '';
+    writeRecipient('');
     amountInput.value = '';
     balanceFetchedAt = 0; // the balance just changed — refetch on next look
     window.setTimeout(() => {
