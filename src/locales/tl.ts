@@ -37,6 +37,7 @@ export default {
   "shell.nameMissing": "Walang may-ari ng pangalang {name}",
   "shell.namePending": "Kakabago lang ng {name}. Subukan muli pagkalipas ng isang minuto",
   "shell.nameFailed": "Hindi masuri ang {name} ngayon",
+  "shell.nameNimOff": "Hindi sinusuri ng site na ito ang mga pangalang .nim",
   "shell.nameUnverified": "Hindi beripikado ang address",
   "shell.nameUseAddress": "Ipadala sa address na ito",
   "shell.nameUndelegated": "Walang {name}. Walang delegasyon ang parent na pangalan",

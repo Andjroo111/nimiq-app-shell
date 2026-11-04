@@ -547,7 +547,7 @@ catches a drifted database or a bad deploy, not an operator who lies.
 | field state | what the sheet shows |
 |---|---|
 | proven name | a row to tap; no auto-advance, since `gasto` may be registered too |
-| delegated (`shop.gaston`) | the full address and "Address not verified"; only a tap on "Send to this address" continues, and the amount sheet shows the address, not the name |
+| delegated (`shop.gaston`) | the full address and "Address not verified"; only a tap on "Send to this address" continues; the amount sheet shows the first three blocks, not the name, and all nine appear on the row before it |
 | parent has no delegation | "shop.gaston does not exist. Its parent name has no delegation" |
 | unregistered | "No one holds the name gaston" |
 | not a queryable name (`gas`, `@NQ12...`) | "Enter an address without symbols, or a name of at least 5 letters" |
@@ -568,7 +568,8 @@ to, and it fills the field through the same row.
 
 A proof shows an answer matches the root sent with it. One host can serve a forged
 tree that is self-consistent, so two independent hosts must agree, and until a
-second one runs `.nim` lookups answer "Could not check" with nothing to tap.
+second one runs `.nim` lookups answer "This site does not check .nim names" with
+nothing to tap.
 `names: { nim: { singleOperator: true } }` accepts nimiq.name's proof alone, which
 trusts its operator with where the money goes. That trust is accepted for now, per
 site: a site that wants `.nim` lookup passes this option. `names: { nim: { endpoints } }`

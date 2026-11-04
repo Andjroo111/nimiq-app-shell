@@ -34,6 +34,7 @@ export default {
   "shell.nameMissing": "{name} 이름의 소유자가 없습니다",
   "shell.namePending": "{name}이(가) 방금 변경되었습니다. 1분 후 다시 시도하세요",
   "shell.nameFailed": "지금은 {name}을(를) 확인할 수 없습니다",
+  "shell.nameNimOff": "이 사이트는 .nim 이름을 확인하지 않습니다",
   "shell.nameUnverified": "주소가 확인되지 않았습니다",
   "shell.nameUseAddress": "이 주소로 보내기",
   "shell.nameUndelegated": "{name}은(는) 없습니다. 상위 이름에 위임이 없습니다",

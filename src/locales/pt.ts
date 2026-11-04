@@ -32,6 +32,7 @@ export default {
   'shell.nameMissing': 'Ninguém tem o nome {name}',
   'shell.namePending': '{name} acabou de mudar. Tente de novo em um minuto',
   'shell.nameFailed': 'Não foi possível verificar {name} agora',
+  'shell.nameNimOff': 'Este site não verifica nomes .nim',
   'shell.nameUnverified': 'Endereço não verificado',
   'shell.nameUseAddress': 'Enviar para este endereço',
   'shell.nameUndelegated': '{name} não existe. O nome principal não tem delegação',

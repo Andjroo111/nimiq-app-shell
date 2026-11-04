@@ -8,7 +8,7 @@
 // that is perfectly self-consistent, so a lone endpoint proves nothing, and the
 // default needs two independent hosts, the same rule as nimiq.name's own
 // src/resolver-client.ts. Only one host exists today, so by default every lookup
-// answers `failed` and offers nothing to tap. `singleOperator: true` accepts one
+// answers `nim-off` and offers nothing to tap. `singleOperator: true` accepts one
 // host's proof, which is trusting that operator with where the money goes.
 //
 // Hashing matches nimiq.name src/merkle.ts:
@@ -89,7 +89,7 @@ export function createNimResolver(options: NimResolverOptions = {}) {
   return async function lookupNim(query: string): Promise<NameLookup> {
     const name = query.slice(0, -'.nim'.length);
     // Below the quorum no answer could be believed, so none is asked for.
-    if (endpoints.length < needed) return { state: 'failed', query };
+    if (endpoints.length < needed) return { state: 'nim-off', query };
     const answers = await Promise.all(endpoints.map(async (base): Promise<Answer | 'missing' | null> => {
       try {
         const res = await doFetch(`${base.replace(/\/$/, '')}/api/proof/${encodeURIComponent(name)}`, {

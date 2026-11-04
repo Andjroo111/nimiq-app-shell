@@ -37,6 +37,7 @@ export default {
   "shell.nameMissing": "{name} adı kimseye ait değil",
   "shell.namePending": "{name} az önce değişti. Bir dakika sonra tekrar deneyin",
   "shell.nameFailed": "{name} şu anda kontrol edilemedi",
+  "shell.nameNimOff": "Bu site .nim adlarını kontrol etmiyor",
   "shell.nameUnverified": "Adres doğrulanmadı",
   "shell.nameUseAddress": "Bu adrese gönder",
   "shell.nameUndelegated": "{name} yok. Üst adın yetkilendirmesi yok",

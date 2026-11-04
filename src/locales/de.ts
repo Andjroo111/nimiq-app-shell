@@ -32,6 +32,7 @@ export default {
   'shell.nameMissing': 'Niemand besitzt den Namen {name}',
   'shell.namePending': '{name} wurde gerade geändert. Versuche es in einer Minute erneut',
   'shell.nameFailed': '{name} kann gerade nicht geprüft werden',
+  'shell.nameNimOff': 'Diese Seite prüft keine .nim-Namen',
   'shell.nameUnverified': 'Adresse nicht verifiziert',
   'shell.nameUseAddress': 'An diese Adresse senden',
   'shell.nameUndelegated': '{name} existiert nicht. Der übergeordnete Name hat keine Delegation',

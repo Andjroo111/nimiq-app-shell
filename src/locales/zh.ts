@@ -37,6 +37,7 @@ export default {
   "shell.nameMissing": "没有人持有名称 {name}",
   "shell.namePending": "{name} 刚刚更改，请一分钟后重试",
   "shell.nameFailed": "暂时无法检查 {name}",
+  "shell.nameNimOff": "此网站不检查 .nim 名称",
   "shell.nameUnverified": "地址未验证",
   "shell.nameUseAddress": "发送到此地址",
   "shell.nameUndelegated": "{name} 不存在。其上级名称没有委托",

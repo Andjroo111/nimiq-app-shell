@@ -14,7 +14,8 @@
 // picked the address and nothing proves it, and that host can choose an address
 // whose first blocks match the one the sender expects. So the row shows all nine
 // blocks and says the address is not verified, and only a tap on its own button
-// continues. The amount sheet then shows the address, not the name.
+// continues. The amount sheet then shows the first three blocks, not the name;
+// all nine were on this row before it.
 //
 // Pending, missing, undelegated and failed each get one grey line and nothing to
 // tap, and so does text in name mode that cannot be queried at all, so the field
@@ -28,6 +29,12 @@ import { formatAddressBlocks } from './address-input';
 /** How long typing must pause before a lookup. Each lookup is two resolver
  *  requests, so a keystroke-rate query would be ten per name. */
 export const NAME_LOOKUP_DEBOUNCE_MS = 350;
+
+/** How long text must sit before it is called unqueryable. Every address starts
+ *  `n`, `nq`, and the row is a live region: said at keystroke rate, a screen
+ *  reader user typing a valid address would be told it is invalid. Longer than the
+ *  lookup debounce because the cost of waiting is a hint arriving late. */
+export const NAME_INVALID_DELAY_MS = 800;
 
 export interface NameLookupHandle {
   /** The name the field's address came from, when it came from one. */
@@ -66,11 +73,15 @@ export function mountNameLookup(opts: {
   let picked: { name: string; address: string } | null = null;
 
   function note(key: string, name: string): void {
+    const text = i18n.t(key, { name });
+    // The row is a live region, so rewriting the same words says them again.
+    const shown = row.firstElementChild;
+    if (!row.hidden && shown?.className === 'nq-cc-name-note' && shown.textContent === text) return;
     row.hidden = false;
     row.textContent = '';
     const line = document.createElement('p');
     line.className = 'nq-cc-name-note';
-    line.textContent = i18n.t(key, { name });
+    line.textContent = text;
     row.appendChild(line);
   }
 
@@ -168,8 +179,8 @@ export function mountNameLookup(opts: {
     const query = nameQuery(field.value);
     ticket += 1;
     if (!query) {
-      if (isNameInput(field.value)) note('shell.nameInvalid', '');
-      else clear();
+      clear();
+      if (isNameInput(field.value)) timer = setTimeout(() => note('shell.nameInvalid', ''), NAME_INVALID_DELAY_MS);
       return;
     }
     const mine = ticket;
@@ -184,6 +195,7 @@ export function mountNameLookup(opts: {
       else if (got.state === 'missing') note('shell.nameMissing', query);
       else if (got.state === 'pending') note('shell.namePending', query);
       else if (got.state === 'undelegated') note('shell.nameUndelegated', query);
+      else if (got.state === 'nim-off') note('shell.nameNimOff', query);
       else note('shell.nameFailed', query);
     }, NAME_LOOKUP_DEBOUNCE_MS);
   }

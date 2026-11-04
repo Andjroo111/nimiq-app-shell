@@ -89,7 +89,7 @@ describe('what counts as an answer', () => {
   test('DEFAULT: the one real host is not a quorum, so nothing to tap and nothing asked', async () => {
     const calls: string[] = [];
     const r = createNameResolver({ fetch: hosts({ 'nimiq.name': proofs.alice }, calls) });
-    expect((await r.lookup('alice.nim')).state).toBe('failed');
+    expect((await r.lookup('alice.nim')).state).toBe('nim-off');
     expect(calls).toEqual([]);
   });
 
@@ -98,13 +98,13 @@ describe('what counts as an answer', () => {
       fetch: hosts({ 'a.test': proofs.alice, 'a.test:8443': proofs.alice }),
       nim: { endpoints: ['https://a.test', 'https://A.test:8443/'] },
     });
-    expect((await r.lookup('alice.nim')).state).toBe('failed');
+    expect((await r.lookup('alice.nim')).state).toBe('nim-off');
   });
 
   test('singleOperator is the one way to accept a lone proof, and it still checks the proof', async () => {
     expect((await one(proofs.alice).lookup('alice.nim')).state).toBe('found');
     expect((await one(forged()).lookup('alice.nim')).state).toBe('failed');
-    expect((await one(proofs.alice, false).lookup('alice.nim')).state).toBe('failed');
+    expect((await one(proofs.alice, false).lookup('alice.nim')).state).toBe('nim-off');
   });
 
   test('the option a site passes, and nothing else, makes nimiq.name the sole resolver', async () => {
@@ -116,7 +116,7 @@ describe('what counts as an answer', () => {
 
     calls.length = 0;
     const byDefault = createNameResolver({ fetch: fetchOne, nim: { now: () => NOW } });
-    expect((await byDefault.lookup('alice.nim')).state).toBe('failed');
+    expect((await byDefault.lookup('alice.nim')).state).toBe('nim-off');
     expect(calls).toEqual([]);
   });
 

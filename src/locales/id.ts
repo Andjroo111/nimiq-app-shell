@@ -34,6 +34,7 @@ export default {
   "shell.nameMissing": "Tidak ada yang memiliki nama {name}",
   "shell.namePending": "{name} baru saja berubah. Coba lagi dalam satu menit",
   "shell.nameFailed": "Tidak dapat memeriksa {name} saat ini",
+  "shell.nameNimOff": "Situs ini tidak memeriksa nama .nim",
   "shell.nameUnverified": "Alamat belum diverifikasi",
   "shell.nameUseAddress": "Kirim ke alamat ini",
   "shell.nameUndelegated": "{name} tidak ada. Nama induknya tidak memiliki delegasi",

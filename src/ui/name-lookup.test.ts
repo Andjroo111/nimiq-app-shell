@@ -9,7 +9,7 @@ import { Window } from 'happy-dom';
 import { mountMiniWallet, type CornerControlOptions } from './corner-control';
 import { shellLocales, mergeLocales } from '../locales';
 import { createI18n } from '../i18n';
-import { NAME_LOOKUP_CSS, NAME_LOOKUP_DEBOUNCE_MS } from './name-lookup';
+import { NAME_INVALID_DELAY_MS, NAME_LOOKUP_CSS, NAME_LOOKUP_DEBOUNCE_MS } from './name-lookup';
 import type { Wallet } from '../wallet';
 import a from '../names/fixtures/gaston.api.nimiqnames.com.json';
 import b from '../names/fixtures/gaston.nns.sonartech.pro.json';
@@ -250,7 +250,7 @@ describe('names in the recipient field', () => {
     for (const [what, text] of Object.entries(names)) {
       test(`${what} stays a name, does not advance and draws a line`, async () => {
         const { host, type, row } = mount();
-        await type(text, 0);
+        await type(text, NAME_INVALID_DELAY_MS + 50);
         expect(onSendSheet(host)).toBe(false);
         expect(row()!.hidden).toBe(false);
         expect(row()!.textContent).not.toBe('');
@@ -259,17 +259,81 @@ describe('names in the recipient field', () => {
 
     test('text in name mode with no query says why', async () => {
       const { type, row, calls } = mount();
-      await type('gas', 0);
+      await type('gas', NAME_INVALID_DELAY_MS + 50);
       expect(row()!.textContent).toBe('Enter an address without symbols, or a name of at least 5 letters');
       expect(calls).toEqual([]);
     });
 
     test('an empty field draws nothing', async () => {
       const { type, row } = mount();
-      await type('gas', 0);
-      await type('', 0);
+      await type('gas', NAME_INVALID_DELAY_MS + 50);
+      expect(row()!.hidden).toBe(false);
+      await type('', NAME_INVALID_DELAY_MS + 50);
       expect(row()!.hidden).toBe(true);
     });
+  });
+
+  describe('the row is a live region', () => {
+    test('it is marked as one', () => {
+      const { row } = mount();
+      expect(row()!.getAttribute('aria-live')).toBe('polite');
+    });
+
+    test('a screen reader user typing an address is never told it is invalid', async () => {
+      const { type, row } = mount();
+      const heard: string[] = [];
+      for (const text of ['n', 'nq', 'nq1', 'nq12', 'nq12a']) {
+        await type(text, NAME_LOOKUP_DEBOUNCE_MS + 50);
+        heard.push(row()!.textContent ?? '');
+      }
+      await new Promise((r) => setTimeout(r, NAME_INVALID_DELAY_MS + 50));
+      heard.push(row()!.textContent ?? '');
+      expect(heard).toEqual(['', '', '', '', '', '']);
+      expect(row()!.hidden).toBe(true);
+    });
+
+    test('the same words are not written again, so they are not said again', async () => {
+      const { type, row } = mount();
+      await type('gaston', 0);
+      const first = row()!.firstElementChild;
+      expect(first!.textContent).toBe('Checking gaston...');
+      await type('gaston ', 0);
+      expect(row()!.firstElementChild).toBe(first);
+    });
+
+    test('new words are written', async () => {
+      const { type, row } = mount();
+      await type('gaston', 0);
+      const first = row()!.firstElementChild;
+      await type('gastons', 0);
+      expect(row()!.firstElementChild).not.toBe(first);
+      expect(row()!.textContent).toBe('Checking gastons...');
+    });
+  });
+
+  test('a pick does not name an address pasted after it', async () => {
+    const { host, type, row } = mount();
+    await type('gaston');
+    (row()!.querySelector('.nq-cc-name-hit') as HTMLElement).click();
+    (host.querySelector('.nq-cc-view-send .nq-cc-back') as HTMLElement).click();
+    await type('NQ48 8CKH BA24 2VR3 N249 N8MN J5XX 74DB 5XJ8', 0);
+    const parties = host.querySelectorAll('.nq-cc-party-name');
+    const party = parties[parties.length - 1] as HTMLElement;
+    expect(party.textContent).toBe('NQ48 8CKH BA24');
+    expect(party.classList.contains('nq-cc-is-name')).toBe(false);
+  });
+
+  test('Send disarms if the field turns into name text that spells an address', async () => {
+    const { host, type } = mount();
+    const spelled = GASTON_SPACED.replace(/ /g, '');
+    await type(spelled, 0);
+    const amount = host.querySelector('.nq-cc-view-send .nq-cc-input') as HTMLInputElement;
+    amount.value = '1';
+    amount.dispatchEvent(new (globalThis as unknown as { Event: typeof Event }).Event('input'));
+    const send = host.querySelector('.nq-cc-send-confirm') as HTMLButtonElement;
+    expect(send.disabled).toBe(false);
+    await type(`@${spelled}`, 0);
+    expect(send.disabled).toBe(true);
   });
 
   describe('a drawn row on a short screen', () => {
@@ -503,7 +567,7 @@ describe('names in the recipient field', () => {
       await type('alice.nim');
       expect(calls).toEqual([]);
       expect(row()!.querySelector('.nq-cc-name-hit')).toBeNull();
-      expect(row()!.textContent).toBe('Could not check alice.nim right now');
+      expect(row()!.textContent).toBe('This site does not check .nim names');
     });
 
     test('a forged address draws one line and no row', async () => {

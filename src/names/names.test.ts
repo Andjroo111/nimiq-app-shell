@@ -6,7 +6,8 @@ import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { ANCHORED_TOPIC0 } from '@nimiqnames/anchor';
 import { CONSTANTS } from '@nimiqnames/core';
-import { addressIsVerified, createNameResolver, isNameInput, nameQuery } from './index';
+import { DEFAULT_ANCHOR_PUBLISHERS } from '@nimiqnames/resolver';
+import { addressIsVerified, createNameResolver, isNameInput, nameQuery, nimQuery, NNS_RESOLVERS } from './index';
 import a from './fixtures/gaston.api.nimiqnames.com.json';
 import b from './fixtures/gaston.nns.sonartech.pro.json';
 
@@ -101,11 +102,11 @@ describe('the committed bundle', () => {
 describe('what the docs say about the resolvers', () => {
   const read = (path: string) => readFileSync(join(import.meta.dir, path), 'utf8');
 
-  // Read off upstream's own file, so an upgrade that adds an independently run
-  // resolver fails here and the docs get corrected.
-  test('upstream still says one operator runs both', () => {
-    const upstream = read('../../node_modules/@nimiqnames/resolver/dist/defaults.js').replace(/\s*\n\s*\*\s*/g, ' ');
-    expect(upstream).toContain('both are run by the operator that publishes this package');
+  // Pinned by value, so upstream rewording its comment passes and a new resolver or
+  // anchor publisher fails here, which is the moment the one operator text goes stale.
+  test('the shipped resolvers and publishers are the ones the docs describe', () => {
+    expect(NNS_RESOLVERS.map((r) => r.url)).toEqual(['https://api.nimiqnames.com', 'https://nns.sonartech.pro']);
+    expect(DEFAULT_ANCHOR_PUBLISHERS).toEqual([]);
   });
 
   test('the header does not count the states, and each registry is described as it is', () => {
@@ -133,6 +134,32 @@ describe('what the docs say about the resolvers', () => {
     const code = read('index.ts').replace(/\s*\n\s*\*?\s*/g, ' ');
     expect(code).toContain("A found NNS answer rests on one operator's honesty");
   });
+});
+
+describe('characters a sender cannot see', () => {
+  // Refused, not cleaned. Stripping them would resolve text whose bytes differ from
+  // what it shows, and a bidi override can show one name while holding another.
+  const INVISIBLE: Record<string, string> = {
+    'zero-width space': '\u200b',
+    'zero-width joiner': '\u200d',
+    'right-to-left mark': '\u200f',
+    'right-to-left override': '\u202e',
+    'soft hyphen': '\u00ad',
+  };
+  for (const [what, c] of Object.entries(INVISIBLE)) {
+    test(`a name holding a ${what} is refused by nameQuery`, () => {
+      expect(nameQuery(`gas${c}ton`)).toBeNull();
+      expect(nameQuery(`${c}gaston`)).toBeNull();
+      expect(nameQuery(`gaston${c}`)).toBeNull();
+      expect(nameQuery(`ali${c}ce.nim`)).toBeNull();
+    });
+
+    test(`a name holding a ${what} is refused by nimQuery`, () => {
+      expect(nimQuery(`ali${c}ce.nim`)).toBeNull();
+      expect(nimQuery(`${c}alice.nim`)).toBeNull();
+      expect(nimQuery(`alice.nim${c}`)).toBeNull();
+    });
+  }
 });
 
 describe('looksLikeAddress through isNameInput', () => {

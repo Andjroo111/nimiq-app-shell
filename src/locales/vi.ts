@@ -34,6 +34,7 @@ export default {
   "shell.nameMissing": "Không ai sở hữu tên {name}",
   "shell.namePending": "{name} vừa thay đổi. Hãy thử lại sau một phút",
   "shell.nameFailed": "Không thể kiểm tra {name} lúc này",
+  "shell.nameNimOff": "Trang này không kiểm tra tên .nim",
   "shell.nameUnverified": "Địa chỉ chưa được xác minh",
   "shell.nameUseAddress": "Gửi đến địa chỉ này",
   "shell.nameUndelegated": "{name} không tồn tại. Tên cha không có ủy quyền",

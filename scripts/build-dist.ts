@@ -6,7 +6,7 @@
 // and that is not in this bundle; the resolver wants ARTIFACT.anchoredTopic0 from
 // the same object, so the object stays and the two long hex values go. That is
 // about 1 KB of dead weight and the only reason: the privacy gate did not flag
-// them, and CI's gate was already clean at 09e7ac8 with them in the bundle.
+// them, and CI's gate was already clean with them still in the bundle.
 //
 // 2. @nimiqnames/core's published reserved-word list. Their resolver releases every
 // query from reservation before parsing it (`parseQuery(query, new Set([name]))`

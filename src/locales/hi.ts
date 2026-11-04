@@ -34,6 +34,7 @@ export default {
   "shell.nameMissing": "{name} नाम किसी के पास नहीं है",
   "shell.namePending": "{name} अभी बदला है। एक मिनट में फिर कोशिश करें",
   "shell.nameFailed": "{name} अभी जाँचा नहीं जा सका",
+  "shell.nameNimOff": "यह साइट .nim नामों की जाँच नहीं करती",
   "shell.nameUnverified": "पता सत्यापित नहीं है",
   "shell.nameUseAddress": "इस पते पर भेजें",
   "shell.nameUndelegated": "{name} मौजूद नहीं है। मूल नाम का कोई प्रत्यायोजन नहीं है",

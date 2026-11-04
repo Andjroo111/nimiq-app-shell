@@ -44,7 +44,10 @@ export type NameLookup =
    *  target the chain never proved. The two look identical from here, and a
    *  checkpoint lands every ~1 minute, so waiting is cheap and paying is not. */
   | { state: 'pending'; query: string }
-  | { state: 'failed'; query: string };
+  | { state: 'failed'; query: string }
+  /** A `.nim` query on a site with too few hosts to believe an answer, so nothing
+   *  was asked. Trying again will not change it; the site has to opt in. */
+  | { state: 'nim-off'; query: string };
 
 export interface NameResolverOptions {
   /** ADD to the shipped list, never replace it. Their spec asks for independent
