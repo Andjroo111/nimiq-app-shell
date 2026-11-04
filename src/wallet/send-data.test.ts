@@ -1,6 +1,7 @@
 import { describe, expect, test } from 'bun:test';
 import { HubBackend } from './hub-backend';
 import { MiniAppBackend, type MiniAppProvider } from './miniapp-backend';
+import { describeWalletError } from './outcome';
 import { buildHandleClaimPayload, parseHandleClaim } from '../format/handle';
 
 // What lands on chain, one fixture per wallet. No wallet is involved in this file.
@@ -90,7 +91,9 @@ describe('the bytes on chain are the bytes the caller meant', () => {
   test('Pay refuses bytes it cannot carry before anything is sent; the Hub carries them', async () => {
     const binary = new Uint8Array([0, 255, 16]);
     const p = pay();
-    await expect(p.backend.signAndSend({ ...send, data: binary })).rejects.toThrow(/nothing was sent/);
+    const refused = await p.backend.signAndSend({ ...send, data: binary }).catch((e) => e);
+    expect(refused.message).toBe('Nimiq Pay: data is not text, nothing was sent');
+    expect(describeWalletError(refused).kind).toBe('failed'); // not a cancel, not "still pending"
     expect(p.calls).toEqual([]);
 
     const h = hub();

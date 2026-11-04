@@ -145,7 +145,7 @@ describe('miniapp wallet', () => {
     expect(res.serializedTx).toBe('serialized-basic');
   });
 
-  test('signAndSend with data → sendBasicTransactionWithData (hex-encoded)', async () => {
+  test('signAndSend with data → sendBasicTransactionWithData (as text)', async () => {
     let captured: any = null;
     const provider = fakeMiniAppProvider({
       sendBasicTransactionWithData: async (tx) => {
@@ -156,8 +156,7 @@ describe('miniapp wallet', () => {
     setWindow({ nimiqPay: {}, nimiq: provider });
     const w = createWallet({}, { miniApp: { provider } });
     const res = await w.signAndSend({ recipient: 'NQ11', valueLuna: 5, data: 'hi' });
-    // "hi" → 0x68 0x69
-    expect(captured.data).toBe('6869');
+    expect(captured.data).toBe('hi');
     expect(captured.value).toBe(5);
     expect(res.txHash).toBe('serialized-with-data');
   });

@@ -69,7 +69,7 @@ wallet.onAccountChange((acc) => render(acc));
 const { txHash } = await wallet.signAndSend({
   recipient: 'NQ…',
   valueLuna: 100_000,        // 1 NIM = 100 000 Luna
-  // data: 'thanks!',         // optional UTF-8 or Uint8Array — apps encode cashlinks here
+  // data: 'thanks!',         // optional UTF-8 or Uint8Array — apps encode cashlinks here; a hex string is text, pass bytes
 });
 
 // Prove wallet ownership by signing a challenge (Sign-in-with-Nimiq). Requires
@@ -99,7 +99,7 @@ options (used by the tests).
 | Unified call | miniapp backend | hub backend |
 | --- | --- | --- |
 | `connect()` | first **basic** account of `provider.listAccounts()` → `{address, label:''}` | `hub.chooseAddress()` → `{address, label}` |
-| `signAndSend({…, data})` | `sendBasicTransactionWithData` (data hex-encoded) | `signTransaction` (basic transfer, `extraData` bytes) |
+| `signAndSend({…, data})` | `sendBasicTransactionWithData` (data as text, Pay utf-8 encodes it; bytes that are not utf-8 are refused, nothing sent) | `signTransaction` (basic transfer, `extraData` bytes) |
 | `signAndSend({…})` | `sendBasicTransaction` | `signTransaction` |
 | result | `{ txHash: serializedTx, serializedTx }` | `{ txHash: hash, serializedTx }` |
 | `signMessage(message)` | `provider.sign(message)` (hex pubkey/sig) | `hub.signMessage({signer, message})` (bytes → hex) |
