@@ -35,6 +35,8 @@ export default {
   "shell.namePending": "{name} vừa thay đổi. Hãy thử lại sau một phút",
   "shell.nameFailed": "Không thể kiểm tra {name} lúc này",
   "shell.nameUnverified": "Địa chỉ chưa được xác minh",
+  "shell.nameUseAddress": "Gửi đến địa chỉ này",
+  "shell.nameUndelegated": "{name} không tồn tại. Tên cha không có ủy quyền",
   "shell.publicMessage": "Thêm tin nhắn công khai...",
   "shell.contacts": "Danh bạ",
   "shell.addressUnavailable": "Không có địa chỉ?",

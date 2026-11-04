@@ -38,6 +38,8 @@ export default {
   "shell.namePending": "{name} 刚刚更改，请一分钟后重试",
   "shell.nameFailed": "暂时无法检查 {name}",
   "shell.nameUnverified": "地址未验证",
+  "shell.nameUseAddress": "发送到此地址",
+  "shell.nameUndelegated": "{name} 不存在。其上级名称没有委托",
   "shell.publicMessage": "添加公开留言...",
   "shell.contacts": "联系人",
   "shell.addressUnavailable": "没有地址？",

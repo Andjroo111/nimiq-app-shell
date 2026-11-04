@@ -538,12 +538,17 @@ amount step, where the recipient shows as `gaston`.
 
 The registry is [NNS](https://nimiqnames.com) (selfcrypto, MIT), live on
 mainnet. The shell does not run its own. Resolution is their
-`@nimiqnames/resolver`, pinned exactly: two independent resolvers must agree,
-and each answer's Merkle proof is recombined in the browser.
+`@nimiqnames/resolver`, pinned exactly: two resolvers must agree, and each
+answer's Merkle proof is recombined in the browser. Both resolvers are run by one
+operator, as upstream's `resolver/dist/defaults.js` says, and no anchor publisher
+is configured, so a found answer rests on that operator's honesty. Agreement
+catches a drifted database or a bad deploy, not an operator who lies.
 
 | field state | what the sheet shows |
 |---|---|
 | proven name | a row to tap; no auto-advance, since `gast` may be registered too |
+| delegated (`shop.gaston`) | the full address and "Address not verified"; only a tap on "Send to this address" continues, and the amount sheet shows the address, not the name |
+| parent has no delegation | "shop.gaston does not exist. Its parent name has no delegation" |
 | unregistered | "No one holds the name gaston" |
 | repointed since the last checkpoint | "gaston just changed. Try again in a minute" |
 | resolver down, quorum split, bad proof | "Could not check gaston right now" |

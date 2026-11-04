@@ -38,6 +38,8 @@ export default {
   "shell.namePending": "Kakabago lang ng {name}. Subukan muli pagkalipas ng isang minuto",
   "shell.nameFailed": "Hindi masuri ang {name} ngayon",
   "shell.nameUnverified": "Hindi beripikado ang address",
+  "shell.nameUseAddress": "Ipadala sa address na ito",
+  "shell.nameUndelegated": "Walang {name}. Walang delegasyon ang parent na pangalan",
   "shell.publicMessage": "Magdagdag ng pampublikong mensahe...",
   "shell.contacts": "Mga kontak",
   "shell.addressUnavailable": "Walang adres?",

@@ -33,6 +33,8 @@ export default {
   'shell.namePending': '{name} wurde gerade geändert. Versuche es in einer Minute erneut',
   'shell.nameFailed': '{name} kann gerade nicht geprüft werden',
   'shell.nameUnverified': 'Adresse nicht verifiziert',
+  'shell.nameUseAddress': 'An diese Adresse senden',
+  'shell.nameUndelegated': '{name} existiert nicht. Der übergeordnete Name hat keine Delegation',
   'shell.publicMessage': 'Öffentliche Nachricht hinzufügen...',
   'shell.contacts': 'Kontakte',
   'shell.addressUnavailable': 'Adresse nicht verfügbar?',

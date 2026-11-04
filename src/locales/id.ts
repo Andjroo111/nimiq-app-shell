@@ -35,6 +35,8 @@ export default {
   "shell.namePending": "{name} baru saja berubah. Coba lagi dalam satu menit",
   "shell.nameFailed": "Tidak dapat memeriksa {name} saat ini",
   "shell.nameUnverified": "Alamat belum diverifikasi",
+  "shell.nameUseAddress": "Kirim ke alamat ini",
+  "shell.nameUndelegated": "{name} tidak ada. Nama induknya tidak memiliki delegasi",
   "shell.publicMessage": "Tambahkan pesan publik...",
   "shell.contacts": "Kontak",
   "shell.addressUnavailable": "Alamat tidak tersedia?",

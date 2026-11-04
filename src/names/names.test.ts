@@ -90,6 +90,26 @@ describe('the committed bundle', () => {
   });
 });
 
+describe('what the docs say about the resolvers', () => {
+  const read = (path: string) => readFileSync(join(import.meta.dir, path), 'utf8');
+
+  // Read off upstream's own file, so an upgrade that adds an independently run
+  // resolver fails here and the docs get corrected.
+  test('upstream still says one operator runs both', () => {
+    const upstream = read('../../node_modules/@nimiqnames/resolver/dist/defaults.js').replace(/\s*\n\s*\*\s*/g, ' ');
+    expect(upstream).toContain('both are run by the operator that publishes this package');
+  });
+
+  test('the README and the code state it, and nothing calls them independent', () => {
+    const readme = read('../../README.md').replace(/\s+/g, ' ');
+    expect(readme).toContain('Both resolvers are run by one operator');
+    expect(readme).toContain("a found answer rests on that operator's honesty");
+    expect(readme).not.toContain('two independent resolvers');
+    const code = read('index.ts').replace(/\s*\n\s*\*?\s*/g, ' ');
+    expect(code).toContain("A found NNS answer rests on one operator's honesty");
+  });
+});
+
 describe('isNameInput', () => {
   test('anything typed that is not an address, including prefixes too short to query', () => {
     expect(isNameInput('g')).toBe(true);
@@ -203,6 +223,27 @@ describe('lookup', () => {
       if (got.state !== 'found') throw new Error(got.state);
       expect(got.address).toBe(GASTON);
       expect(addressIsVerified(got.verification)).toBe(true);
+    });
+
+    test('a parent with no delegate host is undelegated, not a failure to retry', async () => {
+      const r = createNameResolver({
+        fetch: fakeFetch({
+          'api.nimiqnames.com': () => reply(200, a),
+          'nns.sonartech.pro': () => reply(200, b),
+        }),
+      });
+      expect(await r.lookup('shop.gaston')).toEqual({ state: 'undelegated', query: 'shop.gaston' });
+    });
+
+    test('a delegate host that does not answer is still a failure', async () => {
+      const r = createNameResolver({
+        fetch: fakeFetch({
+          'api.nimiqnames.com': () => reply(200, { ...a, host: FORGED_HOST }),
+          'nns.sonartech.pro': () => reply(200, { ...b, host: FORGED_HOST }),
+          [FORGED_HOST]: () => reply(500, {}),
+        }),
+      });
+      expect((await r.lookup('shop.gaston')).state).toBe('failed');
     });
 
     test('only the named verified states count as verified', () => {

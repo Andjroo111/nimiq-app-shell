@@ -35,6 +35,8 @@ export default {
   "shell.namePending": "{name} अभी बदला है। एक मिनट में फिर कोशिश करें",
   "shell.nameFailed": "{name} अभी जाँचा नहीं जा सका",
   "shell.nameUnverified": "पता सत्यापित नहीं है",
+  "shell.nameUseAddress": "इस पते पर भेजें",
+  "shell.nameUndelegated": "{name} मौजूद नहीं है। मूल नाम का कोई प्रत्यायोजन नहीं है",
   "shell.publicMessage": "सार्वजनिक संदेश जोड़ें...",
   "shell.contacts": "संपर्क",
   "shell.addressUnavailable": "पता उपलब्ध नहीं?",

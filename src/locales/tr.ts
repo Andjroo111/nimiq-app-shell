@@ -38,6 +38,8 @@ export default {
   "shell.namePending": "{name} az önce değişti. Bir dakika sonra tekrar deneyin",
   "shell.nameFailed": "{name} şu anda kontrol edilemedi",
   "shell.nameUnverified": "Adres doğrulanmadı",
+  "shell.nameUseAddress": "Bu adrese gönder",
+  "shell.nameUndelegated": "{name} yok. Üst adın yetkilendirmesi yok",
   "shell.publicMessage": "Herkese açık mesaj ekleyin...",
   "shell.contacts": "Kişiler",
   "shell.addressUnavailable": "Adres yok mu?",

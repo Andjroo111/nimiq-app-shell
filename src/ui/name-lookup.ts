@@ -1,22 +1,23 @@
 // The name row under the send sheet's recipient field.
 //
 // Type `gaston` and a row appears: the face, the name, the first blocks of the
-// address it proves to. Tapping it FILLS the field with that address, the same
-// way a contact chip does, so the address is on screen and checkable before
-// the amount step. A name never goes straight to the signer.
+// address it proves to. Tapping it fills the field with that address and moves
+// to the amount step, where Back returns to the full address. A name never goes
+// straight to the signer.
 //
-// No auto-advance, unlike a 36-character address. An address is finished when
-// it is long enough; a name is not: `gast` might be registered too, and a
-// sheet that jumped on the first hit would pay whoever holds the prefix.
+// No auto-advance on typing, unlike a 36-character address. An address is
+// finished when it is long enough; a name is not: `gast` might be registered
+// too, and a sheet that jumped on the first hit would pay whoever holds the
+// prefix.
 //
-// Only a PROVEN or DELEGATED answer offers the row. Pending, missing and failed
-// each get one grey line and nothing to tap. See ../names for why each state
-// is what it is; this file only draws them.
+// A DELEGATED answer is a different row, because the host behind `shop.gaston`
+// picked the address and nothing proves it, and that host can choose an address
+// whose first blocks match the one the sender expects. So the row shows all nine
+// blocks and says the address is not verified, and only a tap on its own button
+// continues. The amount sheet then shows the address, not the name.
 //
-// A DELEGATED row says on its face that the address is not verified, because
-// the host behind `shop.gaston` picked it and nothing proves it. It also does
-// not name the recipient on the amount sheet: a pick from it reads there like a
-// pasted address, which is what it is worth.
+// Pending, missing, undelegated and failed each get one grey line and nothing to
+// tap. See ../names for why each state is what it is; this file only draws them.
 
 import type { I18n } from '../i18n';
 import { addressIsVerified, nameQuery, type NameResolver } from '../names';
@@ -71,45 +72,79 @@ export function mountNameLookup(opts: {
     row.appendChild(line);
   }
 
-  function offer(name: string, address: string, verified: boolean): void {
+  function faceFor(address: string): HTMLElement | null {
+    if (!opts.identicon) return null;
+    const face = document.createElement('span');
+    face.className = 'nq-cc-name-icon';
+    face.appendChild(opts.identicon(address, 32));
+    return face;
+  }
+
+  function labelFor(name: string): HTMLElement {
+    const label = document.createElement('span');
+    label.className = 'nq-cc-name-label';
+    label.textContent = name;
+    return label;
+  }
+
+  function offer(name: string, address: string): void {
     row.hidden = false;
     row.textContent = '';
     const btn = document.createElement('button');
     btn.type = 'button';
     btn.className = 'nq-cc-name-hit';
-    if (opts.identicon) {
-      const face = document.createElement('span');
-      face.className = 'nq-cc-name-icon';
-      face.appendChild(opts.identicon(address, 32));
-      btn.appendChild(face);
-    }
+    const face = faceFor(address);
+    if (face) btn.appendChild(face);
     const text = document.createElement('span');
     text.className = 'nq-cc-name-text';
-    const label = document.createElement('span');
-    label.className = 'nq-cc-name-label';
-    label.textContent = name;
     const addr = document.createElement('span');
     addr.className = 'nq-cc-name-addr nq-cc-mono';
     const spaced = formatAddressBlocks(address).replace(/\n/g, ' ');
     addr.textContent = `${spaced.slice(0, 14)} ...`;
-    text.append(label, addr);
-    if (!verified) {
-      btn.classList.add('nq-cc-name-hit-unverified');
-      const warn = document.createElement('span');
-      warn.className = 'nq-cc-name-unverified';
-      warn.textContent = i18n.t('shell.nameUnverified');
-      text.appendChild(warn);
-    }
+    text.append(labelFor(name), addr);
     btn.appendChild(text);
     btn.title = spaced;
-    const pay = i18n.t('shell.payName', { name });
-    btn.setAttribute('aria-label', verified ? pay : `${pay}. ${i18n.t('shell.nameUnverified')}`);
+    btn.setAttribute('aria-label', i18n.t('shell.payName', { name }));
     btn.addEventListener('click', () => {
-      picked = verified ? { name, address } : null;
+      picked = { name, address };
       row.hidden = true;
       opts.onPick(spaced);
     });
     row.appendChild(btn);
+  }
+
+  /** Not a button: reading it must not be one mis-tap from the amount sheet. */
+  function offerUnverified(name: string, address: string): void {
+    row.hidden = false;
+    row.textContent = '';
+    const box = document.createElement('div');
+    box.className = 'nq-cc-name-unverified-box';
+    const head = document.createElement('div');
+    head.className = 'nq-cc-name-unverified-head';
+    const face = faceFor(address);
+    if (face) head.appendChild(face);
+    const text = document.createElement('span');
+    text.className = 'nq-cc-name-text';
+    const warn = document.createElement('span');
+    warn.className = 'nq-cc-name-unverified';
+    warn.textContent = i18n.t('shell.nameUnverified');
+    text.append(labelFor(name), warn);
+    head.appendChild(text);
+    const full = document.createElement('p');
+    full.className = 'nq-cc-name-full nq-cc-mono';
+    full.textContent = formatAddressBlocks(address);
+    const go = document.createElement('button');
+    go.type = 'button';
+    go.className = 'nq-cc-name-continue';
+    go.textContent = i18n.t('shell.nameUseAddress');
+    go.setAttribute('aria-label', `${i18n.t('shell.payName', { name })}. ${i18n.t('shell.nameUnverified')}`);
+    go.addEventListener('click', () => {
+      picked = null;
+      row.hidden = true;
+      opts.onPick(formatAddressBlocks(address).replace(/\n/g, ' '));
+    });
+    box.append(head, full, go);
+    row.appendChild(box);
   }
 
   function clear(): void {
@@ -127,9 +162,13 @@ export function mountNameLookup(opts: {
     timer = setTimeout(async () => {
       const got = await resolver.lookup(query);
       if (mine !== ticket) return;
-      if (got.state === 'found') offer(got.query, got.address, addressIsVerified(got.verification));
+      if (got.state === 'found') {
+        if (addressIsVerified(got.verification)) offer(got.query, got.address);
+        else offerUnverified(got.query, got.address);
+      }
       else if (got.state === 'missing') note('shell.nameMissing', query);
       else if (got.state === 'pending') note('shell.namePending', query);
+      else if (got.state === 'undelegated') note('shell.nameUndelegated', query);
       else note('shell.nameFailed', query);
     }, NAME_LOOKUP_DEBOUNCE_MS);
   }
@@ -159,7 +198,10 @@ export const NAME_LOOKUP_CSS = `
 .nq-cc-addr-is-name .nq-cc-addr-rules { visibility:hidden; }
 /* Three classes: this sheet is injected BEFORE the component's, so a tie with
    .nq-cc-party-name.nq-cc-mono would go to the mono rule. */
-.nq-cc-party-name.nq-cc-mono.nq-cc-is-name { font-family:inherit; font-size:12px; }
+/* A name wraps where the sender checks it. Cutting shop.gaston off at the dot
+   would hide the parent, which is the part that says whose name this is. */
+.nq-cc-party-name.nq-cc-mono.nq-cc-is-name { font-family:inherit; font-size:12px;
+  white-space:normal; overflow:visible; overflow-wrap:anywhere; }
 .nq-cc-name-row { width:100%; margin-top:10px; display:flex; justify-content:center; }
 .nq-cc-name-row[hidden] { display:none; }
 .nq-cc-name-note { margin:0; font-size:12px; font-weight:600; text-align:center;
@@ -172,8 +214,21 @@ export const NAME_LOOKUP_CSS = `
 .nq-cc-name-icon { display:block; flex:none; width:32px; height:32px; }
 .nq-cc-name-icon > * { display:block; width:100%; height:100%; }
 .nq-cc-name-text { display:flex; flex-direction:column; align-items:flex-start; min-width:0; }
-.nq-cc-name-label { font-size:14px; font-weight:700; }
-.nq-cc-name-addr { font-size:11px; white-space:nowrap; color:var(--nq-cc-menu-muted, rgba(31,35,72,.6)); }
-.nq-cc-name-hit-unverified { box-shadow:inset 0 0 0 1.5px var(--nq-cc-warning, #fc8702); }
-.nq-cc-name-unverified { font-size:11px; font-weight:700; white-space:nowrap; color:var(--nq-cc-warning, #fc8702); }
+.nq-cc-name-label { font-size:14px; font-weight:700; text-align:left; overflow-wrap:anywhere; }
+.nq-cc-name-addr { font-family:'Fira Mono',ui-monospace,monospace; font-size:11px; white-space:nowrap; color:var(--nq-cc-menu-muted, rgba(31,35,72,.6)); }
+/* The wash and ring are the warning; the words are the foreground, so they stay
+   readable on any surface a host themes. Nimiq orange as text is 2.18:1 on white. */
+.nq-cc-name-unverified-box { width:100%; padding:12px; border-radius:10px;
+  display:flex; flex-direction:column; gap:10px;
+  background:color-mix(in srgb, var(--nq-cc-warning, #fc8702) 12%, transparent);
+  box-shadow:inset 0 0 0 1.5px var(--nq-cc-warning, #fc8702); }
+.nq-cc-name-unverified-head { display:flex; align-items:center; gap:10px; min-width:0; }
+.nq-cc-name-unverified { font-size:12px; font-weight:700; color:var(--nq-cc-menu-fg, #1f2348); }
+.nq-cc-name-full { margin:0; font-family:'Fira Mono',ui-monospace,monospace; font-size:13px; line-height:1.5;
+  text-align:center; white-space:pre-line;
+  color:var(--nq-cc-menu-fg, #1f2348); }
+.nq-cc-name-continue { align-self:center; min-height:44px; padding:0 20px; border:none; border-radius:500px;
+  font-family:inherit; font-size:13px; font-weight:700; cursor:pointer;
+  background:var(--nq-cc-menu-hover, rgba(31,35,72,.06)); color:var(--nq-cc-menu-fg, #1f2348); }
+.nq-cc-name-continue:focus-visible { outline:2px solid var(--nq-cc-accent, #0582ca); outline-offset:2px; }
 `;

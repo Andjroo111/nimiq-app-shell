@@ -34,6 +34,9 @@ export type { ResolverEndpoint as NnsResolverEndpoint };
 export type NameLookup =
   | { state: 'found'; query: string; address: string; verification: Verification | 'NIM_PROOF'; agreed: number }
   | { state: 'missing'; query: string }
+  /** A dotted query whose parent is registered but delegates nowhere, so the
+   *  name does not exist. Waiting will not change that, unlike 'failed'. */
+  | { state: 'undelegated'; query: string }
   /** It resolves, but the proof has not caught up with the answer: the owner
    *  repointed it since the last checkpoint, OR every resolver is serving a
    *  target the chain never proved. The two look identical from here, and a
@@ -107,6 +110,12 @@ export function addressIsVerified(verification: Verification | 'NIM_PROOF'): boo
   return verification === 'PROVEN' || verification === 'NIM_PROOF';
 }
 
+/** A found NNS answer rests on one operator's honesty. DEFAULT_RESOLVERS are two
+ *  separately replayed databases, but upstream's resolver/dist/defaults.js says
+ *  both are run by the operator that publishes the package, and it configures no
+ *  anchor publisher, so nothing outside that operator attests the proof's root.
+ *  Two agreeing catches drift and a bad deploy, not a lie. The repo owner accepted
+ *  this one operator trust, so PROVEN keeps its look. */
 export function createNameResolver(options: NameResolverOptions = {}): NameResolver {
   const nns = createResolver({
     resolvers: [...DEFAULT_RESOLVERS, ...(options.resolvers ?? [])],
@@ -135,6 +144,7 @@ export function createNameResolver(options: NameResolverOptions = {}): NameResol
         // recombine) is a failure, and a failure never becomes an address.
         const code = (err as { code?: string }).code;
         if (code === 'NOT_FOUND' || code === 'IN_GRACE') return { state: 'missing', query };
+        if (code === 'PARENT_NOT_DELEGATING') return { state: 'undelegated', query };
         return { state: 'failed', query };
       }
     },

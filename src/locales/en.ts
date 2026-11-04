@@ -34,6 +34,8 @@ export default {
   'shell.namePending': '{name} just changed. Try again in a minute',
   'shell.nameFailed': 'Could not check {name} right now',
   'shell.nameUnverified': 'Address not verified',
+  'shell.nameUseAddress': 'Send to this address',
+  'shell.nameUndelegated': '{name} does not exist. Its parent name has no delegation',
   'shell.publicMessage': 'Add a public message...',
   'shell.contacts': 'Contacts',
   'shell.addressUnavailable': 'Address unavailable?',

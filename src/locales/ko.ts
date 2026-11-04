@@ -35,6 +35,8 @@ export default {
   "shell.namePending": "{name}이(가) 방금 변경되었습니다. 1분 후 다시 시도하세요",
   "shell.nameFailed": "지금은 {name}을(를) 확인할 수 없습니다",
   "shell.nameUnverified": "주소가 확인되지 않았습니다",
+  "shell.nameUseAddress": "이 주소로 보내기",
+  "shell.nameUndelegated": "{name}은(는) 없습니다. 상위 이름에 위임이 없습니다",
   "shell.publicMessage": "공개 메시지 추가...",
   "shell.contacts": "연락처",
   "shell.addressUnavailable": "주소가 없나요?",

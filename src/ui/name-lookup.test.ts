@@ -9,7 +9,7 @@ import { Window } from 'happy-dom';
 import { mountMiniWallet, type CornerControlOptions } from './corner-control';
 import { shellLocales, mergeLocales } from '../locales';
 import { createI18n } from '../i18n';
-import { NAME_LOOKUP_DEBOUNCE_MS } from './name-lookup';
+import { NAME_LOOKUP_CSS, NAME_LOOKUP_DEBOUNCE_MS } from './name-lookup';
 import type { Wallet } from '../wallet';
 import a from '../names/fixtures/gaston.api.nimiqnames.com.json';
 import b from '../names/fixtures/gaston.nns.sonartech.pro.json';
@@ -159,14 +159,34 @@ describe('names in the recipient field', () => {
       return Promise.resolve(new Response(JSON.stringify(body), { status: 200 }));
     }) as typeof fetch);
 
-    test('a forged host on both answers draws a row that says the address is not verified', async () => {
-      const { type, row } = mount({ names: { fetch: delegated } });
+    test('a forged host on both answers says not verified and shows every block', async () => {
+      const { host, field, type, row } = mount({ names: { fetch: delegated } });
       await type('shop.gaston');
-      const hit = row()!.querySelector('.nq-cc-name-hit') as HTMLElement;
-      expect(hit.title).toBe(PICKED);
-      expect(hit.classList.contains('nq-cc-name-hit-unverified')).toBe(true);
-      expect(hit.querySelector('.nq-cc-name-unverified')!.textContent).toBe('Address not verified');
-      expect(hit.getAttribute('aria-label')).toBe('Pay shop.gaston. Address not verified');
+      expect(row()!.querySelector('.nq-cc-name-hit')).toBeNull();
+      expect(row()!.querySelector('.nq-cc-name-unverified')!.textContent).toBe('Address not verified');
+      expect(row()!.querySelector('.nq-cc-name-full')!.textContent).toBe('NQ48 8CKH BA24\n2VR3 N249 N8MN\nJ5XX 74DB 5XJ8');
+      const go = row()!.querySelector('.nq-cc-name-continue') as HTMLElement;
+      expect(go.textContent).toBe('Send to this address');
+      expect(go.getAttribute('aria-label')).toBe('Pay shop.gaston. Address not verified');
+      // Showing it moves nothing: the field and the step wait for the tap.
+      expect(field.value).toBe('shop.gaston');
+      expect(host.querySelector('.nq-cc')!.classList.contains('nq-cc-show-send')).toBe(false);
+    });
+
+    test('tapping the box itself does nothing, only the button continues', async () => {
+      const { host, field, type, row } = mount({ names: { fetch: delegated } });
+      await type('shop.gaston');
+      (row()!.querySelector('.nq-cc-name-unverified-box') as HTMLElement).click();
+      (row()!.querySelector('.nq-cc-name-full') as HTMLElement).click();
+      expect(field.value).toBe('shop.gaston');
+      expect(host.querySelector('.nq-cc')!.classList.contains('nq-cc-show-send')).toBe(false);
+    });
+
+    test('a parent with no delegation says the name does not exist, not to retry', async () => {
+      const { type, row } = mount();
+      await type('shop.gaston');
+      expect(row()!.querySelector('button')).toBeNull();
+      expect(row()!.textContent).toBe('shop.gaston does not exist. Its parent name has no delegation');
     });
 
     test('a proven name on the same fetch draws no such line', async () => {
@@ -174,21 +194,75 @@ describe('names in the recipient field', () => {
       await type('gaston');
       const hit = row()!.querySelector('.nq-cc-name-hit') as HTMLElement;
       expect(hit.title).toBe(GASTON_SPACED);
-      expect(hit.classList.contains('nq-cc-name-hit-unverified')).toBe(false);
-      expect(hit.querySelector('.nq-cc-name-unverified')).toBeNull();
+      expect(row()!.querySelector('.nq-cc-name-unverified')).toBeNull();
+      expect(row()!.querySelector('.nq-cc-name-continue')).toBeNull();
       expect(hit.getAttribute('aria-label')).toBe('Pay gaston');
     });
 
     test('tapping it fills the address and the amount sheet does not name the recipient', async () => {
       const { host, field, type, row } = mount({ names: { fetch: delegated } });
       await type('shop.gaston');
-      (row()!.querySelector('.nq-cc-name-hit') as HTMLElement).click();
+      (row()!.querySelector('.nq-cc-name-continue') as HTMLElement).click();
       expect(field.value.replace(/\s+/g, ' ')).toBe(PICKED);
       expect(host.querySelector('.nq-cc')!.classList.contains('nq-cc-show-send')).toBe(true);
       const parties = host.querySelectorAll('.nq-cc-party-name');
       const party = parties[parties.length - 1] as HTMLElement;
       expect(party.textContent).toBe('NQ48 8CKH BA24');
       expect(party.classList.contains('nq-cc-is-name')).toBe(false);
+    });
+  });
+
+  describe('text in name mode that spells an address', () => {
+    const SPELLED = GASTON_SPACED.replace(/ /g, '');
+    for (const text of [`@${SPELLED}`, `${SPELLED}.nim`]) {
+      test(`${text.replace(SPELLED, '<address>')} does not advance`, async () => {
+        const { host, type } = mount();
+        await type(text, 0);
+        expect(host.querySelector('.nq-cc')!.classList.contains('nq-cc-show-send')).toBe(false);
+      });
+    }
+
+    test('the address alone still advances', async () => {
+      const { host, type } = mount();
+      await type(SPELLED, 0);
+      expect(host.querySelector('.nq-cc')!.classList.contains('nq-cc-show-send')).toBe(true);
+    });
+
+    test('names: false still advances on the same text, as it always did', async () => {
+      const { host, type } = mount({ names: false });
+      await type(`@${SPELLED}`, 0);
+      expect(host.querySelector('.nq-cc')!.classList.contains('nq-cc-show-send')).toBe(true);
+    });
+  });
+
+  describe('the row styles', () => {
+    const rule = (selector: string) => NAME_LOOKUP_CSS.slice(NAME_LOOKUP_CSS.indexOf(`\n${selector} {`)).split('}')[0]!;
+    const channel = (v: number) => { const s = v / 255; return s <= 0.03928 ? s / 12.92 : ((s + 0.055) / 1.055) ** 2.4; };
+    const lum = ([r, g, b]: number[]) => 0.2126 * channel(r!) + 0.7152 * channel(g!) + 0.0722 * channel(b!);
+    const ratio = (x: number[], y: number[]) => {
+      const [hi, lo] = [lum(x), lum(y)].sort((m, n) => n - m) as [number, number];
+      return (hi + 0.05) / (lo + 0.05);
+    };
+    const hex = (h: string) => [1, 3, 5].map((i) => parseInt(h.slice(i, i + 2), 16));
+
+    test('the warning text reaches AA on the washed row, on white', () => {
+      const color = rule('.nq-cc-name-unverified').match(/color:var\([^,]+, (#[0-9a-f]{6})\)/)![1]!;
+      const pct = Number(rule('.nq-cc-name-unverified-box').match(/#fc8702\) (\d+)%/)![1]) / 100;
+      const washed = hex('#fc8702').map((c) => c * pct + 255 * (1 - pct));
+      expect(ratio(hex(color), washed)).toBeGreaterThanOrEqual(4.5);
+    });
+
+    test('an address on either row is in the mono face its blocks line up in', () => {
+      expect(rule('.nq-cc-name-full')).toContain('Fira Mono');
+      expect(rule('.nq-cc-name-addr')).toContain('Fira Mono');
+    });
+
+    test('a long name wraps in the row and on the amount sheet', () => {
+      expect(rule('.nq-cc-name-label')).toContain('overflow-wrap:anywhere');
+      const party = rule('.nq-cc-party-name.nq-cc-mono.nq-cc-is-name');
+      expect(party).toContain('white-space:normal');
+      expect(party).toContain('overflow:visible');
+      expect(party).toContain('overflow-wrap:anywhere');
     });
   });
 

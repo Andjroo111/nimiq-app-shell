@@ -2189,6 +2189,13 @@ export function mountMiniWallet(
     if (address) recipientIcon.appendChild(options.identicon(address, 36));
   }
   const compactRecipient = (): string => significantChars(recipientInput.value);
+  // Name mode wins over the characters. `@NQ12...` and `NQ12....nim` both spell an
+  // address once the punctuation is stripped, and neither is one the sender typed
+  // as an address, so neither may move toward paying it.
+  // With names off the input handler has already reformatted the text into blocks,
+  // so this reads an address there too.
+  const recipientIsAddress = (): boolean =>
+    !isNameInput(recipientInput.value) && NIM_ADDRESS_RE.test(compactRecipient());
   const amountNim = (): number => {
     const n = Number(amountInput.value.replace(',', '.'));
     return Number.isFinite(n) ? n : 0;
@@ -2225,7 +2232,7 @@ export function mountMiniWallet(
     // contact chip, a name pick), not only on input events.
     recipientWrap.classList.toggle('nq-cc-addr-is-name',
       options.names !== false && isNameInput(recipientInput.value));
-    const okAddress = NIM_ADDRESS_RE.test(compactRecipient());
+    const okAddress = recipientIsAddress();
     renderRecipientIcon(okAddress ? compactRecipient() : null);
     const nim = amountNim();
     renderSendFiat(nim);
@@ -2267,7 +2274,7 @@ export function mountMiniWallet(
    *  only job is to acknowledge a complete form is a tap for nothing. It fires
    *  on a paste and on a contact chip the same way. */
   function advanceToAmount(): void {
-    if (!NIM_ADDRESS_RE.test(compactRecipient())) return;
+    if (!recipientIsAddress()) return;
     if (root.classList.contains('nq-cc-show-send')) return;
     renderParties();
     root.classList.remove('nq-cc-show-sendto');

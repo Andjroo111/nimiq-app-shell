@@ -35,6 +35,8 @@ export default {
   "shell.namePending": "{name} ya canza yanzu. Sake gwadawa bayan minti ɗaya",
   "shell.nameFailed": "Ba a iya duba {name} yanzu ba",
   "shell.nameUnverified": "Ba a tabbatar da adireshin ba",
+  "shell.nameUseAddress": "Aika zuwa wannan adireshin",
+  "shell.nameUndelegated": "{name} ba ya wanzu. Sunan asali ba shi da wakilci",
   "shell.publicMessage": "Ƙara saƙo na jama'a...",
   "shell.contacts": "Lambobin sadarwa",
   "shell.addressUnavailable": "Babu adireshi?",
