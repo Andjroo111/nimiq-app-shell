@@ -6,7 +6,7 @@ import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { ANCHORED_TOPIC0 } from '@nimiqnames/anchor';
 import { CONSTANTS } from '@nimiqnames/core';
-import { createNameResolver, isNameInput, nameQuery } from './index';
+import { addressIsVerified, createNameResolver, isNameInput, nameQuery } from './index';
 import a from './fixtures/gaston.api.nimiqnames.com.json';
 import b from './fixtures/gaston.nns.sonartech.pro.json';
 
@@ -86,6 +86,7 @@ describe('the committed bundle', () => {
   test('still holds the resolver and its default endpoints', () => {
     expect(dist).toContain('api.nimiqnames.com');
     expect(dist).toContain('NAME_INVALID');
+    expect(dist).toContain('nq-cc-name-unverified');
   });
 });
 
@@ -155,6 +156,61 @@ describe('lookup', () => {
       }),
     });
     expect(await r.lookup('gaston')).toEqual({ state: 'pending', query: 'gaston' });
+  });
+
+  describe('a delegated answer', () => {
+    const FORGED_HOST = 'evil.example';
+    const delegate = () => reply(200, { address: OTHER, ttl: 60 });
+
+    test('a forged top-level host on both answers still comes back DELEGATED, never verified', async () => {
+      const asked: string[] = [];
+      const r = createNameResolver({
+        fetch: fakeFetch({
+          'api.nimiqnames.com': () => reply(200, { ...a, host: FORGED_HOST }),
+          'nns.sonartech.pro': () => reply(200, { ...b, host: FORGED_HOST }),
+          [FORGED_HOST]: () => { asked.push(FORGED_HOST); return delegate(); },
+        }),
+      });
+      const got = await r.lookup('shop.gaston');
+      // The parent's proof commits to no host at all, and that does not stop it:
+      // this is why the row may not imply any part of the answer is proven.
+      expect(a.proof.delegate).toBe('');
+      expect(asked).toEqual([FORGED_HOST]);
+      if (got.state !== 'found') throw new Error(got.state);
+      expect(got.verification).toBe('DELEGATED');
+      expect(addressIsVerified(got.verification)).toBe(false);
+    });
+
+    test('a forged host on one answer splits the quorum and is refused', async () => {
+      const r = createNameResolver({
+        fetch: fakeFetch({
+          'api.nimiqnames.com': () => reply(200, { ...a, host: FORGED_HOST }),
+          'nns.sonartech.pro': () => reply(200, b),
+          [FORGED_HOST]: delegate,
+        }),
+      });
+      expect((await r.lookup('shop.gaston')).state).toBe('failed');
+    });
+
+    test('a forged host does not touch a plain name, which never asks it', async () => {
+      const r = createNameResolver({
+        fetch: fakeFetch({
+          'api.nimiqnames.com': () => reply(200, { ...a, host: FORGED_HOST }),
+          'nns.sonartech.pro': () => reply(200, { ...b, host: FORGED_HOST }),
+        }),
+      });
+      const got = await r.lookup('gaston');
+      if (got.state !== 'found') throw new Error(got.state);
+      expect(got.address).toBe(GASTON);
+      expect(addressIsVerified(got.verification)).toBe(true);
+    });
+
+    test('only the named verified states count as verified', () => {
+      expect(addressIsVerified('PROVEN')).toBe(true);
+      expect(addressIsVerified('NIM_PROOF')).toBe(true);
+      expect(addressIsVerified('DELEGATED')).toBe(false);
+      expect(addressIsVerified('PROOF_PENDING')).toBe(false);
+    });
   });
 
   test('a tampered proof fails and is refused', async () => {

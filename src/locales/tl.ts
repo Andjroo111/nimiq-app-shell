@@ -37,6 +37,7 @@ export default {
   "shell.nameMissing": "Walang may-ari ng pangalang {name}",
   "shell.namePending": "Kakabago lang ng {name}. Subukan muli pagkalipas ng isang minuto",
   "shell.nameFailed": "Hindi masuri ang {name} ngayon",
+  "shell.nameUnverified": "Hindi beripikado ang address",
   "shell.publicMessage": "Magdagdag ng pampublikong mensahe...",
   "shell.contacts": "Mga kontak",
   "shell.addressUnavailable": "Walang adres?",

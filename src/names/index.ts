@@ -95,6 +95,18 @@ export function nameQuery(raw: string): string | null {
   return parseQuery(text, new Set([parent])).ok ? text : null;
 }
 
+/** Whether anything proves the ADDRESS of a found answer. A dotted query comes
+ *  back DELEGATED: the parent's delegate host picked the address and nothing
+ *  vouches for it, and upstream requires it shown differently from a verified
+ *  result (their spec, section 8.5 item 6). Do not lean on the parent being
+ *  proven either: their proof check binds the target and the EVM record, not the
+ *  host, so two resolvers serving the same forged host still arrive here as
+ *  DELEGATED with a PROVEN parent. Named values only, so a verification state
+ *  added upstream reads as unverified until someone decides otherwise. */
+export function addressIsVerified(verification: Verification | 'NIM_PROOF'): boolean {
+  return verification === 'PROVEN' || verification === 'NIM_PROOF';
+}
+
 export function createNameResolver(options: NameResolverOptions = {}): NameResolver {
   const nns = createResolver({
     resolvers: [...DEFAULT_RESOLVERS, ...(options.resolvers ?? [])],

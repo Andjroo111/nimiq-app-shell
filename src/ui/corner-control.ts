@@ -1974,6 +1974,13 @@ export function mountMiniWallet(
     recipientWrap.classList.toggle('nq-cc-addr-is-name', isName);
     if (!isName) reformatInPlace(recipientInput);
   });
+  // The one way code writes this field. Setting .value fires no input event, so
+  // a write that went around this would leave the name row answering for text
+  // the field no longer holds. A test fails on any other write.
+  function writeRecipient(text: string): void {
+    recipientInput.value = text;
+    names?.fieldWritten();
+  }
   // Enter would add a fourth line to a three-line field.
   recipientInput.addEventListener('keydown', (e) => {
     if ((e as KeyboardEvent).key === 'Enter') e.preventDefault();
@@ -2073,7 +2080,7 @@ export function mountMiniWallet(
       const name = el('span', 'nq-cc-contact-name', chip);
       name.textContent = contact.label;
       chip.addEventListener('click', () => {
-        recipientInput.value = formatAddressBlocks(contact.address);
+        writeRecipient(formatAddressBlocks(contact.address));
         validateSend();
         recipientInput.focus();
         // Caret to the START. The grid shows all nine blocks at once now, so
@@ -2276,7 +2283,7 @@ export function mountMiniWallet(
     i18n,
     ...(options.identicon ? { identicon: options.identicon } : {}),
     onPick: (address) => {
-      recipientInput.value = formatAddressBlocks(address);
+      writeRecipient(formatAddressBlocks(address));
       validateSend();
       advanceToAmount();
     },
@@ -2321,7 +2328,7 @@ export function mountMiniWallet(
     // before it, because a prompt between "Send" and the money moving is an
     // obstacle at the worst possible moment.
     void offerToSave(spaced);
-    recipientInput.value = '';
+    writeRecipient('');
     amountInput.value = '';
     balanceFetchedAt = 0; // the balance just changed — refetch on next look
     window.setTimeout(() => {

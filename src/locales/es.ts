@@ -32,6 +32,7 @@ export default {
   'shell.nameMissing': 'Nadie tiene el nombre {name}',
   'shell.namePending': '{name} acaba de cambiar. Inténtalo en un minuto',
   'shell.nameFailed': 'No se pudo comprobar {name} ahora',
+  'shell.nameUnverified': 'Dirección no verificada',
   'shell.publicMessage': 'Añade un mensaje público...',
   'shell.contacts': 'Contactos',
   'shell.addressUnavailable': '¿No tienes la dirección?',

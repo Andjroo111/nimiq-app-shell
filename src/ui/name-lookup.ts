@@ -12,9 +12,14 @@
 // Only a PROVEN or DELEGATED answer offers the row. Pending, missing and failed
 // each get one grey line and nothing to tap. See ../names for why each state
 // is what it is; this file only draws them.
+//
+// A DELEGATED row says on its face that the address is not verified, because
+// the host behind `shop.gaston` picked it and nothing proves it. It also does
+// not name the recipient on the amount sheet: a pick from it reads there like a
+// pasted address, which is what it is worth.
 
 import type { I18n } from '../i18n';
-import { nameQuery, type NameResolver } from '../names';
+import { addressIsVerified, nameQuery, type NameResolver } from '../names';
 import { formatAddressBlocks } from './address-input';
 
 /** How long typing must pause before a lookup. Each lookup is two resolver
@@ -24,7 +29,12 @@ export const NAME_LOOKUP_DEBOUNCE_MS = 350;
 export interface NameLookupHandle {
   /** The name the field's address came from, when it came from one. */
   nameFor(compactAddress: string): string | null;
-  /** Clear the row and forget the last pick (a new send). */
+  /** The field was written from code, which fires no input event. Whatever the
+   *  row holds or is waiting on was for the text that write replaced. */
+  fieldWritten(): void;
+  /** The sheet opened: forget the last pick and check what the field still
+   *  holds. The field keeps its text across a close, a name as much as an
+   *  address, so a name on screen gets its row back. */
   reset(): void;
 }
 
@@ -61,7 +71,7 @@ export function mountNameLookup(opts: {
     row.appendChild(line);
   }
 
-  function offer(name: string, address: string): void {
+  function offer(name: string, address: string, verified: boolean): void {
     row.hidden = false;
     row.textContent = '';
     const btn = document.createElement('button');
@@ -83,11 +93,19 @@ export function mountNameLookup(opts: {
     const spaced = formatAddressBlocks(address).replace(/\n/g, ' ');
     addr.textContent = `${spaced.slice(0, 14)} ...`;
     text.append(label, addr);
+    if (!verified) {
+      btn.classList.add('nq-cc-name-hit-unverified');
+      const warn = document.createElement('span');
+      warn.className = 'nq-cc-name-unverified';
+      warn.textContent = i18n.t('shell.nameUnverified');
+      text.appendChild(warn);
+    }
     btn.appendChild(text);
     btn.title = spaced;
-    btn.setAttribute('aria-label', i18n.t('shell.payName', { name }));
+    const pay = i18n.t('shell.payName', { name });
+    btn.setAttribute('aria-label', verified ? pay : `${pay}. ${i18n.t('shell.nameUnverified')}`);
     btn.addEventListener('click', () => {
-      picked = { name, address };
+      picked = verified ? { name, address } : null;
       row.hidden = true;
       opts.onPick(spaced);
     });
@@ -99,7 +117,7 @@ export function mountNameLookup(opts: {
     row.textContent = '';
   }
 
-  field.addEventListener('input', () => {
+  function check(): void {
     clearTimeout(timer);
     const query = nameQuery(field.value);
     ticket += 1;
@@ -109,22 +127,27 @@ export function mountNameLookup(opts: {
     timer = setTimeout(async () => {
       const got = await resolver.lookup(query);
       if (mine !== ticket) return;
-      if (got.state === 'found') offer(got.query, got.address);
+      if (got.state === 'found') offer(got.query, got.address, addressIsVerified(got.verification));
       else if (got.state === 'missing') note('shell.nameMissing', query);
       else if (got.state === 'pending') note('shell.namePending', query);
       else note('shell.nameFailed', query);
     }, NAME_LOOKUP_DEBOUNCE_MS);
-  });
+  }
+
+  field.addEventListener('input', check);
 
   return {
     nameFor(compact) {
       return picked && picked.address === compact ? picked.name : null;
     },
-    reset() {
+    fieldWritten() {
       clearTimeout(timer);
       ticket += 1;
-      picked = null;
       clear();
+    },
+    reset() {
+      picked = null;
+      check();
     },
   };
 }
@@ -151,4 +174,6 @@ export const NAME_LOOKUP_CSS = `
 .nq-cc-name-text { display:flex; flex-direction:column; align-items:flex-start; min-width:0; }
 .nq-cc-name-label { font-size:14px; font-weight:700; }
 .nq-cc-name-addr { font-size:11px; white-space:nowrap; color:var(--nq-cc-menu-muted, rgba(31,35,72,.6)); }
+.nq-cc-name-hit-unverified { box-shadow:inset 0 0 0 1.5px var(--nq-cc-warning, #fc8702); }
+.nq-cc-name-unverified { font-size:11px; font-weight:700; white-space:nowrap; color:var(--nq-cc-warning, #fc8702); }
 `;

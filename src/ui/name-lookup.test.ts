@@ -3,6 +3,8 @@
 // faked per host with the two recorded mainnet answers from ../names, so the
 // proof check still runs for real.
 import { describe, expect, test } from 'bun:test';
+import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
 import { Window } from 'happy-dom';
 import { mountMiniWallet, type CornerControlOptions } from './corner-control';
 import { shellLocales, mergeLocales } from '../locales';
@@ -68,8 +70,14 @@ function mount(opts: Partial<CornerControlOptions> = {}) {
     await new Promise((r) => setTimeout(r, waitMs));
   };
   const row = () => host.querySelector('.nq-cc-name-row') as HTMLElement | null;
-  return { host, field, type, row, calls, paid };
+  const reopen = () => {
+    (host.querySelector('.nq-cc-view-sendto .nq-cc-back') as HTMLElement).click();
+    (host.querySelector('.nq-cc-send') as HTMLElement).click();
+  };
+  return { host, field, type, row, calls, paid, reopen };
 }
+
+const settled = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
 describe('names in the recipient field', () => {
   test('a registered name offers its proven address, and does not advance on its own', async () => {
@@ -139,6 +147,131 @@ describe('names in the recipient field', () => {
     expect(row()).toBeNull();
     expect(field.value).toBe('GAST ON');
     expect(calls).toEqual([]);
+  });
+
+  describe('a delegated answer', () => {
+    const FORGED_HOST = 'evil.example';
+    const PICKED = 'NQ48 8CKH BA24 2VR3 N249 N8MN J5XX 74DB 5XJ8';
+    const delegated = (((url: string) => {
+      const u = new URL(url);
+      const body = u.host === FORGED_HOST ? { address: PICKED, ttl: 60 }
+        : { ...(u.host === 'api.nimiqnames.com' ? a : b), host: FORGED_HOST };
+      return Promise.resolve(new Response(JSON.stringify(body), { status: 200 }));
+    }) as typeof fetch);
+
+    test('a forged host on both answers draws a row that says the address is not verified', async () => {
+      const { type, row } = mount({ names: { fetch: delegated } });
+      await type('shop.gaston');
+      const hit = row()!.querySelector('.nq-cc-name-hit') as HTMLElement;
+      expect(hit.title).toBe(PICKED);
+      expect(hit.classList.contains('nq-cc-name-hit-unverified')).toBe(true);
+      expect(hit.querySelector('.nq-cc-name-unverified')!.textContent).toBe('Address not verified');
+      expect(hit.getAttribute('aria-label')).toBe('Pay shop.gaston. Address not verified');
+    });
+
+    test('a proven name on the same fetch draws no such line', async () => {
+      const { type, row } = mount({ names: { fetch: delegated } });
+      await type('gaston');
+      const hit = row()!.querySelector('.nq-cc-name-hit') as HTMLElement;
+      expect(hit.title).toBe(GASTON_SPACED);
+      expect(hit.classList.contains('nq-cc-name-hit-unverified')).toBe(false);
+      expect(hit.querySelector('.nq-cc-name-unverified')).toBeNull();
+      expect(hit.getAttribute('aria-label')).toBe('Pay gaston');
+    });
+
+    test('tapping it fills the address and the amount sheet does not name the recipient', async () => {
+      const { host, field, type, row } = mount({ names: { fetch: delegated } });
+      await type('shop.gaston');
+      (row()!.querySelector('.nq-cc-name-hit') as HTMLElement).click();
+      expect(field.value.replace(/\s+/g, ' ')).toBe(PICKED);
+      expect(host.querySelector('.nq-cc')!.classList.contains('nq-cc-show-send')).toBe(true);
+      const parties = host.querySelectorAll('.nq-cc-party-name');
+      const party = parties[parties.length - 1] as HTMLElement;
+      expect(party.textContent).toBe('NQ48 8CKH BA24');
+      expect(party.classList.contains('nq-cc-is-name')).toBe(false);
+    });
+  });
+
+  describe('a write to the field from code', () => {
+    const BOB = 'NQ48 8CKH BA24 2VR3 N249 N8MN J5XX 74DB 5XJ8';
+    const withBob = { contacts: { list: async () => [{ label: 'Bob', address: BOB }] } };
+    const chip = async (host: HTMLElement) => {
+      await settled(40);
+      return host.querySelector('.nq-cc-contact') as HTMLElement;
+    };
+
+    test('a chip tapped while the answer is in flight drops that answer', async () => {
+      const { host, field, type, row } = mount(withBob);
+      const bob = await chip(host);
+      await type('gaston', NAME_LOOKUP_DEBOUNCE_MS + 20);
+      bob.click();
+      await settled(700);
+      expect(field.value.replace(/\s+/g, ' ')).toBe(BOB);
+      expect(row()!.hidden).toBe(true);
+      expect(row()!.querySelector('.nq-cc-name-hit')).toBeNull();
+    });
+
+    test('a chip tapped during the debounce cancels the lookup', async () => {
+      const { host, type, row, calls } = mount(withBob);
+      const bob = await chip(host);
+      await type('gaston', 0);
+      bob.click();
+      await settled(NAME_LOOKUP_DEBOUNCE_MS + 100);
+      expect(calls).toEqual([]);
+      expect(row()!.hidden).toBe(true);
+    });
+
+    test('a chip tapped over a drawn row takes the row away', async () => {
+      const { host, type, row } = mount(withBob);
+      const bob = await chip(host);
+      await type('gaston');
+      expect(row()!.querySelector('.nq-cc-name-hit')).not.toBeNull();
+      bob.click();
+      expect(row()!.hidden).toBe(true);
+      expect(row()!.querySelector('.nq-cc-name-hit')).toBeNull();
+    });
+
+    test('no code writes the field except through the one helper', () => {
+      const source = readFileSync(join(import.meta.dir, 'corner-control.ts'), 'utf8');
+      expect(source.match(/recipientInput\.value\s*=[^=]/g)).toHaveLength(1);
+      expect(source).toContain('recipientInput.value = text;\n    names?.fieldWritten();');
+    });
+  });
+
+  describe('reopening the sheet', () => {
+    test('a name still in the field gets its row back', async () => {
+      const { field, type, row, reopen } = mount();
+      await type('gaston');
+      reopen();
+      expect(field.value).toBe('gaston');
+      await settled(NAME_LOOKUP_DEBOUNCE_MS + 650);
+      const hit = row()!.querySelector('.nq-cc-name-hit') as HTMLElement;
+      expect(hit.title).toBe(GASTON_SPACED);
+    });
+
+    test('a plain address stays in the field, as it always has, and asks nobody', async () => {
+      const { field, type, row, calls, reopen } = mount();
+      await type('nq12acqm28ql');
+      reopen();
+      await settled(NAME_LOOKUP_DEBOUNCE_MS + 100);
+      expect(field.value).toBe('NQ12 ACQM 28QL');
+      expect(row()!.hidden).toBe(true);
+      expect(calls).toEqual([]);
+    });
+
+    test('a pick from before the close is forgotten', async () => {
+      const { host, type, row, reopen } = mount();
+      await type('gaston');
+      (row()!.querySelector('.nq-cc-name-hit') as HTMLElement).click();
+      (host.querySelector('.nq-cc-view-send .nq-cc-back') as HTMLElement).click();
+      reopen();
+      await settled(NAME_LOOKUP_DEBOUNCE_MS + 100);
+      expect(row()!.hidden).toBe(true);
+      // Same address, typed this time: it is no longer the name's to label.
+      await type(GASTON_SPACED, 0);
+      const parties = host.querySelectorAll('.nq-cc-party-name');
+      expect((parties[parties.length - 1] as HTMLElement).textContent).toBe('NQ12 ACQM 28QL');
+    });
   });
 
   describe('.nim', () => {

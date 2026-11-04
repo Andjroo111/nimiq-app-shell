@@ -37,6 +37,7 @@ export default {
   "shell.nameMissing": "没有人持有名称 {name}",
   "shell.namePending": "{name} 刚刚更改，请一分钟后重试",
   "shell.nameFailed": "暂时无法检查 {name}",
+  "shell.nameUnverified": "地址未验证",
   "shell.publicMessage": "添加公开留言...",
   "shell.contacts": "联系人",
   "shell.addressUnavailable": "没有地址？",

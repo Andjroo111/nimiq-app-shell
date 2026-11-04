@@ -34,6 +34,7 @@ export default {
   "shell.nameMissing": "{name} नाम किसी के पास नहीं है",
   "shell.namePending": "{name} अभी बदला है। एक मिनट में फिर कोशिश करें",
   "shell.nameFailed": "{name} अभी जाँचा नहीं जा सका",
+  "shell.nameUnverified": "पता सत्यापित नहीं है",
   "shell.publicMessage": "सार्वजनिक संदेश जोड़ें...",
   "shell.contacts": "संपर्क",
   "shell.addressUnavailable": "पता उपलब्ध नहीं?",

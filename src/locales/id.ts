@@ -34,6 +34,7 @@ export default {
   "shell.nameMissing": "Tidak ada yang memiliki nama {name}",
   "shell.namePending": "{name} baru saja berubah. Coba lagi dalam satu menit",
   "shell.nameFailed": "Tidak dapat memeriksa {name} saat ini",
+  "shell.nameUnverified": "Alamat belum diverifikasi",
   "shell.publicMessage": "Tambahkan pesan publik...",
   "shell.contacts": "Kontak",
   "shell.addressUnavailable": "Alamat tidak tersedia?",

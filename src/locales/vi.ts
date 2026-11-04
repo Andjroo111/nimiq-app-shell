@@ -34,6 +34,7 @@ export default {
   "shell.nameMissing": "Không ai sở hữu tên {name}",
   "shell.namePending": "{name} vừa thay đổi. Hãy thử lại sau một phút",
   "shell.nameFailed": "Không thể kiểm tra {name} lúc này",
+  "shell.nameUnverified": "Địa chỉ chưa được xác minh",
   "shell.publicMessage": "Thêm tin nhắn công khai...",
   "shell.contacts": "Danh bạ",
   "shell.addressUnavailable": "Không có địa chỉ?",

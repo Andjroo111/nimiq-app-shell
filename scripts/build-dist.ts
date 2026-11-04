@@ -1,12 +1,12 @@
 // Builds the committed CDN bundle: same output as
 //   bun build src/index.ts --target browser --format esm --minify --outfile dist/app-shell.js
-// except for two pieces of NNS data that nothing on the read path consults, and
-// that a public repo with a committed dist/ should not carry.
+// except for two pieces of NNS data that nothing on the read path consults.
 //
 // 1. @nimiqnames/anchor's compiled contract bytecode. Only deploy.js reads it,
 // and that is not in this bundle; the resolver wants ARTIFACT.anchoredTopic0 from
-// the same object, so the object stays and the two long hex values go. They are
-// what the public repo's privacy gate tripped on.
+// the same object, so the object stays and the two long hex values go. That is
+// about 1 KB of dead weight and the only reason: the privacy gate did not flag
+// them, and CI's gate was already clean at 09e7ac8 with them in the bundle.
 //
 // 2. @nimiqnames/core's published reserved-word list. Their resolver releases every
 // query from reservation before parsing it (`parseQuery(query, new Set([name]))`

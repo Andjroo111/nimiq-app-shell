@@ -34,6 +34,7 @@ export default {
   "shell.nameMissing": "Babu wanda ke da sunan {name}",
   "shell.namePending": "{name} ya canza yanzu. Sake gwadawa bayan minti ɗaya",
   "shell.nameFailed": "Ba a iya duba {name} yanzu ba",
+  "shell.nameUnverified": "Ba a tabbatar da adireshin ba",
   "shell.publicMessage": "Ƙara saƙo na jama'a...",
   "shell.contacts": "Lambobin sadarwa",
   "shell.addressUnavailable": "Babu adireshi?",
