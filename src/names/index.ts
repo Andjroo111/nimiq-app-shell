@@ -23,7 +23,7 @@ import {
   type ResolverEndpoint,
   type Verification,
 } from '@nimiqnames/resolver';
-import { parseQuery } from '@nimiqnames/core';
+import { isShortReserved, parseQuery } from '@nimiqnames/core';
 import { createNimResolver, nimQuery, NIM_RESOLVERS, type NimResolverOptions } from './nim';
 
 export { DEFAULT_RESOLVERS as NNS_RESOLVERS, NIM_RESOLVERS, nimQuery };
@@ -86,7 +86,13 @@ export function nameQuery(raw: string): string | null {
   if (!text) return null;
   if (text.endsWith('.nim')) return nimQuery(text);
   if (looksLikeAddress(text)) return null;
-  return parseQuery(text).ok ? text : null;
+  // Syntax only, released from the published reserved list the way their
+  // resolver's own resolve() releases it: a reserved name awarded on chain is
+  // an ordinary name, and one that is not resolves to nothing there. Short names
+  // stay out because each one is a keystroke on the way to a longer name.
+  const parent = text.slice(text.indexOf('.') + 1);
+  if (isShortReserved(parent)) return null;
+  return parseQuery(text, new Set([parent])).ok ? text : null;
 }
 
 export function createNameResolver(options: NameResolverOptions = {}): NameResolver {
