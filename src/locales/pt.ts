@@ -35,6 +35,7 @@ export default {
   'shell.nameUnverified': 'Endereço não verificado',
   'shell.nameUseAddress': 'Enviar para este endereço',
   'shell.nameUndelegated': '{name} não existe. O nome principal não tem delegação',
+  'shell.nameInvalid': 'Digite um endereço sem símbolos ou um nome com pelo menos 5 letras',
   'shell.publicMessage': 'Adicione uma mensagem pública...',
   'shell.contacts': 'Contatos',
   'shell.addressUnavailable': 'Endereço indisponível?',

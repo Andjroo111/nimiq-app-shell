@@ -37,6 +37,7 @@ export default {
   "shell.nameUnverified": "Alamat belum diverifikasi",
   "shell.nameUseAddress": "Kirim ke alamat ini",
   "shell.nameUndelegated": "{name} tidak ada. Nama induknya tidak memiliki delegasi",
+  "shell.nameInvalid": "Masukkan alamat tanpa simbol, atau nama dengan minimal 5 huruf",
   "shell.publicMessage": "Tambahkan pesan publik...",
   "shell.contacts": "Kontak",
   "shell.addressUnavailable": "Alamat tidak tersedia?",

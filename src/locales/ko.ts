@@ -37,6 +37,7 @@ export default {
   "shell.nameUnverified": "주소가 확인되지 않았습니다",
   "shell.nameUseAddress": "이 주소로 보내기",
   "shell.nameUndelegated": "{name}은(는) 없습니다. 상위 이름에 위임이 없습니다",
+  "shell.nameInvalid": "기호 없는 주소 또는 5자 이상의 이름을 입력하세요",
   "shell.publicMessage": "공개 메시지 추가...",
   "shell.contacts": "연락처",
   "shell.addressUnavailable": "주소가 없나요?",

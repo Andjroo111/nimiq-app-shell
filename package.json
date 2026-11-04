@@ -37,6 +37,7 @@
     }
   },
   "devDependencies": {
+    "@nimiqnames/anchor": "0.1.0",
     "@types/bun": "^1.2.0",
     "happy-dom": "^20.11.2",
     "typescript": "^5.7.0"

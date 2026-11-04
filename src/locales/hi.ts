@@ -37,6 +37,7 @@ export default {
   "shell.nameUnverified": "पता सत्यापित नहीं है",
   "shell.nameUseAddress": "इस पते पर भेजें",
   "shell.nameUndelegated": "{name} मौजूद नहीं है। मूल नाम का कोई प्रत्यायोजन नहीं है",
+  "shell.nameInvalid": "बिना चिह्नों वाला पता या कम से कम 5 अक्षरों वाला नाम दर्ज करें",
   "shell.publicMessage": "सार्वजनिक संदेश जोड़ें...",
   "shell.contacts": "संपर्क",
   "shell.addressUnavailable": "पता उपलब्ध नहीं?",

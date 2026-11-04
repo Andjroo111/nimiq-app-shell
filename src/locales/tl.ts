@@ -40,6 +40,7 @@ export default {
   "shell.nameUnverified": "Hindi beripikado ang address",
   "shell.nameUseAddress": "Ipadala sa address na ito",
   "shell.nameUndelegated": "Walang {name}. Walang delegasyon ang parent na pangalan",
+  "shell.nameInvalid": "Maglagay ng address na walang simbolo, o pangalang may hindi bababa sa 5 letra",
   "shell.publicMessage": "Magdagdag ng pampublikong mensahe...",
   "shell.contacts": "Mga kontak",
   "shell.addressUnavailable": "Walang adres?",

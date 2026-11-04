@@ -1,5 +1,5 @@
 // `.nim` names in the recipient field: type `alice.nim`, pay the address it
-// proves to. The registry is Andrew's own (nimiq.name), a separate namespace from
+// proves to. The registry is the repo owner's (nimiq.name), a separate namespace from
 // NNS: the suffix is what keeps `alice` and `alice.nim` from ever colliding.
 //
 // An answer counts only through its Merkle proof: the address is read from the

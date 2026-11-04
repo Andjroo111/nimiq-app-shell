@@ -6,7 +6,7 @@
 // straight to the signer.
 //
 // No auto-advance on typing, unlike a 36-character address. An address is
-// finished when it is long enough; a name is not: `gast` might be registered
+// finished when it is long enough; a name is not: `gasto` might be registered
 // too, and a sheet that jumped on the first hit would pay whoever holds the
 // prefix.
 //
@@ -17,10 +17,12 @@
 // continues. The amount sheet then shows the address, not the name.
 //
 // Pending, missing, undelegated and failed each get one grey line and nothing to
-// tap. See ../names for why each state is what it is; this file only draws them.
+// tap, and so does text in name mode that cannot be queried at all, so the field
+// never sits there saying nothing. See ../names for why each state is what it is;
+// this file only draws them.
 
 import type { I18n } from '../i18n';
-import { addressIsVerified, nameQuery, type NameResolver } from '../names';
+import { addressIsVerified, isNameInput, nameQuery, type NameResolver } from '../names';
 import { formatAddressBlocks } from './address-input';
 
 /** How long typing must pause before a lookup. Each lookup is two resolver
@@ -59,7 +61,7 @@ export function mountNameLookup(opts: {
   let timer: ReturnType<typeof setTimeout> | undefined;
   // Every lookup takes a ticket. An answer whose ticket is not the latest is
   // for text no longer in the field, and drawing it would offer the address of
-  // `gast` under a field that now says `gaston`.
+  // `gasto` under a field that now says `gaston`.
   let ticket = 0;
   let picked: { name: string; address: string } | null = null;
 
@@ -70,6 +72,11 @@ export function mountNameLookup(opts: {
     line.className = 'nq-cc-name-note';
     line.textContent = i18n.t(key, { name });
     row.appendChild(line);
+  }
+
+  /** The keyboard takes half a phone. An answer nobody can see is no answer. */
+  function reveal(el: HTMLElement): void {
+    el.scrollIntoView?.({ block: 'nearest' });
   }
 
   function faceFor(address: string): HTMLElement | null {
@@ -111,6 +118,7 @@ export function mountNameLookup(opts: {
       opts.onPick(spaced);
     });
     row.appendChild(btn);
+    reveal(btn);
   }
 
   /** Not a button: reading it must not be one mis-tap from the amount sheet. */
@@ -137,7 +145,8 @@ export function mountNameLookup(opts: {
     go.type = 'button';
     go.className = 'nq-cc-name-continue';
     go.textContent = i18n.t('shell.nameUseAddress');
-    go.setAttribute('aria-label', `${i18n.t('shell.payName', { name })}. ${i18n.t('shell.nameUnverified')}`);
+    // Starts with the visible words, so voice control can say what it sees (WCAG 2.5.3).
+    go.setAttribute('aria-label', `${i18n.t('shell.nameUseAddress')}: ${name}. ${i18n.t('shell.nameUnverified')}`);
     go.addEventListener('click', () => {
       picked = null;
       row.hidden = true;
@@ -145,6 +154,8 @@ export function mountNameLookup(opts: {
     });
     box.append(head, full, go);
     row.appendChild(box);
+    reveal(box);
+    reveal(go);
   }
 
   function clear(): void {
@@ -156,7 +167,11 @@ export function mountNameLookup(opts: {
     clearTimeout(timer);
     const query = nameQuery(field.value);
     ticket += 1;
-    if (!query) { clear(); return; }
+    if (!query) {
+      if (isNameInput(field.value)) note('shell.nameInvalid', '');
+      else clear();
+      return;
+    }
     const mine = ticket;
     note('shell.nameChecking', query);
     timer = setTimeout(async () => {
@@ -204,8 +219,8 @@ export const NAME_LOOKUP_CSS = `
   white-space:normal; overflow:visible; overflow-wrap:anywhere; }
 .nq-cc-name-row { width:100%; margin-top:10px; display:flex; justify-content:center; }
 .nq-cc-name-row[hidden] { display:none; }
-.nq-cc-name-note { margin:0; font-size:12px; font-weight:600; text-align:center;
-  color:var(--nq-cc-menu-muted, rgba(31,35,72,.5)); }
+.nq-cc-name-note { margin:0; max-width:100%; font-size:12px; font-weight:600; text-align:center;
+  overflow-wrap:anywhere; color:color-mix(in srgb, var(--nq-cc-menu-fg, #1f2348) 70%, transparent); }
 .nq-cc-name-hit { display:flex; align-items:center; gap:10px; max-width:100%;
   padding:8px 14px 8px 8px; border:none; border-radius:500px; font-family:inherit; cursor:pointer;
   background:var(--nq-cc-menu-hover, rgba(31,35,72,.06)); color:var(--nq-cc-menu-fg, #1f2348); }

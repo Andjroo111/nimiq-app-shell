@@ -79,6 +79,13 @@ function mount(opts: Partial<CornerControlOptions> = {}) {
 
 const settled = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
+const delegatedFetch = ((url: string) => {
+  const u = new URL(url);
+  const body = u.host === 'evil.example' ? { address: 'NQ48 8CKH BA24 2VR3 N249 N8MN J5XX 74DB 5XJ8', ttl: 60 }
+    : { ...(u.host === 'api.nimiqnames.com' ? a : b), host: 'evil.example' };
+  return Promise.resolve(new Response(JSON.stringify(body), { status: 200 }));
+}) as typeof fetch;
+
 describe('names in the recipient field', () => {
   test('a registered name offers its proven address, and does not advance on its own', async () => {
     const { host, field, type, row } = mount();
@@ -167,7 +174,7 @@ describe('names in the recipient field', () => {
       expect(row()!.querySelector('.nq-cc-name-full')!.textContent).toBe('NQ48 8CKH BA24\n2VR3 N249 N8MN\nJ5XX 74DB 5XJ8');
       const go = row()!.querySelector('.nq-cc-name-continue') as HTMLElement;
       expect(go.textContent).toBe('Send to this address');
-      expect(go.getAttribute('aria-label')).toBe('Pay shop.gaston. Address not verified');
+      expect(go.getAttribute('aria-label')).toBe('Send to this address: shop.gaston. Address not verified');
       // Showing it moves nothing: the field and the step wait for the tap.
       expect(field.value).toBe('shop.gaston');
       expect(host.querySelector('.nq-cc')!.classList.contains('nq-cc-show-send')).toBe(false);
@@ -212,6 +219,115 @@ describe('names in the recipient field', () => {
     });
   });
 
+  describe('what a paste can look like', () => {
+    const SPELLED = GASTON_SPACED.replace(/ /g, '');
+    const onSendSheet = (host: HTMLElement) => host.querySelector('.nq-cc')!.classList.contains('nq-cc-show-send');
+    const addresses: Record<string, string> = {
+      'a leading zero-width space': `\u200b${SPELLED}`,
+      'a space inside the prefix': `NQ 12 ACQM 28QL U8T2 L9J1 GVN4 NJPL 1P3G ENVG`,
+      'a nimiq:// link': `nimiq://${SPELLED}`,
+      'a zero-width space before nimiq:': `\u200bnimiq:${SPELLED}`,
+      'quotes': `"${SPELLED}"`,
+    };
+    for (const [what, text] of Object.entries(addresses)) {
+      test(`${what} is an address`, async () => {
+        const { host, field, type, row } = mount();
+        await type(text, 0);
+        expect(field.value.replace(/\s+/g, ' ')).toBe(GASTON_SPACED);
+        expect(onSendSheet(host)).toBe(true);
+        expect(row()!.hidden).toBe(true);
+      });
+    }
+
+    const names: Record<string, string> = {
+      'an @': `@${SPELLED}`,
+      'an @ behind a quote': `"@${SPELLED}`,
+      'an @ behind a zero-width space': `\u200b@${SPELLED}`,
+      '.nim': `${SPELLED}.nim`,
+      '.nim inside quotes': `"${SPELLED}.nim"`,
+      '.nim before a zero-width space': `${SPELLED}.nim\u200b`,
+    };
+    for (const [what, text] of Object.entries(names)) {
+      test(`${what} stays a name, does not advance and draws a line`, async () => {
+        const { host, type, row } = mount();
+        await type(text, 0);
+        expect(onSendSheet(host)).toBe(false);
+        expect(row()!.hidden).toBe(false);
+        expect(row()!.textContent).not.toBe('');
+      });
+    }
+
+    test('text in name mode with no query says why', async () => {
+      const { type, row, calls } = mount();
+      await type('gas', 0);
+      expect(row()!.textContent).toBe('Enter an address without symbols, or a name of at least 5 letters');
+      expect(calls).toEqual([]);
+    });
+
+    test('an empty field draws nothing', async () => {
+      const { type, row } = mount();
+      await type('gas', 0);
+      await type('', 0);
+      expect(row()!.hidden).toBe(true);
+    });
+  });
+
+  describe('a drawn row on a short screen', () => {
+    const watch = () => {
+      const seen: string[] = [];
+      (globalThis.HTMLElement.prototype as unknown as Record<string, unknown>).scrollIntoView =
+        function (this: HTMLElement) { seen.push(this.className); };
+      return seen;
+    };
+
+    test('a proven row scrolls into view', async () => {
+      const { type } = mount();
+      const seen = watch();
+      await type('gaston');
+      expect(seen).toContain('nq-cc-name-hit');
+    });
+
+    test('an unverified row brings its box and its button into view', async () => {
+      const { type } = mount({ names: { fetch: delegatedFetch } });
+      const seen = watch();
+      await type('shop.gaston');
+      expect(seen).toEqual(['nq-cc-name-unverified-box', 'nq-cc-name-continue']);
+    });
+  });
+
+  describe('the unverified button in every language', () => {
+    for (const locale of Object.keys(mergeLocales(shellLocales))) {
+      test(`${locale}: the accessible name contains the visible words`, async () => {
+        const i18n = createI18n({ locales: mergeLocales(shellLocales), fallback: 'en' });
+        i18n.setLanguage(locale);
+        const { type, row } = mount({ names: { fetch: delegatedFetch }, i18n } as never);
+        await type('shop.gaston');
+        const go = row()!.querySelector('.nq-cc-name-continue') as HTMLElement;
+        expect(go.textContent!.length).toBeGreaterThan(0);
+        expect(go.getAttribute('aria-label')).toContain(go.textContent!);
+      });
+    }
+  });
+
+  test('an unverified pick of a proven address does not inherit the proven name', async () => {
+    // gaston is picked first, then a delegate host answers with gaston's own address.
+    const same = ((url: string) => {
+      const u = new URL(url);
+      const body = u.host === 'evil.example' ? { address: GASTON_SPACED, ttl: 60 }
+        : { ...(u.host === 'api.nimiqnames.com' ? a : b), host: 'evil.example' };
+      return Promise.resolve(new Response(JSON.stringify(body), { status: 200 }));
+    }) as typeof fetch;
+    const { host, type, row } = mount({ names: { fetch: same } });
+    await type('gaston');
+    (row()!.querySelector('.nq-cc-name-hit') as HTMLElement).click();
+    (host.querySelector('.nq-cc-view-send .nq-cc-back') as HTMLElement).click();
+    await type('shop.gaston');
+    (row()!.querySelector('.nq-cc-name-continue') as HTMLElement).click();
+    const parties = host.querySelectorAll('.nq-cc-party-name');
+    const party = parties[parties.length - 1] as HTMLElement;
+    expect(party.textContent).toBe('NQ12 ACQM 28QL');
+  });
+
   describe('text in name mode that spells an address', () => {
     const SPELLED = GASTON_SPACED.replace(/ /g, '');
     for (const text of [`@${SPELLED}`, `${SPELLED}.nim`]) {
@@ -250,6 +366,14 @@ describe('names in the recipient field', () => {
       const pct = Number(rule('.nq-cc-name-unverified-box').match(/#fc8702\) (\d+)%/)![1]) / 100;
       const washed = hex('#fc8702').map((c) => c * pct + 255 * (1 - pct));
       expect(ratio(hex(color), washed)).toBeGreaterThanOrEqual(4.5);
+    });
+
+    test('a note reaches AA on white and wraps a long name', () => {
+      const note = rule('.nq-cc-name-note');
+      expect(note).toContain('overflow-wrap:anywhere');
+      const [, fg, pct] = note.match(/color-mix\(in srgb, var\([^,]+, (#[0-9a-f]{6})\) (\d+)%, transparent\)/)!;
+      const alpha = Number(pct) / 100;
+      expect(ratio(hex(fg!).map((c) => c * alpha + 255 * (1 - alpha)), [255, 255, 255])).toBeGreaterThanOrEqual(4.5);
     });
 
     test('an address on either row is in the mono face its blocks line up in', () => {

@@ -40,6 +40,7 @@ export default {
   "shell.nameUnverified": "Adres doğrulanmadı",
   "shell.nameUseAddress": "Bu adrese gönder",
   "shell.nameUndelegated": "{name} yok. Üst adın yetkilendirmesi yok",
+  "shell.nameInvalid": "Sembol içermeyen bir adres veya en az 5 harfli bir ad girin",
   "shell.publicMessage": "Herkese açık mesaj ekleyin...",
   "shell.contacts": "Kişiler",
   "shell.addressUnavailable": "Adres yok mu?",

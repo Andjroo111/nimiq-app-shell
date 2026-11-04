@@ -40,6 +40,7 @@ export default {
   "shell.nameUnverified": "地址未验证",
   "shell.nameUseAddress": "发送到此地址",
   "shell.nameUndelegated": "{name} 不存在。其上级名称没有委托",
+  "shell.nameInvalid": "请输入不含符号的地址，或至少 5 个字母的名称",
   "shell.publicMessage": "添加公开留言...",
   "shell.contacts": "联系人",
   "shell.addressUnavailable": "没有地址？",

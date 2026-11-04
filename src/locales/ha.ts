@@ -37,6 +37,7 @@ export default {
   "shell.nameUnverified": "Ba a tabbatar da adireshin ba",
   "shell.nameUseAddress": "Aika zuwa wannan adireshin",
   "shell.nameUndelegated": "{name} ba ya wanzu. Sunan asali ba shi da wakilci",
+  "shell.nameInvalid": "Shigar da adireshi ba tare da alamomi ba, ko suna mai haruffa 5 ko fiye",
   "shell.publicMessage": "Ƙara saƙo na jama'a...",
   "shell.contacts": "Lambobin sadarwa",
   "shell.addressUnavailable": "Babu adireshi?",

@@ -1,20 +1,22 @@
 // Nimiq names in the recipient field: type `gaston`, pay NQ12 ACQM ...
 //
-// The registry is NOT ours. It is selfcrypto's NNS (nimiqnames.com, Mini Apps
-// Competition Cycle II), live on mainnet since height 62,275,680. We shelved
-// our own nimiq.name registry on 2026-09-26 rather than run a second one: two
-// registries on one chain means `alice` can resolve to two addresses, which is
-// the one failure a name service exists to prevent. So the fleet READS theirs.
+// The registry for bare names is NOT ours. It is selfcrypto's NNS (nimiqnames.com,
+// Mini Apps Competition Cycle II), live on mainnet since height 62,275,680. We
+// dropped our own bare-name registry on 2026-09-26 rather than run a second one:
+// two registries on one chain means `alice` can resolve to two addresses, which is
+// the one failure a name service exists to prevent. So for bare names the fleet
+// READS theirs.
 //
 // Everything that decides whether an answer is true lives in their
 // `@nimiqnames/resolver`, pinned exactly: the name syntax, the two-resolver
 // quorum and the Merkle proof each answer must recombine to. This file only
 // decides WHEN the field is holding a name, and turns their outcomes into the
-// three states the send sheet draws. Restating their rules here is how the two
-// would drift.
+// NameLookup states below. Restating their rules here is how the two would drift.
 //
-// `alice.nim` is a different registry: Andrew's own, read through ./nim. A `.nim`
-// query goes there and never to NNS, which would read it as a subdomain of `nim`.
+// `alice.nim` is a different namespace: nimiq.name came back on 2026-09-29 as the
+// repo owner's registry for `.nim` names only, read through ./nim. The suffix is
+// what keeps it from colliding with NNS. A `.nim` query goes there and never to
+// NNS, which would read it as a subdomain of `nim`.
 // Both paths only read. Nothing here pays or refers anything to either registry.
 
 import {
@@ -45,9 +47,11 @@ export type NameLookup =
   | { state: 'failed'; query: string };
 
 export interface NameResolverOptions {
-  /** ADD to the shipped list, never replace it. Their spec requires two
-   *  independent resolvers to agree, and swapping the list for one of your
-   *  own is how one party ends up vouching for itself. */
+  /** ADD to the shipped list, never replace it. Their spec asks for independent
+   *  resolvers, and the shipped list does not meet that: one operator runs both,
+   *  so today one party already vouches for itself (see createNameResolver). An
+   *  independently run endpoint added here is what upstream says closes the gap;
+   *  replacing the list loses the check against their replay. */
   resolvers?: ResolverEndpoint[];
   /** Per-resolver budget. Theirs is 5000 ms; kept, since a slow answer the
    *  user waits for beats a working resolver reported as down. */
@@ -71,8 +75,12 @@ export interface NameResolver {
  *  field; none are registered, and the cost is that a sender pastes the
  *  address instead. */
 export function looksLikeAddress(raw: string): boolean {
-  if (/\.nim\s*$/i.test(raw)) return false; // no address ends in .nim, so a pasted `nq1cafe.nim` is a name
-  return /^\s*(?:nimiq:)?\s*nq\d/i.test(raw);
+  // Paste debris falls away the way significantChars drops it: a zero-width space,
+  // quotes, `nimiq://`, spaces inside the prefix. `@` and `.nim` do not, because
+  // they are how a sender says name, debris or not.
+  if (/\.nim$/i.test(raw.replace(/[^0-9a-z]+$/i, ''))) return false; // no address ends in .nim, so a pasted `nq1cafe.nim` is a name
+  const body = raw.replace(/^[^0-9a-z@]*/i, '').replace(/^nimiq:[^0-9a-z@]*/i, '');
+  return /^nq\d/i.test(body.replace(/[^0-9a-z@]/gi, ''));
 }
 
 /** Whether the field should be in NAME mode: anything typed that is not an

@@ -43,6 +43,14 @@ describe('nameQuery', () => {
     expect(nameQuery('nimiq:NQ12ACQM')).toBeNull();
   });
 
+  test('a query is at least 5 characters, so the prefix in the docs is one that can answer', () => {
+    expect(nameQuery('gast')).toBeNull();
+    expect(nameQuery('gasto')).toBe('gasto');
+    for (const path of ['../../README.md', '../ui/name-lookup.ts']) {
+      expect(readFileSync(join(import.meta.dir, path), 'utf8')).not.toContain('`gast`');
+    }
+  });
+
   test('text outside their syntax is not a name', () => {
     expect(nameQuery('')).toBeNull();
     expect(nameQuery('bad_name')).toBeNull();
@@ -100,6 +108,23 @@ describe('what the docs say about the resolvers', () => {
     expect(upstream).toContain('both are run by the operator that publishes this package');
   });
 
+  test('the header does not count the states, and each registry is described as it is', () => {
+    const header = read('index.ts').split('import {')[0]!.replace(/\s*\n\/\/\s*/g, ' ');
+    expect(header).not.toMatch(/\b(three|four|five|six) states\b/);
+    expect(header).toContain('The registry for bare names is NOT ours');
+    expect(header).toContain('`alice.nim` is a different namespace');
+    const option = read('index.ts').replace(/\s*\n\s*\*?\s*/g, ' ');
+    expect(option).toContain('the shipped list does not meet that: one operator runs both');
+  });
+
+  test('every @nimiqnames package a test imports is declared', () => {
+    const pkg = JSON.parse(read('../../package.json'));
+    const declared = { ...pkg.dependencies, ...pkg.devDependencies };
+    const imported = [...read('names.test.ts').matchAll(/from '(@nimiqnames\/[a-z]+)'/g)].map((m) => m[1]!);
+    expect(imported).toContain('@nimiqnames/anchor');
+    for (const name of imported) expect(declared[name]).toBeDefined();
+  });
+
   test('the README and the code state it, and nothing calls them independent', () => {
     const readme = read('../../README.md').replace(/\s+/g, ' ');
     expect(readme).toContain('Both resolvers are run by one operator');
@@ -107,6 +132,20 @@ describe('what the docs say about the resolvers', () => {
     expect(readme).not.toContain('two independent resolvers');
     const code = read('index.ts').replace(/\s*\n\s*\*?\s*/g, ' ');
     expect(code).toContain("A found NNS answer rests on one operator's honesty");
+  });
+});
+
+describe('looksLikeAddress through isNameInput', () => {
+  const ADDRESS = 'NQ12ACQM28QLU8T2L9J1GVN4NJPL1P3GENVG';
+  test('paste debris does not stop an address being one', () => {
+    for (const text of [`\u200b${ADDRESS}`, 'NQ 12 ACQM', `nimiq://${ADDRESS}`, `"${ADDRESS}"`, `\u200bnimiq:${ADDRESS}`]) {
+      expect(isNameInput(text)).toBe(false);
+    }
+  });
+  test('@ and .nim still mean a name, whatever is around them', () => {
+    for (const text of [`@${ADDRESS}`, `"@${ADDRESS}`, `\u200b@${ADDRESS}`, `nimiq:@${ADDRESS}`, `${ADDRESS}.nim`, `"${ADDRESS}.NIM"`, `${ADDRESS}.nim\u200b`]) {
+      expect(isNameInput(text)).toBe(true);
+    }
   });
 });
 

@@ -27,7 +27,7 @@ export const NIM_ADDRESS_LENGTH = 36;
  *  address. Spaces, dashes and a pasted `nimiq:` URI prefix all fall away. */
 export function significantChars(raw: string): string {
   return raw
-    .replace(/^\s*(?:nimiq:)?/i, '')
+    .replace(/^[^0-9A-Za-z]*(?:nimiq:)?/i, '')
     .replace(/[^0-9A-Za-z]/g, '')
     .toUpperCase()
     .slice(0, NIM_ADDRESS_LENGTH);

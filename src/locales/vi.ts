@@ -37,6 +37,7 @@ export default {
   "shell.nameUnverified": "Địa chỉ chưa được xác minh",
   "shell.nameUseAddress": "Gửi đến địa chỉ này",
   "shell.nameUndelegated": "{name} không tồn tại. Tên cha không có ủy quyền",
+  "shell.nameInvalid": "Nhập địa chỉ không có ký hiệu hoặc tên có ít nhất 5 chữ cái",
   "shell.publicMessage": "Thêm tin nhắn công khai...",
   "shell.contacts": "Danh bạ",
   "shell.addressUnavailable": "Không có địa chỉ?",
