@@ -1,17 +1,24 @@
 // Builds the committed CDN bundle: same output as
 //   bun build src/index.ts --target browser --format esm --minify --outfile dist/app-shell.js
-// except that @nimiqnames/core's published reserved-word list is left out.
+// except for two pieces of NNS data that nothing on the read path consults, and
+// that a public repo with a committed dist/ should not carry.
 //
-// Why the bundle can drop it: this repo is public and dist/ is committed, and
-// nothing on the read path consults the list. Their resolver releases every
+// 1. @nimiqnames/anchor's compiled contract bytecode. Only deploy.js reads it,
+// and that is not in this bundle; the resolver wants ARTIFACT.anchoredTopic0 from
+// the same object, so the object stays and the two long hex values go. They are
+// what the public repo's privacy gate tripped on.
+//
+// 2. @nimiqnames/core's published reserved-word list. Their resolver releases every
 // query from reservation before parsing it (`parseQuery(query, new Set([name]))`
 // in resolver/dist/resolve.js), and nameQuery does the same. So the list is
 // only ever data the bundle carries, because CONSTANTS holds it and the resolver
 // reads CONSTANTS. Their own build of the resolver (nns.js) carries it too, so
 // importing something else from their packages is not a way out.
 //
-// names.test.ts fails if the list comes back, including if an upgrade moves the
-// file this filter names.
+// names.test.ts fails if either comes back, including if an upgrade moves a file
+// these filters name.
+
+const ANCHOR_BYTECODE = /"(bytecode|deployedBytecode)": "0x[0-9a-f]+"/g;
 
 const result = await Bun.build({
   entrypoints: ['src/index.ts'],
@@ -22,8 +29,12 @@ const result = await Bun.build({
   naming: 'app-shell.js',
   plugins: [
     {
-      name: 'nns-reserved-list-out',
+      name: 'nns-unread-data-out',
       setup(build) {
+        build.onLoad({ filter: /@nimiqnames\/anchor\/dist\/artifact\.js$/ }, async ({ path }) => ({
+          contents: (await Bun.file(path).text()).replace(ANCHOR_BYTECODE, '"$1": ""'),
+          loader: 'js',
+        }));
         build.onLoad({ filter: /@nimiqnames\/core\/dist\/reserved-names\.js$/ }, () => ({
           contents: 'export const RESERVED_NAMES = Object.freeze([]);',
           loader: 'js',

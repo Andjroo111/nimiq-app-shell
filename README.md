@@ -1004,8 +1004,8 @@ git tag, no install, no bundler, no vendored assets:
 
 Rebuild the bundle with `bun run build:dist` (it's committed so the CDN can serve
 it at the tagged ref). Bundled apps should keep importing the TS source instead.
-The bundle leaves out `@nimiqnames/core`'s published reserved-word list, which
-nothing on the read path consults; see `scripts/build-dist.ts`.
+The bundle leaves out NNS's published reserved-word list and its anchor contract
+bytecode, which nothing on the read path consults; see `scripts/build-dist.ts`.
 
 ---
 

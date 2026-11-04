@@ -4,6 +4,7 @@
 import { describe, expect, test } from 'bun:test';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
+import { ANCHORED_TOPIC0 } from '@nimiqnames/anchor';
 import { CONSTANTS } from '@nimiqnames/core';
 import { createNameResolver, isNameInput, nameQuery } from './index';
 import a from './fixtures/gaston.api.nimiqnames.com.json';
@@ -75,6 +76,11 @@ describe('the committed bundle', () => {
       new RegExp(`${quote}${list[i]!}${quote},\\s*${quote}${name}${quote}`).test(dist),
     );
     expect(carried.length).toBe(0);
+  });
+
+  test('does not carry the anchor contract bytecode, and keeps the topic the resolver reads', () => {
+    expect(dist).not.toMatch(/[0-9a-f]{128}/i);
+    expect(dist).toContain(ANCHORED_TOPIC0);
   });
 
   test('still holds the resolver and its default endpoints', () => {
