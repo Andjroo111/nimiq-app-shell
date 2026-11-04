@@ -76,27 +76,6 @@ describe('SDK 0.2 error contract', () => {
   });
 });
 
-describe('memo is hex on the wire', () => {
-  test('UTF-8 memo goes out as lowercase hex, never plaintext', async () => {
-    const sent: Sent[] = [];
-    const be = new MiniAppBackend({ provider: provider({}, sent) });
-    await be.signAndSend({ recipient: OTHER, valueLuna: 1, data: 'np:42:hé 🐶' });
-    const data = sent[0]!.tx.data as string;
-    expect(sent[0]!.method).toBe('data');
-    expect(data).toMatch(/^[0-9a-f]+$/);
-    expect(new TextDecoder().decode(Uint8Array.from(data.match(/../g)!.map((h) => parseInt(h, 16))))).toBe('np:42:hé 🐶');
-  });
-
-  test('raw bytes are hexed as-is; an empty memo is a basic send', async () => {
-    const sent: Sent[] = [];
-    const be = new MiniAppBackend({ provider: provider({}, sent) });
-    await be.signAndSend({ recipient: OTHER, valueLuna: 1, data: new Uint8Array([0, 255, 16]) });
-    await be.signAndSend({ recipient: OTHER, valueLuna: 1, data: '' });
-    expect(sent[0]!.tx.data).toBe('00ff10');
-    expect(sent[1]!.method).toBe('basic');
-  });
-});
-
 describe('HTLC accounts never become the identity', () => {
   test('one listed address: taken as-is, no RPC read', async () => {
     let reads = 0;

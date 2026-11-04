@@ -29,15 +29,19 @@ export interface WalletBackend {
   restore?(account: Account): void;
 }
 
-/** Encode SendArgs.data to the hex string the mini-app SDK expects, or to the
- *  Uint8Array the Hub expects. Centralised so both backends agree. */
-export function dataToHex(data: string | Uint8Array | undefined): string | undefined {
-  if (data == null) return undefined;
-  const bytes = typeof data === 'string' ? new TextEncoder().encode(data) : data;
-  if (bytes.length === 0) return undefined;
-  let hex = '';
-  for (const b of bytes) hex += b.toString(16).padStart(2, '0');
-  return hex;
+/** SendArgs.data as the text Nimiq Pay takes, or undefined when there is none.
+ *  Pay utf-8 encodes the string it gets, so text lands as itself and hex would land
+ *  as the ASCII of its digits. Bytes that are not utf-8 have no such text: this
+ *  throws, and nothing is sent. Never decodes a string: `cafe` is a memo. */
+export function dataToPayText(data: string | Uint8Array | undefined): string | undefined {
+  if (data == null || data.length === 0) return undefined;
+  if (typeof data === 'string') return data;
+  try {
+    // ignoreBOM keeps a leading BOM in the text, so the bytes survive the round trip.
+    return new TextDecoder('utf-8', { fatal: true, ignoreBOM: true }).decode(data);
+  } catch {
+    throw new Error('Nimiq Pay: data is not text, nothing was sent');
+  }
 }
 
 /** Encode SendArgs.data to the Uint8Array the Hub extraData field expects. */
@@ -49,8 +53,7 @@ export function dataToBytes(data: string | Uint8Array | undefined): Uint8Array |
 
 /** Hex-encode raw bytes (the signature/public-key Uint8Arrays the Hub returns),
  *  so both backends emit the same hex-string shape a signed-message verifier
- *  deserialises. Unlike dataToHex this never returns undefined — a signature or
- *  public key is always non-empty. */
+ *  deserialises. */
 export function bytesToHex(bytes: Uint8Array): string {
   let hex = '';
   for (const b of bytes) hex += b.toString(16).padStart(2, '0');

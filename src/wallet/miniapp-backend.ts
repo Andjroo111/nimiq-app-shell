@@ -6,7 +6,7 @@
 //   sendBasicTransaction({recipient, value, fee?, validityStartHeight?})
 //       : Promise<string | ErrorResponse>   // value/fee in Luna
 //   sendBasicTransactionWithData({recipient, value, data, fee?, ...})
-//       : Promise<string | ErrorResponse>   // data is HEX, never plaintext
+//       : Promise<string | ErrorResponse>   // data is TEXT; Pay utf-8 encodes it
 // The send methods return the SERIALIZED transaction (hex), not a hash.
 //
 // Two error shapes reach this file. A raw window.nimiq still RETURNS
@@ -16,7 +16,7 @@
 // either path (recon W-261009-159).
 
 import type { Account, SendArgs, SendResult, SignMessageResult } from './types';
-import { type WalletBackend, dataToHex } from './backend';
+import { type WalletBackend, dataToPayText } from './backend';
 import { errorMessage, hasHostHint, recordWalletDiagnostics } from './detect';
 import { loadMiniAppSdk } from './sdk-loader';
 import { withTimeout } from './timeout';
@@ -268,18 +268,18 @@ export class MiniAppBackend implements WalletBackend {
   async signAndSend(args: SendArgs): Promise<SendResult> {
     const provider = await this.resolveProvider();
     const fee = args.feeLuna ?? 0;
-    // Pay reads `data` as HEX and silently drops anything else, so a
-    // plaintext memo arrives as an empty one and every memo-matched watcher
-    // misses the payment (recon W-261009-19). dataToHex is the only route in.
-    const dataHex = dataToHex(args.data);
+    // Pay utf-8 encodes `data`, so hex here lands as the ASCII of its digits and
+    // no memo-matched watcher finds the payment. Measured on chain, see
+    // send-data.test.ts; recon W-261009-19 said the reverse and is contradicted.
+    const data = dataToPayText(args.data);
     const validityStartHeight = await this.prepareSend(provider, args);
     let serialized: string;
-    if (dataHex !== undefined) {
+    if (data !== undefined) {
       serialized = await call(
         provider.sendBasicTransactionWithData({
           recipient: args.recipient,
           value: args.valueLuna,
-          data: dataHex,
+          data,
           fee,
           validityStartHeight,
         }),
