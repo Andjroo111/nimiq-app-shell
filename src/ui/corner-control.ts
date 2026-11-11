@@ -747,6 +747,10 @@ button.nq-cc-name:focus-visible { outline:2px solid var(--nq-cc-accent, var(--ni
 
    Inset box-shadow for the border, never border (rule 1). */
 .nq-cc-addr-field { position:relative; border-radius:8px; padding:7px 0;
+  /* The block gap, ONE declaration read by the text and by the tick rules.
+     4ch, not 4.9: at 4.9 the line was the field's full width and the NQ
+     placeholder touched the border. This leaves about 10px either side. */
+  --nq-cc-addr-gap:4ch;
   width:100%; max-width:204px; margin-inline:auto; box-sizing:border-box;
   background:var(--nq-cc-input-bg, var(--nq-cc-card-bg, #fff));
   box-shadow:inset 0 0 0 2px color-mix(in srgb, var(--nq-cc-menu-fg, var(--nimiq-blue, #1f2348)) 12%, transparent);
@@ -758,9 +762,6 @@ button.nq-cc-name:focus-visible { outline:2px solid var(--nq-cc-accent, var(--ni
    letters would space the characters inside a block too, and the four
    characters of a block read as one unit. */
 .nq-cc-addr-input { display:block; margin:0 auto; padding:0; border:none;
-  /* 4ch, not 4.9: at 4.9 the line was the field's full width and the NQ
-     placeholder touched the border. This leaves about 10px either side. */
-  --nq-cc-addr-gap:4ch;
   width:calc(14ch + 2 * var(--nq-cc-addr-gap));
   word-spacing:var(--nq-cc-addr-gap);
   outline:none; resize:none; overflow:hidden; background:transparent;
@@ -784,7 +785,6 @@ button.nq-cc-name:focus-visible { outline:2px solid var(--nq-cc-accent, var(--ni
 .nq-cc-addr-rules { position:absolute; inset:7px 0; pointer-events:none;
   font-family:'Fira Mono',ui-monospace,monospace; font-size:14px;
   --nq-cc-addr-rule:color-mix(in srgb, var(--nq-cc-menu-fg, var(--nimiq-blue, #1f2348)) 10%, transparent);
-  --nq-cc-addr-gap:4ch;
   /* Block 1 ends at char 4 and block 2 starts at char 5 plus the gap, so the
      gap centre is 2.5ch + half a gap either side of the line's centre. Derived
      rather than eyeballed, so changing the gap moves the rules with it. */
@@ -1326,28 +1326,42 @@ export function mountMiniWallet(
 
   /** Is the header's ink light or dark? The pill is filled with that ink, so
    *  what is drawn ON the pill has to be the other one. Read through a canvas
-   *  because a computed colour can come back as rgb(), color() or oklch(). */
+   *  because a computed colour can come back as rgb(), color() or oklch().
+   *  Memoised on the computed string, so a call that finds nothing changed
+   *  costs one getComputedStyle. */
+  let inkSeen: string | null = null;
+  let inkCtx: CanvasRenderingContext2D | null | undefined;
   function syncInk(): void {
+    let ink = '';
+    try { ink = getComputedStyle(root).color; } catch { /* detached */ }
+    if (ink === inkSeen && root.dataset.ink) return;
+    inkSeen = ink;
     let light = false;
     try {
-      const ink = getComputedStyle(root).color;
-      const ctx = document.createElement('canvas').getContext('2d');
-      if (ctx && ink) {
-        ctx.fillStyle = ink;
-        ctx.fillRect(0, 0, 1, 1);
-        const [r, g, b] = ctx.getImageData(0, 0, 1, 1).data;
-        light = (0.2126 * r! + 0.7152 * g! + 0.0722 * b!) / 255 > 0.55;
+      if (inkCtx === undefined) inkCtx = document.createElement('canvas').getContext('2d', { willReadFrequently: true });
+      if (inkCtx && ink) {
+        inkCtx.clearRect(0, 0, 1, 1);
+        inkCtx.fillStyle = ink;
+        inkCtx.fillRect(0, 0, 1, 1);
+        const [r, g, b] = inkCtx.getImageData(0, 0, 1, 1).data;
+        // 0.5 is where white and navy text give about the same contrast.
+        light = (0.2126 * r! + 0.7152 * g! + 0.0722 * b!) / 255 > 0.5;
       }
     } catch { /* no canvas (tests, an old WebView): keep the dark-ink default */ }
     root.dataset.ink = light ? 'light' : 'dark';
   }
   syncInk();
-  // A host that flips its theme does it on <html> or <body>, almost always by
-  // class, data attribute or inline style.
+  // The fill follows the host live, because it is currentColor. The ink on it
+  // has to be told, and a host can change its header colour in ways nothing
+  // announces: a class on any ancestor, a media query, a colour transition
+  // that is still running when the class lands, a header inserted after this
+  // mounted. The observer makes the common case immediate; the tick is what
+  // makes the rest correct, and it is one memoised style read.
   const inkWatch = typeof MutationObserver === 'undefined' ? null : new MutationObserver(syncInk);
   for (const node of [document.documentElement, document.body]) {
-    if (node) inkWatch?.observe(node, { attributes: true, attributeFilter: ['class', 'style', 'data-theme'] });
+    if (node) inkWatch?.observe(node, { attributes: true });
   }
+  const inkTick = setInterval(syncInk, 500);
 
   function renderFace(): void {
     syncInk();
@@ -2707,6 +2721,7 @@ export function mountMiniWallet(
       unsubWallet();
       unsubLang();
       inkWatch?.disconnect();
+      clearInterval(inkTick);
       setOpen(false);
       // Before root.remove(): the list has in-flight chain reads that must see
       // the destroyed flag, or a slow RPC repaints a detached node.
