@@ -194,6 +194,30 @@
       </div>
 
       <div class="panel">
+        <h2>Other chains (<code>evm</code>)</h2>
+        <fieldset>
+          <legend>Browser wallet</legend>
+          <label><input type="radio" name="evm" value="off" checked> Off (no <code>evm</code> option)</label>
+          <label><input type="radio" name="evm" value="announced"> Mock announced over EIP-6963 as MetaMask</label>
+          <label><input type="radio" name="evm" value="injected"> Mock at <code>window.ethereum</code> only</label>
+          <label><input type="radio" name="evm" value="none"> No wallet in this browser</label>
+          <p class="hint">The mock is a plain EIP-1193 object, so every state is reachable with no extension. Its icon is a placeholder, not MetaMask's artwork: the real section shows whatever icon the wallet announces.</p>
+        </fieldset>
+        <fieldset>
+          <legend>Mock wallet</legend>
+          <label><input type="checkbox" id="evm-granted"> Already granted (restored with no prompt)</label>
+          <label><input type="checkbox" id="evm-offchain"> Sitting on Ethereum, not Polygon</label>
+          <label><input type="checkbox" id="evm-unknown"> Has never heard of Polygon (4902)</label>
+          <label><input type="radio" name="evm-out" value="ok" checked> Connect succeeds</label>
+          <label><input type="radio" name="evm-out" value="cancel"> User closes the prompt (4001)</label>
+          <label><input type="radio" name="evm-out" value="fail"> Connect fails</label>
+          <button class="mini" id="evm-switch">switch account in wallet</button>
+          <button class="mini" id="evm-revoke">revoke in wallet</button>
+          <p class="hint">A cancel must say Cancelled without the error colour. Switching or revoking fires <code>accountsChanged</code>, which the section follows.</p>
+        </fieldset>
+      </div>
+
+      <div class="panel">
         <h2>Seams</h2>
         <fieldset>
           <label><input type="checkbox" id="opt-receive" checked> Receive (address + QR)</label>
@@ -279,7 +303,7 @@
 <script type="module">
 import {
   createI18n, createWallet, mergeLocales, shellLocales,
-  mountMiniWallet, mountAssetList,
+  mountMiniWallet, mountAssetList, createEvmWallet, EVM_TOKENS,
   fmtNim, fmtUnits, fmtFiat,
 } from '../dist/app-shell.js';
 
@@ -374,6 +398,80 @@ function createMockWallet({ mode, connected }) {
     disconnect() { log('info', 'wallet.disconnect()'); account = null; emit(); renderState(); },
   };
 }
+
+/* -------------------------------------------------------- mock EVM wallet
+   A plain EIP-1193 object, announced over EIP-6963 or parked at
+   window.ethereum depending on the radio. It answers only what the shell asks:
+   accounts, the chain, the switch/add pair, and eth_call for balanceOf. */
+const EVM_ACCOUNTS = ['0x71C7656EC7ab88b098defB751B7401B5f6d8976F', '0x2B5AD5c4795c026514f8317c7a215E218DcCD6cF'];
+/* A neutral placeholder, deliberately not anyone's logo. */
+const MOCK_ICON = 'data:image/svg+xml,' + encodeURIComponent(
+  '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32"><rect width="32" height="32" rx="8" fill="#e9b213"/>' +
+  '<rect x="7" y="11" width="18" height="12" rx="3" fill="#1f2348"/><circle cx="21" cy="17" r="1.6" fill="#e9b213"/></svg>');
+const evmMock = (() => {
+  let granted = false;
+  let accountIx = 0;
+  let chainId = '0x89';
+  const listeners = new Set();
+  const emit = () => { for (const cb of [...listeners]) cb(granted ? [EVM_ACCOUNTS[accountIx]] : []); };
+  const reject = (code, message) => Object.assign(new Error(message), { code });
+  const provider = {
+    isMetaMask: true,
+    async request({ method, params }) {
+      log('info', `evm ${method}`);
+      switch (method) {
+        case 'eth_accounts': return granted ? [EVM_ACCOUNTS[accountIx]] : [];
+        case 'eth_requestAccounts': {
+          await new Promise((r) => setTimeout(r, 400));
+          const out = radio('evm-out');
+          if (out === 'cancel') throw reject(4001, 'User rejected the request.');
+          if (out === 'fail') throw reject(-32603, 'Internal error');
+          granted = true;
+          return [EVM_ACCOUNTS[accountIx]];
+        }
+        case 'eth_chainId': return chainId;
+        case 'wallet_switchEthereumChain':
+          if (opt('evm-unknown')) throw reject(4902, 'Unrecognized chain ID');
+          chainId = params[0].chainId;
+          return null;
+        case 'wallet_addEthereumChain':
+          $('evm-unknown').checked = false;
+          chainId = params[0].chainId;
+          return null;
+        case 'eth_call': {
+          const to = params[0].to.toLowerCase();
+          const tokens = [...EVM_TOKENS.main, ...EVM_TOKENS.test];
+          const ticker = tokens.find((t) => t.address.toLowerCase() === to)?.ticker;
+          const units = ticker === 'USDC' ? usdcUnits : ticker === 'USDT' ? usdtUnits : 0n;
+          return '0x' + (accountIx === 0 ? units : 0n).toString(16).padStart(64, '0');
+        }
+        default: throw reject(4200, `mock does not do ${method}`);
+      }
+    },
+    on(event, cb) { if (event === 'accountsChanged') listeners.add(cb); },
+    removeListener(event, cb) { listeners.delete(cb); },
+  };
+  return {
+    provider,
+    reset() {
+      granted = opt('evm-granted');
+      accountIx = 0;
+      chainId = opt('evm-offchain') || opt('evm-unknown') ? '0x1' : (opt('opt-testnet') ? '0x13882' : '0x89');
+    },
+    switchAccount() { if (!granted) return log('warn', 'mock EVM wallet: connect first'); accountIx = 1 - accountIx; emit(); },
+    revoke() { granted = false; emit(); },
+  };
+})();
+window.addEventListener('eip6963:requestProvider', () => {
+  if (radio('evm') !== 'announced') return;
+  window.dispatchEvent(new CustomEvent('eip6963:announceProvider', {
+    detail: Object.freeze({
+      info: { uuid: '00000000-0000-4000-8000-000000000001', name: 'MetaMask', icon: MOCK_ICON, rdns: 'io.metamask' },
+      provider: evmMock.provider,
+    }),
+  }));
+});
+let evmWallet = null;
 
 /* ------------------------------------------------------------- identicons
    Loaded from a CDN on demand so the playground stays dependency-free. A
@@ -607,6 +705,9 @@ function buildOptions() {
     };
   }
   o.onRename = (label) => log('info', 'onRename()', label);
+  // ONE handle shared by both corners, the way an app that also needs the
+  // account passes its own. `evm: true` would give each corner its own.
+  if (evmWallet) o.evm = evmWallet;
   return o;
 }
 
@@ -661,6 +762,18 @@ function remount() {
   if (backend === 'hub') log('warn', `real Hub wallet, detected mode: ${wallet.mode}`);
   wallet.onAccountChange((acc) => { log('info', 'onAccountChange', acc ? acc.address : 'null'); renderState(); });
 
+  evmWallet?.destroy();
+  evmWallet = null;
+  const evmKind = radio('evm');
+  if (evmKind === 'injected') window.ethereum = evmMock.provider;
+  else delete window.ethereum;
+  if (evmKind !== 'off') {
+    evmMock.reset();
+    // persist:false so a playground Disconnect does not outlive a remount.
+    evmWallet = createEvmWallet({ network: opt('opt-testnet') ? 'test' : 'main', persist: false });
+    evmWallet.onAccountChange((acc) => { log('info', 'evm onAccountChange', acc ? acc.address : 'null'); renderState(); });
+  }
+
   const o = buildOptions();
   const brand = BRANDS[radio('brand')];
   if (brand) o.theme = brand.theme;
@@ -696,6 +809,7 @@ function renderState() {
     `account.label    <b>${acc ? escapeHtml(acc.label || '(none)') : '(none)'}</b>`,
     `i18n.language    <b>${i18n.language ?? document.documentElement.lang}</b>`,
     `fiatTicker       <b>${corners[0]?.fiatTicker ?? 'null'}</b>`,
+    `evm.account      <b>${evmWallet?.account ? escapeHtml(evmWallet.account.address) : 'null'}</b>`,
   ].join('<br>');
 
   $('fmt').innerHTML = [
@@ -726,6 +840,7 @@ window.addEventListener('unhandledrejection', (e) => log('error', 'unhandled rej
    a click script, and a bug can be handed over as a URL.
 
      ?state=menu|receive|send   ?brand=swellet   ?connected=1   ?corner=light
+     ?evm=announced|injected|none   ?evmGranted=1
 
    Read once at boot, deliberately not written back. A URL that rewrites itself
    as you click stops being the thing you pasted to someone. */
@@ -736,6 +851,12 @@ function applyDeepLink() {
     const el = document.querySelector(`input[name="brand"][value="${brand}"]`);
     if (el) el.checked = true;
   }
+  const evm = q.get('evm');
+  if (evm) {
+    const el = document.querySelector(`input[name="evm"][value="${CSS.escape(evm)}"]`);
+    if (el) el.checked = true;
+  }
+  if (q.get('evmGranted') === '1') $('evm-granted').checked = true;
   const state = q.get('state');
   // receive and send are BEHIND a connected wallet, so asking for either asks
   // for the wallet too rather than silently landing on the signed-out menu.
@@ -796,6 +917,8 @@ $('ab-save').addEventListener('click', () => {
   remount();
 });
 renderAddressBook();
+$('evm-switch').addEventListener('click', () => evmMock.switchAccount());
+$('evm-revoke').addEventListener('click', () => evmMock.revoke());
 
 const boot = applyDeepLink();
 remount();

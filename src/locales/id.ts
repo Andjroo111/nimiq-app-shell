@@ -83,4 +83,15 @@ export default {
   'shell.hintSyncing': 'Dompet Anda masih menyinkronkan. Coba lagi sebentar lagi.',
   'shell.hintExpired': 'Pembayaran kedaluwarsa sebelum terkirim. Tidak ada yang keluar dari dompet Anda. Coba lagi.',
   'shell.sendPending': 'Terkirim. Masih dikonfirmasi, jadi jangan kirim lagi.',
+  // other chains (the mini wallet's EVM section)
+  'shell.evmOtherChains': 'Jaringan lain',
+  'shell.evmSub': 'USDC dan USDT di {network}',
+  'shell.evmConnect': 'Hubungkan',
+  'shell.evmSoon': 'Segera',
+  'shell.evmInstall': 'Pasang MetaMask, lalu muat ulang',
+  'shell.evmCancelled': 'Dibatalkan',
+  'shell.evmFailed': 'Tidak dapat terhubung',
+  'shell.evmBrowserWallet': 'Dompet browser',
+  'shell.evmAnyMobile': 'Dompet seluler apa pun',
+  'shell.evmLedgerSub': 'BTC dan Polygon',
 } as const;

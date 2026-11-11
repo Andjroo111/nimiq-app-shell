@@ -83,4 +83,15 @@ export default {
   'shell.hintSyncing': 'Walat ɗinka tana ci gaba da daidaitawa. Sake gwadawa nan da ɗan lokaci.',
   'shell.hintExpired': 'Biyan ya ƙare kafin a aika shi. Babu abin da ya fita daga walat ɗinka. Sake gwadawa.',
   'shell.sendPending': 'An aika. Ana ci gaba da tabbatarwa, don haka kada ka sake aikawa.',
+  // other chains (the mini wallet's EVM section)
+  'shell.evmOtherChains': 'Sauran sarƙoƙi',
+  'shell.evmSub': 'USDC da USDT a kan {network}',
+  'shell.evmConnect': 'Haɗa',
+  'shell.evmSoon': 'Nan gaba',
+  'shell.evmInstall': 'Saka MetaMask, sannan sake lodawa',
+  'shell.evmCancelled': 'An soke',
+  'shell.evmFailed': 'An kasa haɗawa',
+  'shell.evmBrowserWallet': 'Walat na burauza',
+  'shell.evmAnyMobile': 'Kowane walat na wayar hannu',
+  'shell.evmLedgerSub': 'BTC da Polygon',
 } as const;

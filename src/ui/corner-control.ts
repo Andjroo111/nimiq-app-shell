@@ -38,6 +38,8 @@ import { nimiqQr } from './qr';
 import { formatAddressBlocks, reformatInPlace, significantChars } from './address-input';
 import { createNameResolver, isNameInput, type NameResolverOptions } from '../names';
 import { mountNameLookup, NAME_LOOKUP_CSS } from './name-lookup';
+import { createEvmWallet, type EvmWallet } from '../evm';
+import { EVM_SECTION_CSS, mountEvmSection, type EvmSectionHandle } from './evm-section';
 
 /** A NIM address: NQ + 2 check digits + 32 base32 chars. */
 const NIM_ADDRESS_SHAPE = /^NQ[0-9]{2}[0-9A-HJ-NP-VXY]{32}$/;
@@ -286,6 +288,22 @@ export interface CornerControlOptions {
   switchAccount?: boolean;
   /** 'test' renders the network row (mainnet says nothing). Default 'main'. */
   network?: 'main' | 'test';
+  /** Show the "Other chains" section: MetaMask, and any other browser wallet
+   *  that announces itself over EIP-6963, on Polygon. Absent, nothing renders.
+   *
+   *  Signed out it is one Connect row per wallet. Connected it is the short 0x
+   *  address, a USDC and a USDT row with balances read through the wallet, and
+   *  a Disconnect; tapping a token row opens the receive view for it, with the
+   *  Polygon-only warning. It shows whether or not the Nimiq wallet is
+   *  connected, because the two accounts are unrelated.
+   *
+   *  `true` has the mini wallet create and own the handle, on Polygon mainnet
+   *  or, with `network: 'test'`, on Polygon Amoy. Pass your own
+   *  `createEvmWallet()` when the app also needs the account (to build its own
+   *  transactions: sending from the EVM account is the app's, not the shell's).
+   *
+   *  Not rendered inside Nimiq Pay: that WebView has no browser wallet. */
+  evm?: EvmWallet | true;
   /** "Open in Nimiq Pay" deeplink URL (standalone web only). Hidden when
    *  absent. Pass a function for URLs that depend on late state (e.g. an auth
    *  token that must ride along) — it is called at click time. */
@@ -392,7 +410,7 @@ function ensureStyles(): void {
   // as a color-mix of that var: identical when untouched, and it follows the
   // foreground the moment a host themes one. Same for the light-blue washes,
   // which are --nq-cc-accent at 8% and 12%.
-  style.textContent = NAME_LOOKUP_CSS + `
+  style.textContent = NAME_LOOKUP_CSS + EVM_SECTION_CSS + `
 .nq-cc { position:relative; display:inline-block;
   font-family:var(--nq-cc-font, 'Mulish','Muli',system-ui,sans-serif); }
 .nq-cc-caret { width:10px; height:6px; flex:none; color:currentColor; opacity:.6;
@@ -1358,6 +1376,13 @@ export function mountMiniWallet(
   const hasFiat = !!options.fiat && options.fiat.currencies.length > 0;
   if (options.injectStyles !== false) ensureStyles();
 
+  // Inside Nimiq Pay there is no browser wallet to find, so the section is not
+  // built there at all. A wallet-less page (no `wallet` option) still gets it.
+  const ownsEvm = options.evm === true;
+  const evm: EvmWallet | null = !options.evm || wallet?.mode === 'miniapp'
+    ? null
+    : options.evm === true ? createEvmWallet({ network: options.network }) : options.evm;
+
   let fiatTicker = options.fiat?.default ?? 'USD';
   try {
     const stored = localStorage.getItem(FIAT_STORE_KEY);
@@ -1495,6 +1520,8 @@ export function mountMiniWallet(
 
   // ---- signed-out section (hub only) ---------------------------------------
   const signedOut = el('div', 'nq-cc-section nq-cc-when-out nq-cc-when-hub', viewMain);
+  // With a second wallet section below, this one says which wallet it is.
+  if (evm) el('p', 'nq-cc-evm-label', signedOut).textContent = 'Nimiq';
   const connectBtn = el('button', 'nq-cc-connect', signedOut);
   connectBtn.type = 'button';
   tNode(connectBtn, 'shell.connectWallet');
@@ -1632,6 +1659,29 @@ export function mountMiniWallet(
   // have that cash link creation in one place").
   //
   // `createCashlink` is unchanged as an option, so no app has to edit anything.
+
+  // ---- other chains (EVM browser wallets) ----------------------------------
+  // Under the Nimiq connect when signed out, under the wallet block when
+  // connected. No nq-cc-when-* gate: the EVM account is not the Nimiq one, so
+  // it shows either way.
+  let evmSection: EvmSectionHandle | null = null;
+  if (evm) {
+    evmSection = mountEvmSection(viewMain, {
+      evm,
+      i18n,
+      glyph: WALLET_ICON,
+      onReceive: showReceive ? (asset) => openReceive(asset) : undefined,
+      // A receive view left open on the EVM address is now showing an address
+      // that is no longer connected.
+      onAccountChange: () => {
+        if (receiveAsset && evmSection?.owns(receiveAsset)) dropReceive();
+      },
+    });
+    el('div', 'nq-cc-divider', viewMain);
+    // Silent: eth_accounts never prompts. A visitor who connected before sees
+    // their account without tapping anything.
+    void evm.restore();
+  }
 
   // ---- language accordion ---------------------------------------------------
   const langSection = el('div', 'nq-cc-section', viewMain);
@@ -2540,6 +2590,19 @@ export function mountMiniWallet(
       : '';
   };
 
+  /** Close the receive view AND empty it. Leaving the old address in the DOM
+   *  behind a hidden class is a stale address waiting for the next thing that
+   *  reveals the view without repainting it. */
+  function dropReceive(): void {
+    root.classList.remove('nq-cc-show-receive');
+    root.classList.remove('nq-cc-show-qr');
+    receiveAsset = null;
+    receiveAddress = null;
+    qrFor = '';
+    addressBtn.textContent = '';
+    qrSlot.textContent = '';
+  }
+
   /** Show the receive view. With an asset, it shows THAT asset's address, chain
    *  and QR payload; without one, the account's own NIM address as before.
    *
@@ -2550,9 +2613,10 @@ export function mountMiniWallet(
    *  (see asset-list), so this is the second of two guards on the same hazard. */
   function openReceive(asset?: ShellAsset): void {
     const account = wallet?.account ?? null;
-    if (!account) return;
     if (asset && !asset.address) return;
-    const address = asset?.address ?? account.address;
+    // An asset brings its own address, so it needs no Nimiq account: the EVM
+    // rows open this view while the Nimiq wallet is signed out.
+    const address = asset?.address ?? account?.address;
     if (!address) return;
     root.classList.add('nq-cc-show-receive');
 
@@ -2723,6 +2787,7 @@ export function mountMiniWallet(
       document.addEventListener('click', onDocClick, true);
       document.addEventListener('keydown', onKeydown);
       void refreshBalance();
+      void evmSection?.refresh();
     } else {
       root.classList.remove('nq-cc-show-receive');
       root.classList.remove('nq-cc-show-qr');
@@ -2797,6 +2862,7 @@ export function mountMiniWallet(
     renderLangValue();
     renderFaceFlag();
     renderFace();
+    evmSection?.applyLang();
   });
 
   return {
@@ -2813,6 +2879,9 @@ export function mountMiniWallet(
       // Before root.remove(): the list has in-flight chain reads that must see
       // the destroyed flag, or a slow RPC repaints a detached node.
       assetList?.destroy();
+      evmSection?.destroy();
+      // Only the handle this mount created. A host's own outlives the menu.
+      if (ownsEvm) evm?.destroy();
       root.remove();
     },
   };

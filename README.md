@@ -1036,6 +1036,39 @@ A value may be any CSS colour, including a `var()` pointing at your own design
 token: `accent: 'var(--brand-teal)'` works, and follows your dark-mode switch
 for free.
 
+### Other chains: MetaMask and browser wallets
+
+```ts
+mountMiniWallet(el, { wallet, i18n, evm: true });
+
+// or, when the app also needs the account:
+import { createEvmWallet } from 'nimiq-app-shell/evm';
+const evm = createEvmWallet();            // Polygon; { network: 'test' } is Amoy
+mountMiniWallet(el, { wallet, i18n, evm });
+```
+
+The `evm` option adds an **Other chains** section to the menu, whether the Nimiq
+wallet is connected or not. Without the option nothing renders.
+
+| state | what the section shows |
+|---|---|
+| no wallet, desktop | a MetaMask row that says "Install MetaMask, then reload" when tapped |
+| no wallet, phone | a MetaMask row that reopens the page in the MetaMask app browser |
+| signed out | one Connect row per wallet announced over EIP-6963, MetaMask first, with the wallet's own name and icon; a bare `window.ethereum` gets the neutral glyph |
+| connected | the short 0x address, USDC and USDT on Polygon with balances, Disconnect; a token row opens the receive view with its Polygon warning |
+| planned | WalletConnect and Ledger as greyed Soon rows |
+
+It is a **connector list**, not a MetaMask special case: `evm.connectors`
+carries every way to connect, and WalletConnect or Ledger become one more entry.
+No viem or ethers: calls are raw EIP-1193 `request`s, and `balanceOf` is a
+hand-encoded `eth_call` decoded as a `bigint`. Balances are read through the
+connected wallet and checked against the chain id before and after, or through
+`rpcUrl` when passed. Sending from the EVM account is not in the shell; the app
+builds its own transactions on `evm.provider()`. A closed wallet prompt (4001)
+reads "Cancelled" and is never an error. Inside Nimiq Pay the section is not
+built. Token addresses (native USDC, USDT) match nimiq.markets'
+`app/src/shared/evm-chains.ts`.
+
 ---
 
 ## Use without a bundler (prebuilt ESM)
@@ -1145,6 +1178,7 @@ run `bun run build:dist` and reload.
 
 ```
 ?state=menu|receive|send   ?brand=swellet|hashmark|cool   ?connected=1   ?corner=light
+?evm=announced|injected|none   ?evmGranted=1
 ```
 
 The menu, the receive view and the send view sit behind `[hidden]` and
