@@ -220,4 +220,15 @@ describe('fmtNimBalance', () => {
     expect(fmtNimBalance(999)).toBe('0.00');
     expect(fmtNimBalance(123_456_789_012_345n)).toBe('1\u202F234\u202F567\u202F890');
   });
+
+  test('a fractional number of luna is dropped, not thrown on', () => {
+    expect(fmtNimBalance(421_837_500.7)).toBe('4218');
+    expect(fmtNimBalance(1.5)).toBe('0.00');
+    expect(() => fmtNimBalance(Number.NaN)).toThrow();
+  });
+
+  test('a negative figure rounds toward zero on the same boundary', () => {
+    expect(fmtNimBalance(-199_999_999)).toBe('-1999');
+    expect(fmtNimBalance(-99_999_999)).toBe('-999.99');
+  });
 });

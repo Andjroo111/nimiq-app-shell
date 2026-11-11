@@ -178,9 +178,12 @@ export const WHOLE_NIM_FROM = 1_000;
  * keeps `fmtNim` and the exact figure.
  */
 export function fmtNimBalance(luna: number | bigint): string {
-  const value = BigInt(luna);
-  const whole = value >= BigInt(WHOLE_NIM_FROM) * BigInt(LUNA_PER_NIM)
-    || value <= -BigInt(WHOLE_NIM_FROM) * BigInt(LUNA_PER_NIM);
+  // A host reader that hands back a fractional or non-finite number is outside
+  // the luna contract. Fractions are dropped; the rest fails the way fmtNim does.
+  if (typeof luna === 'number' && !Number.isFinite(luna)) return fmtNim(luna);
+  const value = typeof luna === 'number' ? BigInt(Math.trunc(luna)) : luna;
+  const size = value < 0n ? -value : value;
+  const whole = size >= BigInt(WHOLE_NIM_FROM) * BigInt(LUNA_PER_NIM);
   const step = BigInt(whole ? LUNA_PER_NIM : LUNA_PER_NIM / 100);
   const floored = value - (value % step); // toward zero
   const decimals = whole ? 0 : 2;
