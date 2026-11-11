@@ -296,8 +296,12 @@ quarter changes one option; it does not migrate to a different control.
 The account row's NIM figure is the SPENDABLE balance and is labelled
 "Available". Staked NIM sits in the staking contract, not in the account, so
 `getAccountByAddress` never included it; the row now shows it as a quiet second
-line ("Staked 10 034.93 NIM") and never adds it to the figure above. Send's
+line ("Staked 10 034 NIM") and never adds it to the figure above. Send's
 "Available:" hint and its max cap use the same spendable number.
+
+Both lines are for reading at a glance: whole NIM from 1 000 NIM up, two
+decimals below that, always rounded DOWN (`fmtNimBalance`). The Send step
+keeps the exact figure, to the luna.
 
 | Wired | Stake line comes from |
 | --- | --- |
