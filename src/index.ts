@@ -254,6 +254,15 @@ export {
   type AssetListOptions,
   type AssetListHandle,
 } from './ui/asset-list';
+// EVM browser wallets (MetaMask and anything else on EIP-1193) for the Polygon
+// side: discovery, connect, address, ERC-20 balances. Additive, and separate
+// from the Nimiq `Wallet`. The mini wallet draws it from its `evm` option.
+export * from './evm';
+export {
+  mountEvmSection,
+  type EvmSectionOptions,
+  type EvmSectionHandle,
+} from './ui/evm-section';
 // The corner's Report a bug row wires itself from `reportBug`; these are for
 // hosts that want the sheet from their own entry point, or the validator alone.
 export {

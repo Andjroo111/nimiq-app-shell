@@ -82,4 +82,15 @@ export default {
   'shell.hintSyncing': 'आपका वॉलेट अभी सिंक हो रहा है। थोड़ी देर में फिर से कोशिश करें।',
   'shell.hintExpired': 'भुगतान भेजे जाने से पहले ही समाप्त हो गया। आपके वॉलेट से कुछ नहीं गया। फिर से कोशिश करें।',
   'shell.sendPending': 'भेज दिया गया। अभी पुष्टि हो रही है, इसलिए दोबारा न भेजें।',
+  // other chains (the mini wallet's EVM section)
+  'shell.evmOtherChains': 'अन्य चेन',
+  'shell.evmSub': '{network} पर USDC और USDT',
+  'shell.evmConnect': 'कनेक्ट करें',
+  'shell.evmSoon': 'जल्द',
+  'shell.evmInstall': 'MetaMask इंस्टॉल करें, फिर रीलोड करें',
+  'shell.evmCancelled': 'रद्द किया गया',
+  'shell.evmFailed': 'कनेक्ट नहीं हो सका',
+  'shell.evmBrowserWallet': 'ब्राउज़र वॉलेट',
+  'shell.evmAnyMobile': 'कोई भी मोबाइल वॉलेट',
+  'shell.evmLedgerSub': 'BTC और Polygon',
 } as const;

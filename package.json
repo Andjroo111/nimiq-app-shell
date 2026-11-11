@@ -6,6 +6,7 @@
   "exports": {
     ".": "./src/index.ts",
     "./wallet": "./src/wallet/index.ts",
+    "./evm": "./src/evm/index.ts",
     "./memo": "./src/format/memo.ts",
     "./address": "./src/format/address.ts",
     "./handle": "./src/format/handle.ts",

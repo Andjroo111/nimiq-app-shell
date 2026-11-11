@@ -81,4 +81,15 @@ export default {
   'shell.hintSyncing': 'Tu billetera aún se está sincronizando. Inténtalo de nuevo en un momento.',
   'shell.hintExpired': 'El pago caducó antes de enviarse. No salió nada de tu billetera. Vuelve a intentarlo.',
   'shell.sendPending': 'Enviado. Aún se está confirmando, así que no lo envíes de nuevo.',
+  // other chains (the mini wallet's EVM section)
+  'shell.evmOtherChains': 'Otras redes',
+  'shell.evmSub': 'USDC y USDT en {network}',
+  'shell.evmConnect': 'Conectar',
+  'shell.evmSoon': 'Pronto',
+  'shell.evmInstall': 'Instala MetaMask y recarga',
+  'shell.evmCancelled': 'Cancelado',
+  'shell.evmFailed': 'No se pudo conectar',
+  'shell.evmBrowserWallet': 'Cartera del navegador',
+  'shell.evmAnyMobile': 'Cualquier cartera móvil',
+  'shell.evmLedgerSub': 'BTC y Polygon',
 } as const;

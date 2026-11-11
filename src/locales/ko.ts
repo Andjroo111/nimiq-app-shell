@@ -82,4 +82,15 @@ export default {
   'shell.hintSyncing': '지갑이 아직 동기화 중입니다. 잠시 후 다시 시도하세요.',
   'shell.hintExpired': '결제가 전송 전에 만료되었습니다. 지갑에서 빠져나간 금액은 없습니다. 다시 시도하세요.',
   'shell.sendPending': '전송됨. 아직 확인 중이니 다시 보내지 마세요.',
+  // other chains (the mini wallet's EVM section)
+  'shell.evmOtherChains': '다른 체인',
+  'shell.evmSub': '{network}의 USDC 및 USDT',
+  'shell.evmConnect': '연결',
+  'shell.evmSoon': '출시 예정',
+  'shell.evmInstall': 'MetaMask 설치 후 새로고침하세요',
+  'shell.evmCancelled': '취소됨',
+  'shell.evmFailed': '연결하지 못했습니다',
+  'shell.evmBrowserWallet': '브라우저 지갑',
+  'shell.evmAnyMobile': '모든 모바일 지갑',
+  'shell.evmLedgerSub': 'BTC 및 Polygon',
 } as const;
