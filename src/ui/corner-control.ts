@@ -400,19 +400,27 @@ function ensureStyles(): void {
 .nq-cc-face[aria-expanded="true"] .nq-cc-caret,
 .nq-cc-face-flag[aria-expanded="true"] .nq-cc-caret { transform:rotate(180deg); }
 
-/* face (hub mode): the fleet outline pill, both states, + the caret */
+/* face (hub mode): a pill filled with the HEADER'S OWN INK, so it is the
+   opposite of whatever it sits on: white on a navy header, navy on a light
+   one. The outline pill it replaces was navy on navy and white on white
+   (Andjroo, phone review 2026-11-11). The fill is currentColor, which needs no
+   detection; only the ink ON the pill does, and syncInk() sets data-ink for it. */
 .nq-cc-face { display:inline-flex; align-items:center; gap:8px; height:40px; padding:0 14px;
-  border:1px solid color-mix(in srgb, currentColor 22%, transparent); border-radius:999px;
-  background:transparent; color:inherit; font:inherit; font-size:14px; font-weight:700; line-height:1; cursor:pointer;
-  transition:border-color .15s var(--nimiq-ease, cubic-bezier(.25,0,0,1)), background-color .15s var(--nimiq-ease, cubic-bezier(.25,0,0,1)); }
-.nq-cc-face:hover { border-color: color-mix(in srgb, currentColor 45%, transparent); background: color-mix(in srgb, currentColor 6%, transparent); }
+  border:none; border-radius:999px;
+  background:currentColor; color:inherit; font:inherit; font-size:14px; font-weight:700; line-height:1; cursor:pointer;
+  transition:opacity .15s var(--nimiq-ease, cubic-bezier(.25,0,0,1)); }
+.nq-cc-face > * { color:var(--nq-cc-pill-ink, #fff); }
+.nq-cc[data-ink="light"] .nq-cc-face > * { color:var(--nq-cc-pill-ink, var(--nimiq-blue, #1f2348)); }
+.nq-cc-face:hover { opacity:.88; }
 .nq-cc-face:focus-visible { outline:2px solid var(--nq-cc-accent, var(--nimiq-light-blue, #0582ca)); outline-offset:3px; }
 /* 8px left: the identicon needs air off the pill edge (Andjroo, phone review) */
 .nq-cc[data-connected] .nq-cc-face { padding:4px 12px 4px 8px; font-size:13px; }
 .nq-cc-face-icon { width:28px; height:28px; flex:none; border-radius:50%; overflow:hidden; display:inline-flex; }
 .nq-cc-face-icon > * { width:100%; height:100%; display:block; }
 .nq-cc-face-label { white-space:nowrap; }
-.nq-cc[data-connected] .nq-cc-face-label { font-family:'Fira Mono',ui-monospace,monospace; letter-spacing:.02em; }
+/* Mono is for an ADDRESS. A name is set in the control's own face, as the
+   wallet sets every name. */
+.nq-cc-face-label[data-address] { font-family:'Fira Mono',ui-monospace,monospace; letter-spacing:.02em; }
 
 /* face (mini-app mode): flag only, the wallet is ambient */
 .nq-cc-face-flag { display:none; align-items:center; gap:7px; height:38px; padding:0 10px;
@@ -739,6 +747,10 @@ button.nq-cc-name:focus-visible { outline:2px solid var(--nq-cc-accent, var(--ni
 
    Inset box-shadow for the border, never border (rule 1). */
 .nq-cc-addr-field { position:relative; border-radius:8px; padding:7px 0;
+  /* The block gap, ONE declaration read by the text and by the tick rules.
+     4ch, not 4.9: at 4.9 the line was the field's full width and the NQ
+     placeholder touched the border. This leaves about 10px either side. */
+  --nq-cc-addr-gap:4ch;
   width:100%; max-width:204px; margin-inline:auto; box-sizing:border-box;
   background:var(--nq-cc-input-bg, var(--nq-cc-card-bg, #fff));
   box-shadow:inset 0 0 0 2px color-mix(in srgb, var(--nq-cc-menu-fg, var(--nimiq-blue, #1f2348)) 12%, transparent);
@@ -750,7 +762,6 @@ button.nq-cc-name:focus-visible { outline:2px solid var(--nq-cc-accent, var(--ni
    letters would space the characters inside a block too, and the four
    characters of a block read as one unit. */
 .nq-cc-addr-input { display:block; margin:0 auto; padding:0; border:none;
-  --nq-cc-addr-gap:4.9ch;
   width:calc(14ch + 2 * var(--nq-cc-addr-gap));
   word-spacing:var(--nq-cc-addr-gap);
   outline:none; resize:none; overflow:hidden; background:transparent;
@@ -774,7 +785,6 @@ button.nq-cc-name:focus-visible { outline:2px solid var(--nq-cc-accent, var(--ni
 .nq-cc-addr-rules { position:absolute; inset:7px 0; pointer-events:none;
   font-family:'Fira Mono',ui-monospace,monospace; font-size:14px;
   --nq-cc-addr-rule:color-mix(in srgb, var(--nq-cc-menu-fg, var(--nimiq-blue, #1f2348)) 10%, transparent);
-  --nq-cc-addr-gap:4.9ch;
   /* Block 1 ends at char 4 and block 2 starts at char 5 plus the gap, so the
      gap centre is 2.5ch + half a gap either side of the line's centre. Derived
      rather than eyeballed, so changing the gap moves the rules with it. */
@@ -1314,7 +1324,47 @@ export function mountMiniWallet(
   faceFlag.setAttribute('aria-haspopup', 'menu');
   faceFlag.setAttribute('aria-expanded', 'false');
 
+  /** Is the header's ink light or dark? The pill is filled with that ink, so
+   *  what is drawn ON the pill has to be the other one. Read through a canvas
+   *  because a computed colour can come back as rgb(), color() or oklch().
+   *  Memoised on the computed string, so a call that finds nothing changed
+   *  costs one getComputedStyle. */
+  let inkSeen: string | null = null;
+  let inkCtx: CanvasRenderingContext2D | null | undefined;
+  function syncInk(): void {
+    let ink = '';
+    try { ink = getComputedStyle(root).color; } catch { /* detached */ }
+    if (ink === inkSeen && root.dataset.ink) return;
+    inkSeen = ink;
+    let light = false;
+    try {
+      if (inkCtx === undefined) inkCtx = document.createElement('canvas').getContext('2d', { willReadFrequently: true });
+      if (inkCtx && ink) {
+        inkCtx.clearRect(0, 0, 1, 1);
+        inkCtx.fillStyle = ink;
+        inkCtx.fillRect(0, 0, 1, 1);
+        const [r, g, b] = inkCtx.getImageData(0, 0, 1, 1).data;
+        // 0.5 is where white and navy text give about the same contrast.
+        light = (0.2126 * r! + 0.7152 * g! + 0.0722 * b!) / 255 > 0.5;
+      }
+    } catch { /* no canvas (tests, an old WebView): keep the dark-ink default */ }
+    root.dataset.ink = light ? 'light' : 'dark';
+  }
+  syncInk();
+  // The fill follows the host live, because it is currentColor. The ink on it
+  // has to be told, and a host can change its header colour in ways nothing
+  // announces: a class on any ancestor, a media query, a colour transition
+  // that is still running when the class lands, a header inserted after this
+  // mounted. The observer makes the common case immediate; the tick is what
+  // makes the rest correct, and it is one memoised style read.
+  const inkWatch = typeof MutationObserver === 'undefined' ? null : new MutationObserver(syncInk);
+  for (const node of [document.documentElement, document.body]) {
+    if (node) inkWatch?.observe(node, { attributes: true });
+  }
+  const inkTick = setInterval(syncInk, 500);
+
   function renderFace(): void {
+    syncInk();
     face.textContent = '';
     const account = wallet?.account ?? null;
     if (account) {
@@ -1324,6 +1374,8 @@ export function mountMiniWallet(
       else icon.innerHTML = PLACEHOLDER_HEX;
       const label = el('span', 'nq-cc-face-label', face);
       label.textContent = shortLabel(account, i18n.t('shell.account'));
+      const named = !!((account.address && storedLabel(account.address)) || account.label);
+      if (!named && account.address) label.dataset.address = '';
     } else {
       delete root.dataset.connected;
       face.insertAdjacentHTML('beforeend', WALLET_ICON);
@@ -2668,6 +2720,8 @@ export function mountMiniWallet(
     destroy() {
       unsubWallet();
       unsubLang();
+      inkWatch?.disconnect();
+      clearInterval(inkTick);
       setOpen(false);
       // Before root.remove(): the list has in-flight chain reads that must see
       // the destroyed flag, or a slow RPC repaints a detached node.
