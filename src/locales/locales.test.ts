@@ -59,6 +59,10 @@ describe('locale values are actually translated', () => {
     'fr:shell.fbBug',       // French UI borrows "bug"
     'fr:shell.fbQuestion',  // "Question" is French
     'fr:shell.contacts',    // "Contacts" is French, and is what the Hub's own fr.po uses
+    'fr:shell.transactions', // French, and what the wallet's own fr locale says
+    'fr:shell.transaction',
+    'fr:shell.date',        // "Date" is French
+    'fr:shell.message',     // "Message" is French
     'id:shell.fbBug',       // Indonesian borrows "bug"
     'tl:shell.fbBug',       // Filipino borrows "bug"
     // Filipino's tech register borrows these three wholesale, the way the

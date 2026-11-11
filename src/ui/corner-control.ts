@@ -33,6 +33,9 @@ import { BUG_ICON, openReportBugSheet, defaultReportBugRepo, type ReportBugOptio
 import { installReportCapture } from './report-capture';
 import { mountAssetList, type AssetListHandle, type ShellAsset } from './asset-list';
 import { createNimBalanceReader } from '../wallet/balance';
+import { createNimStakedReader } from '../wallet/staked';
+import { createNimHistoryReader, type HistoryFetchOptions, type ShellTx } from '../history/chain';
+import { mountHistoryView, HISTORY_CSS, type HistoryViewHandle } from './history-view';
 import { applyTheme, type ShellTheme } from './theme';
 import { nimiqQr } from './qr';
 import { formatAddressBlocks, reformatInPlace, significantChars } from './address-input';
@@ -216,6 +219,26 @@ export interface CornerControlOptions {
    *  testnet app must pass `getBalanceLuna` itself or show nothing. Silently
    *  reading MAINNET balances into a testnet UI would be worse than a blank. */
   balance?: false | { rpc?: string };
+  /** STAKED NIM for the address, in luna, shown as a quiet second line under
+   *  the spendable figure. The built-in read supplies it whenever the built-in
+   *  balance read is on (same node, same 30s cadence, one extra request); a
+   *  host that passes its own `getBalanceLuna` passes this too, or shows no
+   *  staked line. A throw hides the line and never touches the spendable one.
+   *  Not shown with `assets`, whose account row is a fiat total. */
+  getStakedLuna?: (address: string) => Promise<number>;
+  /** Transaction history: the last three on the main view, "All transactions"
+   *  as a sub-view, one transaction's detail behind each row.
+   *
+   *  ON by default for a connected Hub wallet on mainnet, read from the same
+   *  public node as the built-in balance (`balance.rpc` when given), the way
+   *  the balance defaults on. Read when the menu opens, never while it is
+   *  closed, one request per read. Off on testnet and inside Nimiq Pay, where
+   *  the host wallet already shows it.
+   *
+   *  `false` turns it off. `{ fetch }` supplies the rows from your own indexer:
+   *  newest first, `opts.max` of them, older than `opts.startAt` (a tx hash)
+   *  when given. */
+  history?: false | { fetch?: (address: string, opts: HistoryFetchOptions) => Promise<ShellTx[]> };
   /** Multi-asset balances. Supersedes `getBalanceLuna`: when present the mini
    *  wallet shows a per-asset stack, and the account row's right-hand figure
    *  becomes the fiat TOTAL across them.
@@ -392,7 +415,7 @@ function ensureStyles(): void {
   // as a color-mix of that var: identical when untouched, and it follows the
   // foreground the moment a host themes one. Same for the light-blue washes,
   // which are --nq-cc-accent at 8% and 12%.
-  style.textContent = NAME_LOOKUP_CSS + `
+  style.textContent = NAME_LOOKUP_CSS + HISTORY_CSS + `
 .nq-cc { position:relative; display:inline-block;
   font-family:var(--nq-cc-font, 'Mulish','Muli',system-ui,sans-serif); }
 .nq-cc-caret { width:10px; height:6px; flex:none; color:currentColor; opacity:.6;
@@ -520,6 +543,13 @@ button.nq-cc-name:focus-visible { outline:2px solid var(--nq-cc-accent, var(--ni
 .nq-cc-balance[hidden] { display:none; }
 .nq-cc-balance-nim { font-size:13px; font-weight:700; color:var(--nq-cc-menu-fg, var(--nimiq-blue, #1f2348)); }
 .nq-cc-balance-fiat { font-size:12px; font-weight:600; color:var(--nq-cc-menu-muted, rgba(31,35,72,.5)); }
+/* The figure is SPENDABLE and says so; stake is a quieter line under it and is
+   never summed in. */
+.nq-cc-balance-label { font-size:11px; font-weight:600; line-height:1.2; color:var(--nq-cc-menu-muted, rgba(31,35,72,.5)); }
+.nq-cc-balance-staked { margin-top:2px; font-size:11px; font-weight:600; text-align:right;
+  overflow:hidden; text-overflow:ellipsis; white-space:nowrap;
+  color:var(--nq-cc-menu-muted, rgba(31,35,72,.5)); }
+.nq-cc-balance-label[hidden], .nq-cc-balance-staked[hidden], .nq-cc-balance-fiat[hidden] { display:none; }
 
 /* action bar = the wallet's MobileActionBar verbatim: Receive quiet LEFT ↓,
    Send light-blue RIGHT ↑, bare scan glyph at .4 opacity */
@@ -1269,6 +1299,21 @@ export function mountMiniWallet(
   // is a balance to show" gate the single NIM line used to. Both are true only
   // while a host is migrating; the stack wins the account row either way.
   const hasBalance = !!balanceReader || hasAssets;
+  // Stake rides the same decision: the host's seam, else the built-in read only
+  // when the built-in BALANCE is the one running (a host with its own reader
+  // knows where its stake lives; the shell would be guessing).
+  const builtInBalance = !options.getBalanceLuna && !!balanceReader;
+  const balanceRpc = options.balance && options.balance.rpc ? { rpc: options.balance.rpc } : {};
+  const stakedReader: ((address: string) => Promise<number>) | undefined =
+    hasAssets ? undefined
+      : options.getStakedLuna ?? (builtInBalance ? createNimStakedReader(balanceRpc) : undefined);
+  // History: a Hub wallet only (inside Nimiq Pay the host wallet is the
+  // context), off on testnet for the balance's reason, off on `history: false`.
+  const historyFetch: ((address: string, opts: HistoryFetchOptions) => Promise<ShellTx[]>) | undefined =
+    !wallet || wallet.mode === 'miniapp' || options.history === false
+      ? undefined
+      : options.history?.fetch
+        ?? (options.network === 'test' || options.balance === false ? undefined : createNimHistoryReader(balanceRpc));
   // Currency choice stands on its own: a wallet-less page (the language-only
   // corner from v0.5.0) still wants to offer it, so this is gated on the fiat
   // feed alone. It used to require hasBalance, which made the picker
@@ -1406,8 +1451,14 @@ export function mountMiniWallet(
   nameEl.addEventListener('click', () => startRename(nameEl));
   const balanceStack = el('div', 'nq-cc-balance', accountRow);
   balanceStack.hidden = true;
+  const balanceLabel = el('span', 'nq-cc-balance-label', balanceStack);
+  tNode(balanceLabel, 'shell.available');
   const balanceNim = el('span', 'nq-cc-balance-nim', balanceStack);
   const balanceFiat = el('span', 'nq-cc-balance-fiat', balanceStack);
+  // Under the row, not in the stack: a long stake in the stack widened it and
+  // pushed the account name down to two letters.
+  const balanceStaked = el('div', 'nq-cc-balance-staked', walletSection);
+  balanceStaked.hidden = true;
 
   // Multi-asset: the per-asset stack sits under the account row and above the
   // action bar, and the account row's figure becomes the fiat total. Mounted
@@ -1781,6 +1832,32 @@ export function mountMiniWallet(
   // the receive footer pushes into it BEFORE that sheet is built, and a const
   // read from its own temporal dead zone throws at mount.
   const qrLabels: HTMLElement[] = [];
+
+  // ---- transaction history ------------------------------------------------
+  // Its recent rows land at the END of the wallet block, under the action bar;
+  // its two sub-views hang off the card like receive's. Built here, after the
+  // header helper's arrays exist, because it uses that helper.
+  const history: HistoryViewHandle | null = historyFetch
+    ? mountHistoryView({
+      root,
+      menu,
+      slot: walletSection,
+      i18n,
+      fetch: historyFetch,
+      address: () => wallet?.account?.address ?? null,
+      ...(options.identicon ? { identicon: options.identicon } : {}),
+      placeholder: PLACEHOLDER_HEX,
+      ...(options.contacts ? { contacts: () => options.contacts!.list() } : {}),
+      ...(hasFiat ? {
+        fiat: async () => {
+          const rate = await options.fiat!.rate(fiatTicker);
+          return rate === null ? null : { rate, ticker: fiatTicker };
+        },
+      } : {}),
+      network: options.network ?? 'main',
+      header: viewHeader,
+    })
+    : null;
 
   // ---- receive view content -------------------------------------------------
   // The title carries the asset when one is being received, so repaintReceive
@@ -2498,6 +2575,9 @@ export function mountMiniWallet(
   // ---- balance --------------------------------------------------------------
   let balanceFetchedAt = 0;
   let balanceLuna: number | null = null;
+  /** Staked luna, or null for none / unknown. Display only: never added to
+   *  balanceLuna, which is what Send caps against. */
+  let stakedLuna: number | null = null;
   async function refreshBalance(force = false): Promise<void> {
     const account = wallet?.account ?? null;
     if (!hasBalance || !account) return;
@@ -2510,6 +2590,7 @@ export function mountMiniWallet(
       balanceStack.hidden = total === null;
       balanceNim.textContent = total === null ? '' : fmtFiat(total, fiatTicker);
       balanceFiat.hidden = true;
+      balanceLabel.hidden = true;
       // Keep the NIM figure the Send view caps against in sync with the stack.
       const nimUnits = assetList.units('NIM');
       if (nimUnits !== null) balanceLuna = Number(nimUnits);
@@ -2520,10 +2601,18 @@ export function mountMiniWallet(
       renderBalance();
       return;
     }
-    try {
-      balanceLuna = await balanceReader!(account.address);
+    // Spendable and staked side by side, and settled separately: a failed stake
+    // read hides its own line and nothing else.
+    const [spend, stake] = await Promise.allSettled([
+      balanceReader!(account.address),
+      stakedReader ? stakedReader(account.address) : Promise.resolve(null),
+    ]);
+    if (spend.status === 'fulfilled') {
+      balanceLuna = spend.value;
       balanceFetchedAt = now;
-    } catch { /* keep the last known value */ }
+    } /* else keep the last known value */
+    stakedLuna = stake.status === 'fulfilled' && typeof stake.value === 'number'
+      && Number.isFinite(stake.value) && stake.value > 0 ? stake.value : null;
     renderBalance();
     if (hasFiat && !assetList && balanceLuna !== null) {
       try {
@@ -2539,13 +2628,19 @@ export function mountMiniWallet(
       }
     }
   }
+  function renderStaked(): void {
+    balanceStaked.hidden = stakedLuna === null;
+    balanceStaked.textContent = stakedLuna === null
+      ? '' : `${i18n.t('shell.staked')} ${fmtNim(stakedLuna, { maxDecimals: 2 })} NIM`;
+  }
   function renderBalance(): void {
     // With a stack mounted, the account row belongs to its fiat total and this
     // NIM line would clobber it. balanceLuna is still tracked, for the Send cap.
     if (assetList) return;
-    if (balanceLuna === null) { balanceStack.hidden = true; return; }
+    if (balanceLuna === null) { balanceStack.hidden = true; balanceStaked.hidden = true; return; }
     balanceStack.hidden = false;
     balanceNim.textContent = `${fmtNim(balanceLuna)} NIM`;
+    renderStaked();
     if (!hasFiat) balanceFiat.hidden = true;
   }
 
@@ -2585,7 +2680,10 @@ export function mountMiniWallet(
       document.addEventListener('click', onDocClick, true);
       document.addEventListener('keydown', onKeydown);
       void refreshBalance();
+      // History reads HERE and nowhere else: a closed menu makes no request.
+      void history?.refresh();
     } else {
+      history?.close();
       root.classList.remove('nq-cc-show-receive');
       root.classList.remove('nq-cc-show-qr');
       root.classList.remove('nq-cc-show-request');
@@ -2631,8 +2729,14 @@ export function mountMiniWallet(
       if (next !== shownAddress) {
         shownAddress = next;
         balanceLuna = null;
+        stakedLuna = null;
+        balanceStaked.hidden = true;
         balanceFetchedAt = 0;
         assetList?.clear();
+        // Another address's payments under this one's name would be the same
+        // lie as its balance.
+        history?.clear();
+        if (!menu.hidden) void history?.refresh();
         // A receive screen left open now shows the previous account's address.
         // Closed AND emptied: leaving the old address in the DOM behind a
         // hidden class is a stale address waiting for the next thing that
@@ -2646,7 +2750,7 @@ export function mountMiniWallet(
       }
       renderFace();
       if (wallet.account) { renderWalletBlock(); void refreshBalance(true); }
-      else { balanceStack.hidden = true; }
+      else { balanceStack.hidden = true; balanceStaked.hidden = true; }
     })
     : () => { /* language-only: no wallet to subscribe to */ };
   const unsubLang = i18n.onChange(() => {
@@ -2658,6 +2762,7 @@ export function mountMiniWallet(
     renderLangValue();
     renderFaceFlag();
     renderFace();
+    renderStaked();
   });
 
   return {
@@ -2672,6 +2777,7 @@ export function mountMiniWallet(
       // Before root.remove(): the list has in-flight chain reads that must see
       // the destroyed flag, or a slow RPC repaints a detached node.
       assetList?.destroy();
+      history?.destroy();
       root.remove();
     },
   };

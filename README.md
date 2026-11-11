@@ -291,6 +291,46 @@ Two components would mean two things to keep pixel-identical forever, which is
 the exact drift this package exists to end. A betting app that adds USDC next
 quarter changes one option; it does not migrate to a different control.
 
+### Available and staked
+
+The account row's NIM figure is the SPENDABLE balance and is labelled
+"Available". Staked NIM sits in the staking contract, not in the account, so
+`getAccountByAddress` never included it; the row now shows it as a quiet second
+line ("Staked 10 034.93 NIM") and never adds it to the figure above. Send's
+"Available:" hint and its max cap use the same spendable number.
+
+| Wired | Stake line comes from |
+| --- | --- |
+| nothing (built-in balance) | `getStakerByAddress` on the same node, same 30s cache, one extra request per read |
+| `getBalanceLuna` | your `getStakedLuna(address)`, or no line |
+| `assets`, `balance: false`, testnet | no line |
+
+A failed or zero stake read hides the line and never touches the spendable
+figure. The no-staker answer is an RPC error (`No staker with address`), read as 0.
+
+### Transaction history
+
+Under the Receive and Send bar: the last three transactions, then "All
+transactions", a sub-view with month groups that loads older pages on demand.
+Each row opens a detail view (full address plate, fee, date, message, and a
+`nimiq.watch/#<hash>` link, the explorer the Nimiq wallet links to).
+
+```ts
+mountMiniWallet(el, { wallet, i18n, history: false });           // off
+mountMiniWallet(el, { wallet, i18n, history: { fetch: myIndexer } }); // your rows
+// fetch(address, { max, startAt }) => Promise<ShellTx[]>, newest first,
+// older than the tx hash `startAt` when given.
+```
+
+ON by default for a connected Hub wallet on mainnet, read with
+`getTransactionsByAddress(address, max, startAt)` from the balance's node
+(`balance.rpc` when given). It reads when the menu opens, never while it is
+closed, one request per read, and reuses its rows for 30s. Off on testnet, with
+`balance: false`, and inside Nimiq Pay. Contact names come from
+`contacts.list`, faces from `identicon`, fiat from `fiat.rate` at today's rate.
+Messages are decoded only when they are clean UTF-8 text and are always set as
+text, never markup.
+
 ### The older pills
 
 `mountLanguagePill`, `mountWalletPill` and `mountLanguageSwitcher` are the
