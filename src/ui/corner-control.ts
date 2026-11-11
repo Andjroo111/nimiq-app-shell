@@ -435,6 +435,18 @@ function ensureStyles(): void {
 .nq-cc[data-connected] .nq-cc-face { padding:4px 12px 4px 8px; font-size:13px; }
 .nq-cc-face-icon { width:28px; height:28px; flex:none; border-radius:50%; overflow:hidden; display:inline-flex; }
 .nq-cc-face-icon > * { width:100%; height:100%; display:block; }
+/* On a NAVY pill (a light header) an identicon whose own background is navy
+   disappears into it. So the identicon sits on a hexagon of the pill's ink,
+   3px larger all round: the identicon's own shape, never a disc (Andjroo,
+   2026-11-11). The mask is the same hexagon path the placeholder draws. A
+   white pill needs none of this, every identicon colour reads on white. */
+.nq-cc[data-ink="dark"] .nq-cc-face-icon { position:relative; overflow:visible; border-radius:0; }
+.nq-cc[data-ink="dark"] .nq-cc-face-icon::before { content:""; position:absolute; inset:-3px;
+  background:var(--nq-cc-pill-ink, #fff);
+  -webkit-mask:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 -4 64 64'%3E%3Cpath d='M62.3 25.4L49.2 2.6A5.3 5.3 0 0 0 44.6 0H18.4c-1.9 0-3.6 1-4.6 2.6L.7 25.4c-1 1.6-1 3.6 0 5.2l13.1 22.8c1 1.6 2.7 2.6 4.6 2.6h26.2c1.9 0 3.6-1 4.6-2.6l13-22.8c1-1.6 1-3.6.1-5.2z'/%3E%3C/svg%3E") center/100% 100% no-repeat;
+  mask:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 -4 64 64'%3E%3Cpath d='M62.3 25.4L49.2 2.6A5.3 5.3 0 0 0 44.6 0H18.4c-1.9 0-3.6 1-4.6 2.6L.7 25.4c-1 1.6-1 3.6 0 5.2l13.1 22.8c1 1.6 2.7 2.6 4.6 2.6h26.2c1.9 0 3.6-1 4.6-2.6l13-22.8c1-1.6 1-3.6.1-5.2z'/%3E%3C/svg%3E") center/100% 100% no-repeat; }
+.nq-cc[data-ink="dark"] .nq-cc-face-icon > * { position:relative; }
+.nq-cc[data-ink="dark"][data-connected] .nq-cc-face { padding-left:11px; }
 .nq-cc-face-label { white-space:nowrap; }
 /* Mono is for an ADDRESS. A name is set in the control's own face, as the
    wallet sets every name. */
