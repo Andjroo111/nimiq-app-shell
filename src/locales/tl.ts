@@ -85,4 +85,15 @@ export default {
   'shell.hintSyncing': 'Nagsi-sync pa ang iyong wallet. Subukan ulit maya-maya.',
   'shell.hintExpired': 'Nag-expire ang bayad bago naipadala. Walang lumabas sa iyong wallet. Subukan ulit.',
   'shell.sendPending': 'Naipadala na. Kinukumpirma pa, kaya huwag nang ipadala ulit.',
+  // other chains (the mini wallet's EVM section)
+  'shell.evmOtherChains': 'Iba pang chain',
+  'shell.evmSub': 'USDC at USDT sa {network}',
+  'shell.evmConnect': 'Ikonekta',
+  'shell.evmSoon': 'Malapit na',
+  'shell.evmInstall': 'I-install ang MetaMask, saka i-reload',
+  'shell.evmCancelled': 'Kinansela',
+  'shell.evmFailed': 'Hindi makakonekta',
+  'shell.evmBrowserWallet': 'Wallet ng browser',
+  'shell.evmAnyMobile': 'Anumang mobile wallet',
+  'shell.evmLedgerSub': 'BTC at Polygon',
 } as const;

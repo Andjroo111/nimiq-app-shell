@@ -85,4 +85,15 @@ export default {
   'shell.hintSyncing': '你的钱包仍在同步。请稍后再试。',
   'shell.hintExpired': '付款在发送前已过期。你的钱包没有任何资金转出。请再试一次。',
   'shell.sendPending': '已发送。仍在确认中，请勿重复发送。',
+  // other chains (the mini wallet's EVM section)
+  'shell.evmOtherChains': '其他链',
+  'shell.evmSub': '{network} 上的 USDC 和 USDT',
+  'shell.evmConnect': '连接',
+  'shell.evmSoon': '即将推出',
+  'shell.evmInstall': '请安装 MetaMask，然后刷新',
+  'shell.evmCancelled': '已取消',
+  'shell.evmFailed': '无法连接',
+  'shell.evmBrowserWallet': '浏览器钱包',
+  'shell.evmAnyMobile': '任何手机钱包',
+  'shell.evmLedgerSub': 'BTC 和 Polygon',
 } as const;

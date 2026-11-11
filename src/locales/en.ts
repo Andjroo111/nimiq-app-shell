@@ -82,4 +82,15 @@ export default {
   'shell.hintSyncing': 'Your wallet is still syncing. Try again in a moment.',
   'shell.hintExpired': 'The payment expired before it was sent. Nothing left your wallet. Try again.',
   'shell.sendPending': 'Sent. Still confirming, so don\'t send it again.',
+  // other chains (the mini wallet's EVM section)
+  'shell.evmOtherChains': 'Other chains',
+  'shell.evmSub': 'USDC and USDT on {network}',
+  'shell.evmConnect': 'Connect',
+  'shell.evmSoon': 'Soon',
+  'shell.evmInstall': 'Install MetaMask, then reload',
+  'shell.evmCancelled': 'Cancelled',
+  'shell.evmFailed': 'Could not connect',
+  'shell.evmBrowserWallet': 'Browser wallet',
+  'shell.evmAnyMobile': 'Any mobile wallet',
+  'shell.evmLedgerSub': 'BTC and Polygon',
 } as const;

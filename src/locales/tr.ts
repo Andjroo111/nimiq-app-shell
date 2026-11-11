@@ -85,4 +85,15 @@ export default {
   'shell.hintSyncing': 'Cüzdanın hâlâ senkronize oluyor. Birazdan tekrar dene.',
   'shell.hintExpired': 'Ödeme gönderilmeden süresi doldu. Cüzdanından hiçbir şey çıkmadı. Tekrar dene.',
   'shell.sendPending': 'Gönderildi. Hâlâ onaylanıyor, tekrar gönderme.',
+  // other chains (the mini wallet's EVM section)
+  'shell.evmOtherChains': 'Diğer zincirler',
+  'shell.evmSub': '{network} üzerinde USDC ve USDT',
+  'shell.evmConnect': 'Bağlan',
+  'shell.evmSoon': 'Yakında',
+  'shell.evmInstall': 'MetaMask yükle, sonra yenile',
+  'shell.evmCancelled': 'İptal edildi',
+  'shell.evmFailed': 'Bağlanılamadı',
+  'shell.evmBrowserWallet': 'Tarayıcı cüzdanı',
+  'shell.evmAnyMobile': 'Herhangi bir mobil cüzdan',
+  'shell.evmLedgerSub': 'BTC ve Polygon',
 } as const;

@@ -82,4 +82,15 @@ export default {
   'shell.hintSyncing': 'Ví của bạn vẫn đang đồng bộ. Hãy thử lại sau giây lát.',
   'shell.hintExpired': 'Khoản thanh toán đã hết hạn trước khi được gửi. Không có gì rời khỏi ví của bạn. Hãy thử lại.',
   'shell.sendPending': 'Đã gửi. Vẫn đang xác nhận, đừng gửi lại.',
+  // other chains (the mini wallet's EVM section)
+  'shell.evmOtherChains': 'Chuỗi khác',
+  'shell.evmSub': 'USDC và USDT trên {network}',
+  'shell.evmConnect': 'Kết nối',
+  'shell.evmSoon': 'Sắp có',
+  'shell.evmInstall': 'Cài MetaMask rồi tải lại trang',
+  'shell.evmCancelled': 'Đã hủy',
+  'shell.evmFailed': 'Không thể kết nối',
+  'shell.evmBrowserWallet': 'Ví trình duyệt',
+  'shell.evmAnyMobile': 'Mọi ví di động',
+  'shell.evmLedgerSub': 'BTC và Polygon',
 } as const;
