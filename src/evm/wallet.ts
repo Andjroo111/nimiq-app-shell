@@ -239,17 +239,25 @@ export function createEvmWallet(options: CreateEvmWalletOptions = {}): EvmWallet
     }
   }
 
+  // Bumped by disconnect() and destroy(). A connect or restore that was waiting
+  // on the wallet when either ran must not bind a listener or set an account
+  // afterwards: that is a disconnect that reconnects itself, and a destroyed
+  // wallet still listening on the extension's provider.
+  let epoch = 0;
+
   async function connect(connectorId?: string): Promise<EvmAccount> {
     const id = connectorId ?? connectors().find((c) => c.ready)?.id;
     const provider = id ? providerFor(id) : null;
     if (!id || !provider) throw new EvmWalletError('no-provider', 'No browser wallet found');
     awaitingWallet = false;
+    const mine = epoch;
     const accounts = await provider.request({ method: 'eth_requestAccounts' });
     const first = Array.isArray(accounts) ? accounts[0] : undefined;
     if (typeof first !== 'string' || !isEvmAddress(first)) {
       throw new EvmWalletError('no-account', 'The wallet shared no account');
     }
     await ensureChain(provider);
+    if (mine !== epoch) throw new EvmWalletError('cancelled', 'Disconnected while connecting');
     bind(provider, id);
     store.set(OFF_KEY, null);
     store.set(CONNECTOR_KEY, id);
@@ -270,8 +278,10 @@ export function createEvmWallet(options: CreateEvmWalletOptions = {}): EvmWallet
       return null;
     }
     awaitingWallet = false;
+    const mine = epoch;
     try {
       const accounts = await provider.request({ method: 'eth_accounts' });
+      if (mine !== epoch) return account;
       const first = Array.isArray(accounts) ? accounts[0] : undefined;
       if (typeof first !== 'string' || !isEvmAddress(first)) return null;
       bind(provider, id);
@@ -342,6 +352,7 @@ export function createEvmWallet(options: CreateEvmWalletOptions = {}): EvmWallet
       return () => { connectorListeners.delete(cb); };
     },
     disconnect() {
+      epoch++;
       awaitingWallet = false;
       unbind();
       store.set(OFF_KEY, '1');
@@ -350,6 +361,7 @@ export function createEvmWallet(options: CreateEvmWalletOptions = {}): EvmWallet
     balanceOf,
     provider: () => bound?.provider ?? null,
     destroy() {
+      epoch++;
       unsubDiscovery();
       unbind();
       discovery.destroy();

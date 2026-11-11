@@ -223,6 +223,40 @@ describe('connect, restore, account changes, disconnect', () => {
     expect(evm.account).toBeNull();
   });
 
+  // A wallet whose eth_accounts answer is held until the test releases it.
+  const slow = () => {
+    let release!: () => void;
+    const gate = new Promise<void>((r) => { release = r; });
+    const provider = mockProvider({ eth_accounts: async () => { await gate; return [ADDR]; } });
+    return { provider, release };
+  };
+
+  test('a disconnect during a restore is not undone when the wallet answers', async () => {
+    const win = new Window();
+    const { provider, release } = slow();
+    const evm = createEvmWallet({ win: asWin(win) });
+    announce(win, METAMASK_RDNS, 'MetaMask', provider);
+    const pending = evm.restore();
+    evm.disconnect();
+    release();
+    expect(await pending).toBeNull();
+    expect(evm.account).toBeNull();
+    expect(provider.listenerCount('accountsChanged')).toBe(0);
+  });
+
+  test('a destroy during a restore leaves no listener on the provider', async () => {
+    const win = new Window();
+    const { provider, release } = slow();
+    const evm = createEvmWallet({ win: asWin(win) });
+    announce(win, METAMASK_RDNS, 'MetaMask', provider);
+    const pending = evm.restore();
+    evm.destroy();
+    release();
+    await pending;
+    expect(evm.account).toBeNull();
+    expect(provider.listenerCount('accountsChanged')).toBe(0);
+  });
+
   test('restore that ran before any wallet announced completes when one does', async () => {
     const win = new Window();
     const evm = createEvmWallet({ win: asWin(win) });
