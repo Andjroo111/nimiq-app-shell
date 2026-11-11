@@ -964,37 +964,37 @@ describe('send and receive match the wallet sheets', () => {
     }
   });
 
-  // The wallet shows the fiat value of the amount always, even at zero. It is
-  // the number the person actually decided on; NIM is the denomination.
-  test('the send amount carries its fiat value, and tracks typing', async () => {
-    const { host } = mount({
-      fiat: { currencies: ['USD'], default: 'USD', rate: async () => 0.002 },
-    });
-    open(host);
-    (host.querySelector('.nq-cc-send') as HTMLElement).click();
-    await settle();
-    const fiat = host.querySelector('.nq-cc-send-fiat') as HTMLElement;
-    expect(fiat.hidden).toBe(false);
-    const atZero = fiat.textContent ?? '';
-
-    const amount = host.querySelector(
-      '.nq-cc-view-send .nq-cc-amount-row .nq-cc-input') as HTMLInputElement;
-    amount.value = '1000';
-    amount.dispatchEvent(new (globalThis as unknown as { Event: typeof Event }).Event('input', { bubbles: true }));
-    await settle();
-    expect(fiat.textContent).not.toBe(atZero);
-    expect(fiat.textContent).toContain('2');
+  // The owner's call (2026-11-11): no price under the amount on this step,
+  // even with a fiat feed wired. The fiat value stays everywhere else.
+  test('the send amount step carries no fiat line, with or without a feed', async () => {
+    for (const opts of [
+      { fiat: { currencies: ['USD'], default: 'USD', rate: async () => 0.002 } },
+      {},
+    ]) {
+      const { host } = mount(opts);
+      open(host);
+      (host.querySelector('.nq-cc-send') as HTMLElement).click();
+      await settle();
+      const sheet = host.querySelector('.nq-cc-view-send') as HTMLElement;
+      expect(sheet.querySelector('.nq-cc-send-fiat')).toBeNull();
+      expect(sheet.textContent ?? '').not.toContain('$');
+      expect(host.querySelector('.nq-cc-send-confirm')).toBeTruthy();
+    }
   });
 
-  // No feed is a missing line, never a blocked send: the NIM amount is the
-  // authoritative one with or without a rate.
-  test('no fiat feed leaves the line hidden and the send usable', async () => {
+  // The wallet's amount has no label over it: a large numeral beside a NIM
+  // ticker says what it is. A screen reader still gets the name.
+  test('the amount field has no visible label but keeps an accessible name', async () => {
     const { host } = mount();
     open(host);
     (host.querySelector('.nq-cc-send') as HTMLElement).click();
     await settle();
-    expect((host.querySelector('.nq-cc-send-fiat') as HTMLElement).hidden).toBe(true);
-    expect(host.querySelector('.nq-cc-send-confirm')).toBeTruthy();
+    const sheet = host.querySelector('.nq-cc-view-send') as HTMLElement;
+    expect(sheet.querySelector('.nq-cc-field-label')).toBeNull();
+    const amount = sheet.querySelector('.nq-cc-amount-row .nq-cc-input') as HTMLInputElement;
+    expect(amount.getAttribute('aria-label')).toBe('Amount');
+    expect(amount.inputMode).toBe('decimal');
+    expect(sheet.querySelector('.nq-cc-amount-row')?.classList.contains('nq-cc-amount-hero')).toBe(true);
   });
 
   // The QR follows the live sheet, not the registry component it was ported
@@ -1131,10 +1131,27 @@ describe('the type scale is the wallet\'s, not half of it', () => {
 
   test('the primary button carries the nq-button weight', async () => {
     const src = await Bun.file(new URL('./corner-control.ts', import.meta.url)).text();
-    // The rule is shared with the request sheet's copy button, so the selector
-    // is a group, not a single class.
-    expect(src).toMatch(/\.nq-cc-send-confirm[^{]*\{[^}]*height:52px/);
-    expect(src).toMatch(/\.nq-cc-send-confirm[^{]*\{[^}]*font-size:16px/);
+    // The request sheet's copy button keeps the full-width 52px pill.
+    expect(src).toMatch(/\.nq-cc-request-copy[^{]*\{[^}]*height:52px/);
+    expect(src).toMatch(/\.nq-cc-request-copy[^{]*\{[^}]*font-size:16px/);
+  });
+
+  // Send is the wallet's button by share: 79.5% of the card, uppercase and
+  // letter-spaced, and a grey pill when disabled rather than a faded gradient.
+  test('the send button is the wallet SEND NIM pill, grey when disabled', async () => {
+    const src = await Bun.file(new URL('./corner-control.ts', import.meta.url)).text();
+    const rule = src.match(/\.nq-cc-send-body \.nq-cc-send-confirm \{[^}]*\}/)?.[0] ?? '';
+    expect(rule).toContain('width:88.5%');
+    expect(rule).toContain('text-transform:uppercase');
+    expect(rule).toContain('letter-spacing:.1em');
+    const disabled = src.match(/\.nq-cc-send-body \.nq-cc-send-confirm:disabled \{[^}]*\}/)?.[0] ?? '';
+    expect(disabled).toContain('opacity:1');
+    expect(disabled).toContain('background-image:none');
+  });
+
+  test('the Available line centres under the amount', async () => {
+    const src = await Bun.file(new URL('./corner-control.ts', import.meta.url)).text();
+    expect(src).toMatch(/\.nq-cc-send-hint \{[^}]*text-align:center/);
   });
 
   // The taller sheet has to be reachable on a short window, and `vh` alone is
@@ -1293,7 +1310,7 @@ describe('receive carries a working request link', () => {
     (host.querySelector('.nq-cc-send') as HTMLElement).click();
     await settle();
     expect(host.querySelector('.nq-cc-view-send .nq-cc-view-title')?.textContent)
-      .toBe('Send Amount');
+      .toBe('Set Amount');
   });
 });
 
@@ -1369,7 +1386,8 @@ describe('send is the wallet\'s two sheets', () => {
     type(host, OTHER);
     expect(root(host).classList.contains('nq-cc-show-send')).toBe(true);
     expect(host.querySelector('.nq-cc-view-send .nq-cc-view-title')?.textContent)
-      .toBe('Send Amount');
+      .toBe('Set Amount');
+    expect(host.querySelector('.nq-cc-send-confirm')?.textContent).toBe('Send NIM');
   });
 
   test('step two shows both parties as faces', async () => {

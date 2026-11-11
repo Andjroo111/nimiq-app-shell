@@ -883,6 +883,58 @@ Two places a proportion loses on purpose, both to a legibility floor:
 | Subtitle | 10.4px | **12px** | below 12 it stops being comfortable to read |
 | Send address grid | 11px / 158px | **16px / 236px** | this is the field where a wrong character costs money |
 
+The address grid row is superseded below: the 11px figure assumed our extra
+block gap, and without it the share says 17px.
+
+#### Set Amount, by share (v0.33)
+
+The send amount step, measured the same way: ink bounding boxes off the
+wallet's `send-set-amount-mobile.png` (780 device px for a 390px sheet) and off
+our card at 390x844 @2x (544 device px for 272), each as a share of its OWN
+width. Owner's decisions 2026-11-11: title **Set Amount**, no fiat line on this
+step, **Available** kept and centred, no currency caret.
+
+| element | wallet | before | now |
+| --- | --- | --- | --- |
+| Title cap height | 4.4% | 5.3% | **4.4%** (19px to 16px, every sub-view) |
+| "Set Amount" width | 31.7% | 45.0% ("Send Amount") | **33.1%** |
+| Back arrow width | 5.9% | 2.9% (chevron) | **5.7%** (long-tailed arrow) |
+| Close disc | 6.2% at 20% navy | 9.6% at 10% | **6.2% at 20%** |
+| Identicons | 18.5% | 20.6% | **18.4%** |
+| Identicon centres | 20.4% / 79.4% | 24.6% / 75.4% | **20.5% / 79.5%** |
+| Party name | navy regular, 24.1% column, fade | grey bold 11px, ellipsis | **navy regular 12px, 24.3% column, fade** |
+| Connector | 3.8%, ~10% navy, fading | 8.8% at 18% | **5.1% at 12%, fading** |
+| Amount digit height | 12.1% | ~3.7% (14px semibold) | **12.3%** (46px light) |
+| Amount box at "0" | 14.9% x 20.5% | 41.2% x 13.2% | **14.9% x 20.3%** |
+| NIM ticker cap height | 5.9% | 4.2% | **6.1%** |
+| Box to ticker gap | 4.7% | 3.5% | **4.8%** |
+| Send button | 79.5% x 14.4% | 89.7% x 19.1% | **79.4% x 16.2%** |
+| Button label | SEND NIM, 21.0% wide | Send, 27.6% | **SEND NIM, 24.4%** |
+| Send address field | 58.5% | 75.0% | **58.5%** |
+| Secondary pills | 34.4 to 35.9% x 6.9% | 54.9% x 14.0% | **45.1 to 48.3% x 10.3%** |
+
+⚠ **The address field was wide because of OUR gap, not the wallet's.** Its
+line is a plain `XXXX XXXX XXXX`, one space between blocks, at a 15px advance
+on a 390px sheet. By share that is 17px Fira Mono in 159px, so the field got
+narrower AND the type got bigger. `--nq-cc-addr-gap` is now `0ch`.
+
+**The amount box hugs its digits** the way the wallet's AmountInput does: a
+hidden copy of the text measures the width, and `fitAmount()` shrinks the whole
+row (numeral, box, gap and ticker are all in em) when the number would not fit,
+down to a 16px floor, past which the ticker wraps under the box rather than
+leaving the card. `1234567.12345` lands at 27px on one line. The numeral is
+Mulish 300, so a host has to load that weight; one that loads only 400 and up
+renders 400.
+
+Where a share loses on purpose:
+
+| element | the share says | ships at | why |
+| --- | --- | --- | --- |
+| Party names | 11.2px | **12px** | the type floor above |
+| Button height | 39px | **44px** | touch-target floor |
+| Button label | 11px | **12px** | the type floor |
+| Secondary pills | 10px type, 19px tall | **12px, 28px** | type floor and a tappable target, so 45% not 35% |
+
 #### The receive footer, the X, and the request link (v0.24.0)
 
 | What | Was | Now |
