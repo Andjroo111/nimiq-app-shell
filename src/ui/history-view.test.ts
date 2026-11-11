@@ -158,6 +158,31 @@ describe('spendable and staked on the account row', () => {
     expect(q(two.host, '.nq-cc-balance-staked')!.textContent).toBe('Staked 2.00 NIM');
   });
 
+  test('a balance read still in flight when the account changes never paints beside the new name', async () => {
+    let release!: () => void;
+    const gate = new Promise<void>((r) => { release = r; });
+    let onChange: (() => void) | null = null;
+    const w = wallet();
+    (w as { onAccountChange: unknown }).onAccountChange = (cb: () => void) => { onChange = cb; return () => {}; };
+    const { host } = mount({
+      wallet: w,
+      history: false,
+      // ME answers late; the account switched to never answers at all.
+      getBalanceLuna: async (address: string) => {
+        if (address === ME) { await gate; return 7_00000; }
+        return new Promise<number>(() => {});
+      },
+    });
+    await settle();
+    (w as { account: unknown }).account = { address: STRANGER, label: 'Other' };
+    onChange!();
+    await settle();
+    release();
+    await settle();
+    expect(q(host, '.nq-cc-balance')!.hidden).toBe(true);
+    expect(q(host, '.nq-cc-balance-nim')!.textContent).not.toContain('7');
+  });
+
   test('a host with its own balance wiring gets no built-in history unless it asks', async () => {
     const quiet = mount({ getBalanceLuna: async () => 1 });
     await settle();
@@ -165,6 +190,11 @@ describe('spendable and staked on the account row', () => {
     await settle();
     expect(methods).toEqual([]);
     expect(q(quiet.host, '.nq-cc-history')).toBeNull();
+    const stack = mount({ assets: [{ ticker: 'NIM', name: 'Nimiq', network: 'Nimiq', decimals: 5, balance: async () => 1, address: ME }] });
+    await settle();
+    stack.handle.open();
+    await settle();
+    expect(methods).toEqual([]);
     const asked = mount({ getBalanceLuna: async () => 1, history: true });
     await settle();
     asked.handle.open();

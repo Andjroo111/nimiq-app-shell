@@ -2840,11 +2840,16 @@ export function mountMiniWallet(
   async function refreshBalance(force = false): Promise<void> {
     const account = wallet?.account ?? null;
     if (!hasBalance || !account) return;
+    // A read that was in flight when the account changed must not paint: it
+    // would put the previous account's figure beside the new name. Checked
+    // after every await below.
+    const stale = (): boolean => wallet?.account?.address !== account.address;
     if (assetList) {
       // The stack owns the rows; the account row shows their fiat total. It is
       // painted AFTER the refresh rather than per row, so the headline figure
       // never counts a half-filled list and jumps as the slow chains land.
       await assetList.refresh(force);
+      if (stale()) return;
       const total = assetList.total();
       balanceStack.hidden = total === null;
       balanceNim.textContent = total === null ? '' : fmtFiat(total, fiatTicker);
@@ -2867,6 +2872,7 @@ export function mountMiniWallet(
       balanceReader!(account.address),
       stakedReader ? stakedReader(account.address) : Promise.resolve(null),
     ]);
+    if (stale()) return;
     if (spend.status === 'fulfilled') {
       balanceLuna = spend.value;
       balanceFetchedAt = now;
@@ -2877,6 +2883,7 @@ export function mountMiniWallet(
     if (hasFiat && !assetList && balanceLuna !== null) {
       try {
         const rate = await options.fiat!.rate(fiatTicker);
+        if (stale()) return;
         if (rate !== null && wallet?.account) {
           balanceFiat.textContent = fmtFiat(lunaToNim(balanceLuna) * rate, fiatTicker);
           balanceFiat.hidden = false;

@@ -317,16 +317,25 @@ Each row opens a detail view (full address plate, fee, date, message, and a
 
 ```ts
 mountMiniWallet(el, { wallet, i18n, history: false });           // off
+mountMiniWallet(el, { wallet, i18n, history: true });            // on, for a host with its own balances
 mountMiniWallet(el, { wallet, i18n, history: { fetch: myIndexer } }); // your rows
 // fetch(address, { max, startAt }) => Promise<ShellTx[]>, newest first,
 // older than the tx hash `startAt` when given.
 ```
 
-ON by default for a connected Hub wallet on mainnet, read with
-`getTransactionsByAddress(address, max, startAt)` from the balance's node
-(`balance.rpc` when given). It reads when the menu opens, never while it is
-closed, one request per read, and reuses its rows for 30s. Off on testnet, with
-`balance: false`, and inside Nimiq Pay. Contact names come from
+| Host wiring | History |
+| --- | --- |
+| nothing (built-in balance), Hub wallet, mainnet | ON, built-in read |
+| `getBalanceLuna` or `assets` | OFF unless `history: true` or `{ fetch }` |
+| `history: false`, `balance: false`, testnet | OFF (a `{ fetch }` still runs on testnet and with `balance: false`) |
+| inside Nimiq Pay | OFF, always |
+
+A host that wires its own balances is opt in because its account may not be a
+plain wallet address (Hashmark's is a betting key), and the shell does not
+guess. The built-in read is `getTransactionsByAddress(address, max, startAt)`
+from the balance's node (`balance.rpc` when given). It reads when the menu
+opens, never while it is closed, one request per read, and reuses its rows for
+30s. Contact names come from
 `contacts.list`, faces from `identicon`, fiat from `fiat.rate` at today's rate.
 Messages are decoded only when they are clean UTF-8 text and are always set as
 text, never markup.
