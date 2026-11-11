@@ -560,8 +560,17 @@ function ensureStyles(): void {
 
 /* mini wallet block */
 .nq-cc-wallet { padding:10px 8px 8px; }
-.nq-cc-account { display:flex; align-items:center; gap:10px; }
-.nq-cc-identicon { display:block; flex:none; width:40px; height:40px; }
+/* The account block is a three-row grid beside a large identicon (Andjroo,
+   2026-11-11): the name and the fiat value share the first line, then
+   "Available N NIM", then "Staked N NIM". Available and Staked are a labelled
+   pair in the same unit, so what can be spent is never confused with the
+   whole. The balance stack is display:contents so its three spans are grid
+   items of this row. */
+.nq-cc-account { display:grid; grid-template-columns:68px minmax(0,1fr) auto; column-gap:12px; row-gap:2px;
+  align-items:baseline; }
+.nq-cc-identicon { display:block; width:68px; height:68px; grid-column:1; grid-row:1 / span 3; align-self:center; }
+.nq-cc-account > .nq-cc-name, .nq-cc-account > .nq-cc-name-input { grid-column:2; grid-row:1; justify-self:start; max-width:100%;
+  margin-bottom:8px; }
 .nq-cc-identicon > * { width:100%; height:100%; display:block; }
 .nq-cc-name { font-size:14px; font-weight:600; min-width:0; overflow:hidden; text-overflow:ellipsis;
   white-space:nowrap; border:none; background:none; font-family:inherit; color:inherit; text-align:left;
@@ -577,16 +586,28 @@ button.nq-cc-name:focus-visible { outline:2px solid var(--nq-cc-accent, var(--ni
   box-shadow:inset 0 0 0 2px color-mix(in srgb, var(--nq-cc-menu-fg, var(--nimiq-blue, #1f2348)) 10%, transparent); }
 .nq-cc-name-input:focus { outline:none;
   box-shadow:inset 0 0 0 2px var(--nq-cc-accent, var(--nimiq-light-blue, #0582ca)); }
-.nq-cc-balance { margin-left:auto; display:flex; flex-direction:column; align-items:flex-end; gap:1px; flex:none; }
+.nq-cc-balance { display:contents; }
 .nq-cc-balance[hidden] { display:none; }
-.nq-cc-balance-nim { font-size:13px; font-weight:700; color:var(--nq-cc-menu-fg, var(--nimiq-blue, #1f2348)); }
-.nq-cc-balance-fiat { font-size:12px; font-weight:600; color:var(--nq-cc-menu-muted, rgba(31,35,72,.5)); }
+.nq-cc-balance-fiat { grid-column:3; grid-row:1; justify-self:end; font-size:14px; font-weight:700;
+  color:var(--nq-cc-menu-fg, var(--nimiq-blue, #1f2348)); }
+.nq-cc-balance-avail { grid-column:2 / 4; grid-row:2; justify-self:end; display:flex; align-items:baseline; gap:4px; min-width:0; }
+.nq-cc-balance-nim { font-size:12px; font-weight:700; white-space:nowrap;
+  color:var(--nq-cc-menu-fg, var(--nimiq-blue, #1f2348)); }
+/* A multi-asset host: the one figure is the fiat total, so it takes the
+   headline place beside the name. */
+.nq-cc-account[data-total] { align-items:center; }
+.nq-cc-account[data-total] .nq-cc-identicon { grid-row:1; }
+.nq-cc-account[data-total] > .nq-cc-name { margin-bottom:-6px; }
+.nq-cc-account[data-total] .nq-cc-balance-avail { grid-column:3; grid-row:1; }
+.nq-cc-account[data-total] .nq-cc-balance-nim { font-size:14px; }
 /* The figure is SPENDABLE and says so; stake is a quieter line under it and is
    never summed in. */
-.nq-cc-balance-label { font-size:11px; font-weight:600; line-height:1.2; color:var(--nq-cc-menu-muted, rgba(31,35,72,.5)); }
-.nq-cc-balance-staked { margin-top:2px; font-size:11px; font-weight:600; text-align:right;
+.nq-cc-balance-label { font-size:12px; font-weight:600; white-space:nowrap;
+  color:var(--nq-cc-menu-muted, rgba(31,35,72,.5)); }
+.nq-cc-balance-staked { grid-column:2 / 4; grid-row:3; font-size:12px; font-weight:600; text-align:right;
   overflow:hidden; text-overflow:ellipsis; white-space:nowrap;
   color:var(--nq-cc-menu-muted, rgba(31,35,72,.5)); }
+.nq-cc-balance-staked b { font-weight:700; color:var(--nq-cc-menu-fg, var(--nimiq-blue, #1f2348)); }
 .nq-cc-balance-label[hidden], .nq-cc-balance-staked[hidden], .nq-cc-balance-fiat[hidden] { display:none; }
 
 /* action bar = the wallet's MobileActionBar verbatim: Receive quiet LEFT ↓,
@@ -1614,13 +1635,16 @@ export function mountMiniWallet(
   nameEl.addEventListener('click', () => startRename(nameEl));
   const balanceStack = el('div', 'nq-cc-balance', accountRow);
   balanceStack.hidden = true;
-  const balanceLabel = el('span', 'nq-cc-balance-label', balanceStack);
+  // "Available N NIM" is ONE grid item, so the fiat figure alone sets the
+  // width of the column beside the name and the name keeps its room.
+  const balanceAvail = el('span', 'nq-cc-balance-avail', balanceStack);
+  const balanceLabel = el('span', 'nq-cc-balance-label', balanceAvail);
   tNode(balanceLabel, 'shell.available');
-  const balanceNim = el('span', 'nq-cc-balance-nim', balanceStack);
+  const balanceNim = el('span', 'nq-cc-balance-nim', balanceAvail);
   const balanceFiat = el('span', 'nq-cc-balance-fiat', balanceStack);
   // Under the row, not in the stack: a long stake in the stack widened it and
   // pushed the account name down to two letters.
-  const balanceStaked = el('div', 'nq-cc-balance-staked', walletSection);
+  const balanceStaked = el('div', 'nq-cc-balance-staked', accountRow);
   balanceStaked.hidden = true;
 
   // Multi-asset: the per-asset stack sits under the account row and above the
@@ -2805,6 +2829,7 @@ export function mountMiniWallet(
       balanceNim.textContent = total === null ? '' : fmtFiat(total, fiatTicker);
       balanceFiat.hidden = true;
       balanceLabel.hidden = true;
+      accountRow.dataset.total = '';
       // Keep the NIM figure the Send view caps against in sync with the stack.
       const nimUnits = assetList.units('NIM');
       if (nimUnits !== null) balanceLuna = Number(nimUnits);
@@ -2844,8 +2869,11 @@ export function mountMiniWallet(
   }
   function renderStaked(): void {
     balanceStaked.hidden = stakedLuna === null;
-    balanceStaked.textContent = stakedLuna === null
-      ? '' : `${i18n.t('shell.staked')} ${fmtNim(stakedLuna, { maxDecimals: 2 })} NIM`;
+    balanceStaked.textContent = '';
+    if (stakedLuna === null) return;
+    // Label quiet, figure in ink: the same pairing as the Available line above.
+    balanceStaked.append(`${i18n.t('shell.staked')} `);
+    el('b', undefined, balanceStaked).textContent = `${fmtNim(stakedLuna, { maxDecimals: 2 })} NIM`;
   }
   function renderBalance(): void {
     // With a stack mounted, the account row belongs to its fiat total and this
@@ -2863,7 +2891,7 @@ export function mountMiniWallet(
     const account = wallet?.account ?? null;
     if (!account) return;
     identiconSlot.textContent = '';
-    if (options.identicon) identiconSlot.appendChild(options.identicon(account.address, 40));
+    if (options.identicon) identiconSlot.appendChild(options.identicon(account.address, 68));
     else identiconSlot.innerHTML = PLACEHOLDER_HEX;
     nameEl.textContent = shortLabel(account, i18n.t('shell.account'));
     qrFor = '';
