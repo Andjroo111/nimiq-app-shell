@@ -456,6 +456,7 @@ function ensureStyles(): void {
 .nq-cc-face:focus-visible { outline:2px solid var(--nq-cc-accent, var(--nimiq-light-blue, #0582ca)); outline-offset:3px; }
 /* 8px left: the identicon needs air off the pill edge (Andjroo, phone review) */
 .nq-cc[data-connected] .nq-cc-face { padding:4px 12px 4px 8px; font-size:13px; }
+.nq-cc:not([data-connected]) .nq-cc-face { padding:0 18px; }
 .nq-cc-face-icon { width:28px; height:28px; flex:none; border-radius:50%; overflow:hidden; display:inline-flex; }
 .nq-cc-face-icon > * { width:100%; height:100%; display:block; }
 /* On a NAVY pill (a light header) an identicon whose own background is navy
@@ -1552,10 +1553,13 @@ export function mountMiniWallet(
       const named = !!((account.address && storedLabel(account.address)) || account.label);
       if (!named && account.address) label.dataset.address = '';
     } else {
+      // Signed out the control is the words and nothing else: no wallet glyph,
+      // no caret. One shape fleet-wide (Andjroo, 2026-11-11), and with more
+      // than one kind of wallet behind it a single glyph would name the wrong one.
       delete root.dataset.connected;
-      face.insertAdjacentHTML('beforeend', WALLET_ICON);
       const label = el('span', 'nq-cc-face-label', face);
       label.textContent = i18n.t('shell.connectWallet');
+      return;
     }
     face.insertAdjacentHTML('beforeend', CARET);
   }

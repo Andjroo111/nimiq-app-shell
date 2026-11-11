@@ -79,12 +79,6 @@ const PLACEHOLDER_SVG =
       '<path opacity=".25" d="M62.3 25.4L49.2 2.6A5.3 5.3 0 0 0 44.6 0H18.4c-1.9 0-3.6 1-4.6 2.6L.7 25.4c-1 1.6-1 3.6 0 5.2l13.1 22.8c1 1.6 2.7 2.6 4.6 2.6h26.2c1.9 0 3.6-1 4.6-2.6l13-22.8c1-1.6 1-3.6.1-5.2z" fill="currentColor"/></svg>',
   );
 
-const WALLET_ICON =
-  '<svg class="nq-connect__icon" viewBox="0 0 20 20" fill="none" aria-hidden="true">' +
-  '<rect x="2" y="5" width="16" height="12" rx="2" stroke="currentColor" stroke-width="1.5"/>' +
-  '<path d="M2 9h16" stroke="currentColor" stroke-width="1.5"/>' +
-  '<circle cx="6" cy="13" r="1" fill="currentColor"/></svg>';
-
 const CARET =
   '<svg class="nq-wallet__caret" viewBox="0 0 10 6" aria-hidden="true">' +
   '<path d="M1 1l4 4 4-4" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>';
@@ -138,18 +132,18 @@ export function mountWalletPill(
     const btn = document.createElement('button');
     btn.className = 'nq-connect';
     btn.type = 'button';
-    btn.innerHTML = WALLET_ICON + `<span>${i18n.t('shell.connectWallet')}</span>`;
+    btn.innerHTML = `<span>${i18n.t('shell.connectWallet')}</span>`;
     btn.addEventListener('click', async () => {
       btn.disabled = true;
-      btn.innerHTML = WALLET_ICON + `<span>${i18n.t('shell.connecting')}</span>`;
+      btn.innerHTML = `<span>${i18n.t('shell.connecting')}</span>`;
       // Reset in `finally`, as corner-control does: a connect() that resolves
       // null without an account change (a cancelled pick) left this button
       // disabled on "Connecting" with nothing to re-render it.
       try {
         await wallet.connect();
-        btn.innerHTML = WALLET_ICON + `<span>${i18n.t('shell.connectWallet')}</span>`;
+        btn.innerHTML = `<span>${i18n.t('shell.connectWallet')}</span>`;
       } catch {
-        btn.innerHTML = WALLET_ICON + `<span>${i18n.t('shell.retry')}</span>`;
+        btn.innerHTML = `<span>${i18n.t('shell.retry')}</span>`;
       } finally {
         btn.disabled = false;
       }
