@@ -41,6 +41,8 @@ import { nimiqQr } from './qr';
 import { formatAddressBlocks, reformatInPlace, significantChars } from './address-input';
 import { createNameResolver, isNameInput, type NameResolverOptions } from '../names';
 import { mountNameLookup, NAME_LOOKUP_CSS } from './name-lookup';
+import { createEvmWallet, type EvmWallet } from '../evm';
+import { EVM_SECTION_CSS, mountEvmSection, type EvmSectionHandle } from './evm-section';
 
 /** A NIM address: NQ + 2 check digits + 32 base32 chars. */
 const NIM_ADDRESS_SHAPE = /^NQ[0-9]{2}[0-9A-HJ-NP-VXY]{32}$/;
@@ -309,6 +311,22 @@ export interface CornerControlOptions {
   switchAccount?: boolean;
   /** 'test' renders the network row (mainnet says nothing). Default 'main'. */
   network?: 'main' | 'test';
+  /** Show the "Other chains" section: MetaMask, and any other browser wallet
+   *  that announces itself over EIP-6963, on Polygon. Absent, nothing renders.
+   *
+   *  Signed out it is one Connect row per wallet. Connected it is the short 0x
+   *  address, a USDC and a USDT row with balances read through the wallet, and
+   *  a Disconnect; tapping a token row opens the receive view for it, with the
+   *  Polygon-only warning. It shows whether or not the Nimiq wallet is
+   *  connected, because the two accounts are unrelated.
+   *
+   *  `true` has the mini wallet create and own the handle, on Polygon mainnet
+   *  or, with `network: 'test'`, on Polygon Amoy. Pass your own
+   *  `createEvmWallet()` when the app also needs the account (to build its own
+   *  transactions: sending from the EVM account is the app's, not the shell's).
+   *
+   *  Not rendered inside Nimiq Pay: that WebView has no browser wallet. */
+  evm?: EvmWallet | true;
   /** "Open in Nimiq Pay" deeplink URL (standalone web only). Hidden when
    *  absent. Pass a function for URLs that depend on late state (e.g. an auth
    *  token that must ride along) — it is called at click time. */
@@ -415,7 +433,7 @@ function ensureStyles(): void {
   // as a color-mix of that var: identical when untouched, and it follows the
   // foreground the moment a host themes one. Same for the light-blue washes,
   // which are --nq-cc-accent at 8% and 12%.
-  style.textContent = NAME_LOOKUP_CSS + HISTORY_CSS + `
+  style.textContent = NAME_LOOKUP_CSS + EVM_SECTION_CSS + HISTORY_CSS + `
 .nq-cc { position:relative; display:inline-block;
   font-family:var(--nq-cc-font, 'Mulish','Muli',system-ui,sans-serif); }
 .nq-cc-caret { width:10px; height:6px; flex:none; color:currentColor; opacity:.6;
@@ -423,19 +441,39 @@ function ensureStyles(): void {
 .nq-cc-face[aria-expanded="true"] .nq-cc-caret,
 .nq-cc-face-flag[aria-expanded="true"] .nq-cc-caret { transform:rotate(180deg); }
 
-/* face (hub mode): the fleet outline pill, both states, + the caret */
+/* face (hub mode): a pill filled with the HEADER'S OWN INK, so it is the
+   opposite of whatever it sits on: white on a navy header, navy on a light
+   one. The outline pill it replaces was navy on navy and white on white
+   (Andjroo, phone review 2026-11-11). The fill is currentColor, which needs no
+   detection; only the ink ON the pill does, and syncInk() sets data-ink for it. */
 .nq-cc-face { display:inline-flex; align-items:center; gap:8px; height:40px; padding:0 14px;
-  border:1px solid color-mix(in srgb, currentColor 22%, transparent); border-radius:999px;
-  background:transparent; color:inherit; font:inherit; font-size:14px; font-weight:700; line-height:1; cursor:pointer;
-  transition:border-color .15s var(--nimiq-ease, cubic-bezier(.25,0,0,1)), background-color .15s var(--nimiq-ease, cubic-bezier(.25,0,0,1)); }
-.nq-cc-face:hover { border-color: color-mix(in srgb, currentColor 45%, transparent); background: color-mix(in srgb, currentColor 6%, transparent); }
+  border:none; border-radius:999px;
+  background:currentColor; color:inherit; font:inherit; font-size:14px; font-weight:700; line-height:1; cursor:pointer;
+  transition:opacity .15s var(--nimiq-ease, cubic-bezier(.25,0,0,1)); }
+.nq-cc-face > * { color:var(--nq-cc-pill-ink, #fff); }
+.nq-cc[data-ink="light"] .nq-cc-face > * { color:var(--nq-cc-pill-ink, var(--nimiq-blue, #1f2348)); }
+.nq-cc-face:hover { opacity:.88; }
 .nq-cc-face:focus-visible { outline:2px solid var(--nq-cc-accent, var(--nimiq-light-blue, #0582ca)); outline-offset:3px; }
 /* 8px left: the identicon needs air off the pill edge (Andjroo, phone review) */
 .nq-cc[data-connected] .nq-cc-face { padding:4px 12px 4px 8px; font-size:13px; }
 .nq-cc-face-icon { width:28px; height:28px; flex:none; border-radius:50%; overflow:hidden; display:inline-flex; }
 .nq-cc-face-icon > * { width:100%; height:100%; display:block; }
+/* On a NAVY pill (a light header) an identicon whose own background is navy
+   disappears into it. So the identicon sits on a hexagon of the pill's ink,
+   3px larger all round: the identicon's own shape, never a disc (Andjroo,
+   2026-11-11). The mask is the same hexagon path the placeholder draws. A
+   white pill needs none of this, every identicon colour reads on white. */
+.nq-cc[data-ink="dark"] .nq-cc-face-icon { position:relative; overflow:visible; border-radius:0; }
+.nq-cc[data-ink="dark"] .nq-cc-face-icon::before { content:""; position:absolute; inset:-3px;
+  background:var(--nq-cc-pill-ink, #fff);
+  -webkit-mask:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 -4 64 64'%3E%3Cpath d='M62.3 25.4L49.2 2.6A5.3 5.3 0 0 0 44.6 0H18.4c-1.9 0-3.6 1-4.6 2.6L.7 25.4c-1 1.6-1 3.6 0 5.2l13.1 22.8c1 1.6 2.7 2.6 4.6 2.6h26.2c1.9 0 3.6-1 4.6-2.6l13-22.8c1-1.6 1-3.6.1-5.2z'/%3E%3C/svg%3E") center/100% 100% no-repeat;
+  mask:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 -4 64 64'%3E%3Cpath d='M62.3 25.4L49.2 2.6A5.3 5.3 0 0 0 44.6 0H18.4c-1.9 0-3.6 1-4.6 2.6L.7 25.4c-1 1.6-1 3.6 0 5.2l13.1 22.8c1 1.6 2.7 2.6 4.6 2.6h26.2c1.9 0 3.6-1 4.6-2.6l13-22.8c1-1.6 1-3.6.1-5.2z'/%3E%3C/svg%3E") center/100% 100% no-repeat; }
+.nq-cc[data-ink="dark"] .nq-cc-face-icon > * { position:relative; }
+.nq-cc[data-ink="dark"][data-connected] .nq-cc-face { padding-left:11px; }
 .nq-cc-face-label { white-space:nowrap; }
-.nq-cc[data-connected] .nq-cc-face-label { font-family:'Fira Mono',ui-monospace,monospace; letter-spacing:.02em; }
+/* Mono is for an ADDRESS. A name is set in the control's own face, as the
+   wallet sets every name. */
+.nq-cc-face-label[data-address] { font-family:'Fira Mono',ui-monospace,monospace; letter-spacing:.02em; }
 
 /* face (mini-app mode): flag only, the wallet is ambient */
 .nq-cc-face-flag { display:none; align-items:center; gap:7px; height:38px; padding:0 10px;
@@ -586,7 +624,7 @@ button.nq-cc-name:focus-visible { outline:2px solid var(--nq-cc-accent, var(--ni
    wallet only appears for the approval (Hub checkout / Nimiq Pay confirm) */
 /* TWO sheets, because the wallet has two and the split is what makes each of
    ours a mini version of one of theirs rather than a mash of both.
-   "Send Transaction" takes the recipient. "Send Amount" takes the amount, and
+   "Send Transaction" takes the recipient. "Set Amount" takes the amount, and
    by then the recipient is SETTLED, which is what lets it show both parties as
    faces the way the wallet's Set Amount does.
    This was written off as a width constraint for four versions. It is not
@@ -652,17 +690,34 @@ button.nq-cc-name:focus-visible { outline:2px solid var(--nq-cc-accent, var(--ni
 /* Both parties, faces first, with the wallet's hairline dash between them.
    Sender on the left, recipient on the right, which is the direction the money
    goes and the same order the wallet uses. */
-.nq-cc-parties { display:grid; grid-template-columns:1fr 24px 1fr; align-items:start;
-  gap:4px; width:100%; margin-bottom:6px; }
-.nq-cc-party { display:flex; flex-direction:column; align-items:center; gap:6px; min-width:0; }
-.nq-cc-party-icon { display:block; width:56px; height:56px; }
+/* v0.33, measured as shares of each sheet: the wallet's faces are 18.5% of
+   its width with centres at 20.4% and 79.4%. The outer columns are 34.2% of the
+   244px body, which with the 14px of menu and body padding puts the centres at
+   55.8px and 216.2px of the 272px card, the same two shares. */
+.nq-cc-parties { display:grid; grid-template-columns:34.2% 1fr 34.2%; align-items:start;
+  width:100%; margin:0; }
+.nq-cc-party { display:flex; flex-direction:column; align-items:center; gap:7px; min-width:0; }
+.nq-cc-party-icon { display:block; width:50px; height:50px; }
 .nq-cc-party-icon > * { display:block; width:100%; height:100%; }
-.nq-cc-party-name { max-width:100%; font-size:11px; font-weight:600; text-align:center;
-  overflow:hidden; text-overflow:ellipsis; white-space:nowrap;
-  color:var(--nq-cc-menu-muted, rgba(31,35,72,.6)); }
-.nq-cc-party-name.nq-cc-mono { font-family:'Fira Mono',ui-monospace,monospace; font-size:10px; }
-.nq-cc-party-dash { align-self:center; height:1px; margin-top:-14px;
-  background:color-mix(in srgb, var(--nq-cc-menu-fg, var(--nimiq-blue, #1f2348)) 18%, transparent); }
+/* Navy and regular, the wallet's name, not a grey bold caption. The column the
+   wallet clips a name to is 24.2% of its sheet (66px here), and a name or an
+   address that runs past it FADES rather than ending in an ellipsis: an
+   ellipsis says "the rest is unimportant", which of an address is the wrong
+   message. The fade only goes on when the text really overflows (nq-cc-fade,
+   set after layout), so a short name keeps every letter at full ink. */
+.nq-cc-party-name { max-width:66px; font-size:12px; font-weight:400; line-height:1.3; text-align:center;
+  overflow:hidden; white-space:nowrap;
+  color:var(--nq-cc-menu-fg, var(--nimiq-blue, #1f2348)); }
+.nq-cc-party-name.nq-cc-fade { text-align:left;
+  -webkit-mask-image:linear-gradient(90deg, black 70%, transparent);
+  mask-image:linear-gradient(90deg, black 70%, transparent); }
+.nq-cc-party-name.nq-cc-mono { font-family:'Fira Mono',ui-monospace,monospace; font-size:12px; }
+/* A faint short hairline that fades toward the recipient: 3.8% of the wallet's
+   sheet, a tenth of navy at its strong end. It was an 18% rule twice as long,
+   which read as a minus sign between two faces. */
+.nq-cc-party-dash { align-self:start; justify-self:center; width:14px; height:1px; margin-top:25px;
+  background:linear-gradient(90deg,
+    color-mix(in srgb, var(--nq-cc-menu-fg, var(--nimiq-blue, #1f2348)) 12%, transparent), transparent); }
 
 /* The QR gets its own sheet, the way the wallet's "NIM Address" does. It sits
    UNDER receive rather than beside it: receive is what the corner opens, and
@@ -724,9 +779,13 @@ button.nq-cc-name:focus-visible { outline:2px solid var(--nq-cc-accent, var(--ni
 .nq-cc-qr-glyph { display:block; width:22px; height:22px; }
 /* The wallet's secondary pill: a grey capsule, never a coloured one. The one
    coloured button in this menu is Send, and a second would make neither read
-   as the primary. */
-.nq-cc-request-open { min-height:38px; padding:0 16px; border:none; border-radius:500px;
-  font-family:inherit; font-size:14px; font-weight:700; cursor:pointer;
+   as the primary.
+   v0.33, by share: the wallet's pill is 35% of its sheet wide and 6.9% tall,
+   which here would be 95px by 19px and 10px type. It stops at the 12px type
+   floor and a 28px target instead, which lands near 42% by 10%, down from
+   55% by 14%. */
+.nq-cc-request-open { min-height:28px; padding:0 11px; border:none; border-radius:500px;
+  font-family:inherit; font-size:12px; font-weight:700; cursor:pointer;
   color:var(--nq-cc-menu-fg, var(--nimiq-blue, #1f2348));
   background:color-mix(in srgb, var(--nq-cc-menu-fg, var(--nimiq-blue, #1f2348)) 6%, transparent);
   transition:background .15s var(--nimiq-ease, cubic-bezier(.25,0,0,1)); }
@@ -769,7 +828,14 @@ button.nq-cc-name:focus-visible { outline:2px solid var(--nq-cc-accent, var(--ni
 
    Inset box-shadow for the border, never border (rule 1). */
 .nq-cc-addr-field { position:relative; border-radius:8px; padding:7px 0;
-  width:100%; max-width:204px; margin-inline:auto; box-sizing:border-box;
+  /* The block gap, ONE declaration read by the text and by the tick rules.
+     EXTRA space on top of the one space between blocks. v0.33 measured the
+     wallet's field: a plain "XXXX XXXX XXXX" line, one space between blocks,
+     a 15px advance on a 390px sheet. By share that is 17px Fira Mono with no
+     extra gap in a field 58.5% of the card (159px), where the old 4ch gap at
+     14px needed 204px (75%). Bigger type in a narrower field. */
+  --nq-cc-addr-gap:0ch;
+  width:100%; max-width:159px; margin-inline:auto; box-sizing:border-box;
   background:var(--nq-cc-input-bg, var(--nq-cc-card-bg, #fff));
   box-shadow:inset 0 0 0 2px color-mix(in srgb, var(--nq-cc-menu-fg, var(--nimiq-blue, #1f2348)) 12%, transparent);
   transition:box-shadow .15s var(--nimiq-ease, cubic-bezier(.25,0,0,1)); }
@@ -780,11 +846,10 @@ button.nq-cc-name:focus-visible { outline:2px solid var(--nq-cc-accent, var(--ni
    letters would space the characters inside a block too, and the four
    characters of a block read as one unit. */
 .nq-cc-addr-input { display:block; margin:0 auto; padding:0; border:none;
-  --nq-cc-addr-gap:4.9ch;
   width:calc(14ch + 2 * var(--nq-cc-addr-gap));
   word-spacing:var(--nq-cc-addr-gap);
   outline:none; resize:none; overflow:hidden; background:transparent;
-  font-family:'Fira Mono',ui-monospace,monospace; font-size:14px; line-height:28px;
+  font-family:'Fira Mono',ui-monospace,monospace; font-size:17px; line-height:28px;
   /* LEFT, not centred. A full address fills the field exactly, so this only
      moves a partial one and the placeholder, and those are the two states that
      were wrong: the wallet's "NQ" sits at the start of the first cell and ours
@@ -802,9 +867,8 @@ button.nq-cc-name:focus-visible { outline:2px solid var(--nq-cc-accent, var(--ni
    NOTE: this block is a JS template literal, so it must never contain a
    backtick. Writing ch in code quotes here is what broke the build once. */
 .nq-cc-addr-rules { position:absolute; inset:7px 0; pointer-events:none;
-  font-family:'Fira Mono',ui-monospace,monospace; font-size:14px;
+  font-family:'Fira Mono',ui-monospace,monospace; font-size:17px;
   --nq-cc-addr-rule:color-mix(in srgb, var(--nq-cc-menu-fg, var(--nimiq-blue, #1f2348)) 10%, transparent);
-  --nq-cc-addr-gap:4.9ch;
   /* Block 1 ends at char 4 and block 2 starts at char 5 plus the gap, so the
      gap centre is 2.5ch + half a gap either side of the line's centre. Derived
      rather than eyeballed, so changing the gap moves the rules with it. */
@@ -840,24 +904,48 @@ button.nq-cc-name:focus-visible { outline:2px solid var(--nq-cc-accent, var(--ni
   text-align:center; }
 .nq-cc-amount-suffix { flex:none; font-size:16px; font-weight:700; pointer-events:none;
   color:color-mix(in srgb, var(--nq-cc-menu-fg, var(--nimiq-blue, #1f2348)) 45%, transparent); }
+/* The SEND amount is the wallet's AmountInput, by share (v0.33). Its "0" is
+   12.1% of the sheet tall, so the numeral is light Mulish at 46px here (a 33px
+   digit on a 272px card), in a thin box that HUGS the digits: 14.9% of the
+   sheet wide at "0", 1.2em tall, a 1.5px hairline at a tenth of navy. The
+   ticker is half the numeral, grey, on the same baseline, 0.28em off the box.
+   Everything is in em so fitAmount() can shrink the whole row by setting one
+   font-size when a long amount would not fit, and the box width is measured
+   off a hidden copy of the text (nq-cc-amount-sizer) because an input does
+   not size to its value. Light (300) needs the host to load that weight; a
+   page that loads only 400 and up renders the nearest, which is 400. */
+.nq-cc-amount-hero { position:relative; align-items:baseline; align-content:center; flex-wrap:wrap;
+  gap:0 .23em; min-height:55px; margin-top:34px; font-size:46px; line-height:1; }
+.nq-cc-amount-hero .nq-cc-input { flex:0 1 auto; width:1.4em; min-width:0; max-width:100%; height:1.2em;
+  box-sizing:border-box; padding:0 .12em; border-radius:4px;
+  font-size:1em; font-weight:300; line-height:1.2; letter-spacing:0; text-align:center;
+  box-shadow:inset 0 0 0 1.5px color-mix(in srgb, var(--nq-cc-menu-fg, var(--nimiq-blue, #1f2348)) 10%, transparent); }
+.nq-cc-amount-hero .nq-cc-input:focus {
+  box-shadow:inset 0 0 0 1.5px var(--nq-cc-accent, var(--nimiq-light-blue, #0582ca)); }
+.nq-cc-amount-hero .nq-cc-input::placeholder { font-weight:300;
+  color:color-mix(in srgb, var(--nq-cc-menu-fg, var(--nimiq-blue, #1f2348)) 50%, transparent); }
+.nq-cc-amount-hero .nq-cc-amount-suffix { font-size:.5em; font-weight:600;
+  color:color-mix(in srgb, var(--nq-cc-menu-fg, var(--nimiq-blue, #1f2348)) 50%, transparent); }
+.nq-cc-amount-sizer { position:absolute; left:0; top:0; visibility:hidden; pointer-events:none;
+  white-space:pre; font-family:inherit; font-size:1em; font-weight:300; }
 /* Centred, because the field it labels is centred. */
 .nq-cc-send-body .nq-cc-field-label, .nq-cc-request-body .nq-cc-field-label { text-align:center; }
-.nq-cc-send-fiat, .nq-cc-request-hint { text-align:center; }
+.nq-cc-request-hint { text-align:center; }
 /* Underlined-by-nothing and bordered by nothing, which is how the wallet draws
    it: a plain centred line of text that happens to be typeable. A bordered box
    here would read as a second required field next to the amount. */
 .nq-cc-message { width:100%; margin-top:4px; padding:6px 4px; border:none; background:none;
   font-family:inherit; font-size:13px; text-align:center; outline:none;
   color:var(--nq-cc-menu-fg, var(--nimiq-blue, #1f2348)); }
-.nq-cc-message::placeholder { color:color-mix(in srgb, var(--nq-cc-menu-fg, var(--nimiq-blue, #1f2348)) 40%, transparent); }
+.nq-cc-message::placeholder { color:color-mix(in srgb, var(--nq-cc-menu-fg, var(--nimiq-blue, #1f2348)) 50%, transparent); }
 .nq-cc-message:focus { box-shadow:inset 0 -1px 0 0 var(--nq-cc-accent, var(--nimiq-light-blue, #0582ca)); }
-.nq-cc-send-hint { font-size:12px; font-weight:600; color:var(--nq-cc-menu-muted, rgba(31,35,72,.5)); }
-.nq-cc-send-hint:empty { display:none; }
-/* Right-aligned, under the NIM suffix rather than under the digits: it belongs
-   to the field's unit, and the field is the one thing on this view the user is
-   typing into. */
-.nq-cc-send-fiat { margin:0; font-size:13px; font-weight:600;
+/* Centred under the amount, in the slot where the wallet puts its fiat line
+   (which this step does not show: the owner's call, 2026-11-11). */
+.nq-cc-send-hint { margin:0; font-size:12px; font-weight:600; text-align:center;
   color:var(--nq-cc-menu-muted, rgba(31,35,72,.5)); }
+.nq-cc-send-hint:empty { display:none; }
+.nq-cc-send-body .nq-cc-amount-hero + .nq-cc-send-hint { margin-top:-2px; }
+.nq-cc-send-body .nq-cc-message { margin-top:9px; }
 .nq-cc-send-confirm, .nq-cc-request-copy { width:100%; height:52px; border:none; border-radius:500px; margin-top:4px;
   font-family:inherit; font-size:16px; font-weight:700; cursor:pointer;
   color:var(--nq-cc-send-fg, #fff); background-color:var(--nq-cc-send-bg, var(--nimiq-light-blue, #0582ca));
@@ -868,6 +956,17 @@ button.nq-cc-name:focus-visible { outline:2px solid var(--nq-cc-accent, var(--ni
 .nq-cc-send-confirm:focus-visible, .nq-cc-request-copy:focus-visible {
   outline:2px solid var(--nq-cc-accent, var(--nimiq-light-blue, #0582ca)); outline-offset:3px; }
 .nq-cc-send-confirm:disabled { opacity:.4; cursor:default; }
+/* The send button by share (v0.33): 79.5% of the sheet wide, centred, its
+   label the wallet's uppercase and letter-spaced SEND NIM. 88.5% of the 244px
+   body is 216px, which is 79.5% of the card. 44px tall rather
+   than the share's 39px, which is the touch-target floor. Disabled is the
+   wallet's grey pill, a 7% navy wash with 35% ink, not the live gradient at
+   40% opacity, which still read as a blue button that might work. */
+.nq-cc-send-body .nq-cc-send-confirm { align-self:center; width:88.5%; height:44px; margin-top:22px;
+  font-size:12px; letter-spacing:.1em; text-transform:uppercase; }
+.nq-cc-send-body .nq-cc-send-confirm:disabled { opacity:1; background-image:none;
+  background-color:color-mix(in srgb, var(--nq-cc-menu-fg, var(--nimiq-blue, #1f2348)) 7%, transparent);
+  color:color-mix(in srgb, var(--nq-cc-menu-fg, var(--nimiq-blue, #1f2348)) 35%, transparent); }
 .nq-cc-send-error { font-size:12px; font-weight:600; text-align:center;
   color:var(--nq-cc-danger, #d94432); }
 .nq-cc-send-error:empty { display:none; }
@@ -887,8 +986,11 @@ button.nq-cc-name:focus-visible { outline:2px solid var(--nq-cc-accent, var(--ni
    272px card, so copying the number made our content RELATIVELY bigger than
    the wallet's, and the card read as cramped rather than small.
    Every size below is the wallet's share of its own sheet, measured off the
-   real screenshots and applied to 272px. Scale is 272/390 = 0.697. */
-.nq-cc-view-title { grid-column:2; min-width:0; text-align:center; font-size:19px; font-weight:700;
+   real screenshots and applied to 272px. Scale is 272/390 = 0.697.
+   v0.33: the title was still 19px, a 5.3% cap height against the wallet's
+   4.4% on every sheet (Receive NIM, Send Transaction, Set Amount), so "Set
+   Amount" spanned 39.2% of the card to the wallet's 31.7%. 16px matches. */
+.nq-cc-view-title { grid-column:2; min-width:0; text-align:center; font-size:16px; font-weight:700;
   line-height:1.2; text-wrap:balance; color:var(--nq-cc-menu-fg, var(--nimiq-blue, #1f2348)); }
 .nq-cc-view-sub { margin:2px 12px 0; text-align:center; font-size:12px; font-weight:600;
   line-height:1.35; color:var(--nq-cc-menu-muted, rgba(31,35,72,.5)); }
@@ -904,19 +1006,26 @@ button.nq-cc-name:focus-visible { outline:2px solid var(--nq-cc-accent, var(--ni
    worth while the mark stays small. The back chevron is deliberately NOT a
    disc, in the wallet either: one dismisses, one steps, and giving both the
    same weight says they are the same control. */
+/* v0.33: the disc is the wallet's close.svg, sized to its share of the sheet
+   (48 of 780 device px, 6.2%, so 17px here, down from 26px at 9.6%) and painted
+   at the wallet's 20% navy, twice the old 10% that read as disabled. The cross
+   is knocked out of the disc, so it is whatever the card is. The disc sits 5px
+   above the title's centre line and 5px further out, where the wallet puts it. */
 .nq-cc-shut { width:34px; height:34px; }
 .nq-cc-shut-disc { display:inline-flex; align-items:center; justify-content:center;
-  width:26px; height:26px; border-radius:50%;
-  background:color-mix(in srgb, var(--nq-cc-menu-fg, var(--nimiq-blue, #1f2348)) 10%, transparent);
-  color:var(--nq-cc-card-bg, #fff);
-  transition:background .15s var(--nimiq-ease, cubic-bezier(.25,0,0,1)); }
+  width:17px; height:17px; transform:translate(5px, -5px);
+  color:color-mix(in srgb, var(--nq-cc-menu-fg, var(--nimiq-blue, #1f2348)) 20%, transparent);
+  transition:color .15s var(--nimiq-ease, cubic-bezier(.25,0,0,1)); }
 .nq-cc-shut:hover .nq-cc-shut-disc {
-  background:color-mix(in srgb, var(--nq-cc-menu-fg, var(--nimiq-blue, #1f2348)) 18%, transparent); }
-.nq-cc-chevron { display:block; width:8px; height:13px; }
-/* The X shares every pixel of the chevron button but its column, so it shares
+  color:color-mix(in srgb, var(--nq-cc-menu-fg, var(--nimiq-blue, #1f2348)) 32%, transparent); }
+/* The back arrow at the wallet's 40% navy and 5.9% of the sheet wide. */
+.nq-cc-back { color:color-mix(in srgb, var(--nq-cc-menu-fg, var(--nimiq-blue, #1f2348)) 40%, transparent); }
+.nq-cc-back:hover { color:color-mix(in srgb, var(--nq-cc-menu-fg, var(--nimiq-blue, #1f2348)) 70%, transparent); }
+.nq-cc-arrow-back { display:block; width:16px; height:12.5px; }
+/* The X shares every pixel of the back button but its column, so it shares
    the rule too rather than restating it and drifting from it. */
 .nq-cc-shut { grid-column:3; }
-.nq-cc-cross { display:block; width:11px; height:11px; }
+.nq-cc-cross { display:block; width:17px; height:17px; }
 .nq-cc-receive-body { display:flex; flex-direction:column; align-items:center; padding:0 8px 8px; }
 .nq-cc-qr { display:block; padding:10px; border-radius:8px;
   background:var(--nq-cc-qr-plate, #fff); }
@@ -1093,16 +1202,19 @@ button.nq-cc-name:focus-visible { outline:2px solid var(--nq-cc-accent, var(--ni
   document.head.appendChild(style);
 }
 
-/** Back chevron. Same stroke weight and linecaps as the caret it sits beside,
- *  so the two read as one family rather than two icon sets. */
+/** The wallet's close mark: @nimiq/style close.svg verbatim, as the registry's
+ *  close-button ships it. The cross is a KNOCKOUT (evenodd), not a white
+ *  stroke, so it shows whatever surface the card is on: white on Nimiq, the
+ *  host's dark surface on a themed one, never a white cross on a dark card. */
 const CROSS =
-  '<svg class="nq-cc-cross" viewBox="0 0 10 10" aria-hidden="true">' +
-  '<path d="M1 1l8 8M9 1l-8 8" fill="none" stroke="currentColor" stroke-width="1.3" ' +
-  'stroke-linecap="round"/></svg>';
-const CHEVRON_LEFT =
-  '<svg class="nq-cc-chevron" viewBox="0 0 6 10" aria-hidden="true">' +
-  '<path d="M5 1L1 5l4 4" fill="none" stroke="currentColor" stroke-width="1.15" ' +
-  'stroke-linecap="round" stroke-linejoin="round"/></svg>';
+  '<svg class="nq-cc-cross" viewBox="0 0 24 24" aria-hidden="true">' +
+  '<path fill-rule="evenodd" clip-rule="evenodd" d="M3.528 3.52c4.683-4.684 12.275-4.686 16.96-.005 4.678 4.69 4.678 12.28 0 16.97-4.685 4.68-12.277 4.678-16.96-.005-4.682-4.684-4.682-12.276 0-16.96zm13.145 13.133a1 1 0 0 0 .036-1.374l-3.11-3.11a.25.25 0 0 1 0-.352l3.11-3.11a1 1 0 1 0-1.414-1.415l-3.11 3.11a.25.25 0 0 1-.354 0l-3.11-3.11a1 1 0 0 0-1.41 1.415l3.11 3.11a.249.249 0 0 1 0 .353l-3.11 3.109a1 1 0 0 0 0 1.415c.396.38 1.021.38 1.416 0l3.109-3.11a.252.252 0 0 1 .354 0l3.11 3.11a1 1 0 0 0 1.373-.041z" fill="currentColor"/></svg>';
+/** The wallet's long-tailed back arrow: the registry page-header's arrow
+ *  verbatim (23x18, stroke 2). A bare chevron read as a disclosure caret. */
+const ARROW_BACK =
+  '<svg class="nq-cc-arrow-back" viewBox="0 0 23 18" aria-hidden="true">' +
+  '<path d="M22 9L3 9" stroke="currentColor" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>' +
+  '<path d="M9 16L2 9L9 2" stroke="currentColor" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>';
 
 const CARET =
   '<svg class="nq-cc-caret" viewBox="0 0 10 6" aria-hidden="true">' +
@@ -1321,6 +1433,13 @@ export function mountMiniWallet(
   const hasFiat = !!options.fiat && options.fiat.currencies.length > 0;
   if (options.injectStyles !== false) ensureStyles();
 
+  // Inside Nimiq Pay there is no browser wallet to find, so the section is not
+  // built there at all. A wallet-less page (no `wallet` option) still gets it.
+  const ownsEvm = options.evm === true;
+  const evm: EvmWallet | null = !options.evm || wallet?.mode === 'miniapp'
+    ? null
+    : options.evm === true ? createEvmWallet({ network: options.network }) : options.evm;
+
   let fiatTicker = options.fiat?.default ?? 'USD';
   try {
     const stored = localStorage.getItem(FIAT_STORE_KEY);
@@ -1359,7 +1478,47 @@ export function mountMiniWallet(
   faceFlag.setAttribute('aria-haspopup', 'menu');
   faceFlag.setAttribute('aria-expanded', 'false');
 
+  /** Is the header's ink light or dark? The pill is filled with that ink, so
+   *  what is drawn ON the pill has to be the other one. Read through a canvas
+   *  because a computed colour can come back as rgb(), color() or oklch().
+   *  Memoised on the computed string, so a call that finds nothing changed
+   *  costs one getComputedStyle. */
+  let inkSeen: string | null = null;
+  let inkCtx: CanvasRenderingContext2D | null | undefined;
+  function syncInk(): void {
+    let ink = '';
+    try { ink = getComputedStyle(root).color; } catch { /* detached */ }
+    if (ink === inkSeen && root.dataset.ink) return;
+    inkSeen = ink;
+    let light = false;
+    try {
+      if (inkCtx === undefined) inkCtx = document.createElement('canvas').getContext('2d', { willReadFrequently: true });
+      if (inkCtx && ink) {
+        inkCtx.clearRect(0, 0, 1, 1);
+        inkCtx.fillStyle = ink;
+        inkCtx.fillRect(0, 0, 1, 1);
+        const [r, g, b] = inkCtx.getImageData(0, 0, 1, 1).data;
+        // 0.5 is where white and navy text give about the same contrast.
+        light = (0.2126 * r! + 0.7152 * g! + 0.0722 * b!) / 255 > 0.5;
+      }
+    } catch { /* no canvas (tests, an old WebView): keep the dark-ink default */ }
+    root.dataset.ink = light ? 'light' : 'dark';
+  }
+  syncInk();
+  // The fill follows the host live, because it is currentColor. The ink on it
+  // has to be told, and a host can change its header colour in ways nothing
+  // announces: a class on any ancestor, a media query, a colour transition
+  // that is still running when the class lands, a header inserted after this
+  // mounted. The observer makes the common case immediate; the tick is what
+  // makes the rest correct, and it is one memoised style read.
+  const inkWatch = typeof MutationObserver === 'undefined' ? null : new MutationObserver(syncInk);
+  for (const node of [document.documentElement, document.body]) {
+    if (node) inkWatch?.observe(node, { attributes: true });
+  }
+  const inkTick = setInterval(syncInk, 500);
+
   function renderFace(): void {
+    syncInk();
     face.textContent = '';
     const account = wallet?.account ?? null;
     if (account) {
@@ -1369,6 +1528,8 @@ export function mountMiniWallet(
       else icon.innerHTML = PLACEHOLDER_HEX;
       const label = el('span', 'nq-cc-face-label', face);
       label.textContent = shortLabel(account, i18n.t('shell.account'));
+      const named = !!((account.address && storedLabel(account.address)) || account.label);
+      if (!named && account.address) label.dataset.address = '';
     } else {
       delete root.dataset.connected;
       face.insertAdjacentHTML('beforeend', WALLET_ICON);
@@ -1416,6 +1577,8 @@ export function mountMiniWallet(
 
   // ---- signed-out section (hub only) ---------------------------------------
   const signedOut = el('div', 'nq-cc-section nq-cc-when-out nq-cc-when-hub', viewMain);
+  // With a second wallet section below, this one says which wallet it is.
+  if (evm) el('p', 'nq-cc-evm-label', signedOut).textContent = 'Nimiq';
   const connectBtn = el('button', 'nq-cc-connect', signedOut);
   connectBtn.type = 'button';
   tNode(connectBtn, 'shell.connectWallet');
@@ -1560,6 +1723,29 @@ export function mountMiniWallet(
   //
   // `createCashlink` is unchanged as an option, so no app has to edit anything.
 
+  // ---- other chains (EVM browser wallets) ----------------------------------
+  // Under the Nimiq connect when signed out, under the wallet block when
+  // connected. No nq-cc-when-* gate: the EVM account is not the Nimiq one, so
+  // it shows either way.
+  let evmSection: EvmSectionHandle | null = null;
+  if (evm) {
+    evmSection = mountEvmSection(viewMain, {
+      evm,
+      i18n,
+      glyph: WALLET_ICON,
+      onReceive: showReceive ? (asset) => openReceive(asset) : undefined,
+      // A receive view left open on the EVM address is now showing an address
+      // that is no longer connected.
+      onAccountChange: () => {
+        if (receiveAsset && evmSection?.owns(receiveAsset)) dropReceive();
+      },
+    });
+    el('div', 'nq-cc-divider', viewMain);
+    // Silent: eth_accounts never prompts. A visitor who connected before sees
+    // their account without tapping anything.
+    void evm.restore();
+  }
+
   // ---- language accordion ---------------------------------------------------
   const langSection = el('div', 'nq-cc-section', viewMain);
   const langAcc = el('button', 'nq-cc-acc', langSection);
@@ -1646,10 +1832,6 @@ export function mountMiniWallet(
         try { localStorage.setItem(FIAT_STORE_KEY, ticker); } catch { /* ignore */ }
         renderFiatValue();
         if (hasBalance) void refreshBalance(true);
-        // The send view's rate is now for the wrong currency. Dropping it is
-        // enough: openSend refetches, and the picker is only reachable from the
-        // main view, so nothing is on screen to restate.
-        sendRate = null;
         options.fiat!.onChange?.(ticker);
         window.setTimeout(() => collapse(acc, body), 260);
       });
@@ -1801,7 +1983,7 @@ export function mountMiniWallet(
     const btn = el('button', 'nq-cc-back', head);
     btn.type = 'button';
     btn.setAttribute('aria-label', i18n.t('shell.back'));
-    btn.insertAdjacentHTML('beforeend', CHEVRON_LEFT);
+    btn.insertAdjacentHTML('beforeend', ARROW_BACK);
     const title = el('span', 'nq-cc-view-title', head);
     tNode(title, titleKey);
     btn.addEventListener('click', onBack);
@@ -1828,6 +2010,7 @@ export function mountMiniWallet(
   // A placeholder is an attribute, so the i18n subscription's tNode pass does
   // not reach it either.
   const messageLabels: HTMLInputElement[] = [];
+  const amountLabels: HTMLInputElement[] = [];
   // Declared up here with its siblings, not next to the sheet it belongs to:
   // the receive footer pushes into it BEFORE that sheet is built, and a const
   // read from its own temporal dead zone throws at mount.
@@ -2021,7 +2204,7 @@ export function mountMiniWallet(
   addressBtn.addEventListener('blur', () => copyWrap.classList.remove('nq-cc-copied-hold'));
 
   // ---- send view content ----------------------------------------------------
-  // "Send Amount", not "Send": the wallet splits this into Send Transaction
+  // "Set Amount", not "Send": the wallet splits this into Send Transaction
   // then Set Amount, and the half this sheet is standing in for is the second.
   // ---- step one: who ------------------------------------------------------
   viewHeader(viewSendTo, 'shell.sendTransaction', () => closeSend());
@@ -2170,7 +2353,7 @@ export function mountMiniWallet(
     }
   }
   // ---- step two: how much -------------------------------------------------
-  viewHeader(viewSend, 'shell.sendAmount', () => {
+  viewHeader(viewSend, 'shell.setAmount', () => {
     // Back goes to the address step, NOT out of the flow: an amount you want
     // to change is a different correction from a recipient you want to change,
     // and losing the address to fix a typo in the number is the worst of both.
@@ -2190,20 +2373,25 @@ export function mountMiniWallet(
   const recipientPartyIcon = el('span', 'nq-cc-party-icon', recipientParty);
   const recipientPartyName = el('span', 'nq-cc-party-name nq-cc-mono', recipientParty);
 
-  const amountLabel = el('label', 'nq-cc-field-label', sendBody);
-  tNode(amountLabel, 'shell.amount');
-  const amountRow = el('div', 'nq-cc-amount-row', sendBody);
+  // No "Amount" label over the field: the wallet has none, and a large numeral
+  // beside a NIM ticker says what it is. The name is on the input for a screen
+  // reader instead, and the language switch restates it.
+  const amountRow = el('div', 'nq-cc-amount-row nq-cc-amount-hero', sendBody);
+  const amountSizer = el('span', 'nq-cc-amount-sizer', amountRow);
+  amountSizer.setAttribute('aria-hidden', 'true');
   const amountInput = el('input', 'nq-cc-input', amountRow);
   amountInput.placeholder = '0';
   amountInput.inputMode = 'decimal';
   amountInput.autocomplete = 'off';
+  amountInput.setAttribute('aria-label', i18n.t('shell.amount'));
+  amountLabels.push(amountInput);
   const amountSuffix = el('span', 'nq-cc-amount-suffix', amountRow);
   amountSuffix.textContent = 'NIM';
-  // The fiat value of what is about to leave, which the wallet shows always,
-  // even at zero. NIM is the denomination; the number a person actually decided
-  // on is the one in their own currency, and a send screen that makes them
-  // convert it in their head is a send screen that gets the amount wrong.
-  const sendFiat = el('p', 'nq-cc-send-fiat', sendBody);
+  // No fiat line on this step (owner's call, 2026-11-11): the price under the
+  // number being typed is a second number to read while choosing the first.
+  // The fiat value stays everywhere else it is shown. "Available" takes the
+  // slot the wallet's fiat line sits in, centred under the amount.
+  const availableHint = el('p', 'nq-cc-send-hint', sendBody);
   // The wallet's public message, which fits now that the amount has a sheet of
   // its own. It rides SendArgs.data, so it is the transaction's own data field
   // and it really does go on chain, which is why the limit below is real.
@@ -2222,11 +2410,10 @@ export function mountMiniWallet(
       messageInput.value = [...messageInput.value].slice(0, -1).join('');
     }
   });
-  const availableHint = el('p', 'nq-cc-send-hint', sendBody);
   const sendError = el('p', 'nq-cc-send-error', sendBody);
   const sendConfirm = el('button', 'nq-cc-send-confirm', sendBody);
   sendConfirm.type = 'button';
-  tNode(sendConfirm, 'shell.send');
+  tNode(sendConfirm, 'shell.sendNim');
   const sendDone = el('div', 'nq-cc-send-done', viewSend);
   sendDone.insertAdjacentHTML(
     'beforeend',
@@ -2277,31 +2464,32 @@ export function mountMiniWallet(
     const n = Number(amountInput.value.replace(',', '.'));
     return Number.isFinite(n) ? n : 0;
   };
-  /** The rate behind the fiat line, read once per open of the send view.
+  /** Size the amount box to its digits, and shrink the row when they would
+   *  not fit. The wallet's AmountInput does the same: the box hugs the number
+   *  and the type steps down rather than letting the number scroll out of
+   *  sight inside a fixed field.
    *
-   *  Not per keystroke: that is a request per character typed. And not live
-   *  either, because a rate that moves mid-form changes the number under the
-   *  field while someone is reading it, which is worse than a number that is a
-   *  minute old. Cleared when the reference currency changes, so the next open
-   *  reads the new one. */
-  let sendRate: number | null = null;
-
-  function renderSendFiat(nim: number): void {
-    if (!hasFiat || sendRate === null) { sendFiat.hidden = true; return; }
-    sendFiat.hidden = false;
-    sendFiat.textContent = fmtFiat(nim * sendRate, fiatTicker);
-  }
-
-  async function refreshSendRate(): Promise<void> {
-    if (!hasFiat) { renderSendFiat(0); return; }
-    try {
-      sendRate = await options.fiat!.rate(fiatTicker);
-    } catch {
-      // No rate is a missing line, never a blocked send. The amount in NIM is
-      // the authoritative one either way.
-      sendRate = null;
-    }
-    renderSendFiat(amountNim());
+   *  Every size in the row is in em, so one font-size scales the numeral, the
+   *  box, the gap and the ticker together. The sizer is a hidden copy of the
+   *  text in the input's own font, because an input does not size to its
+   *  value. A row that is not laid out (the view is hidden, or there is no
+   *  layout engine) measures 0 and is left alone. Past the 16px floor the box
+   *  stops growing at the row's width and the input scrolls, which is still
+   *  inside the card. */
+  const AMOUNT_PX = 46;
+  const AMOUNT_MIN_PX = 16;
+  function fitAmount(): void {
+    amountSizer.textContent = amountInput.value || amountInput.placeholder;
+    amountRow.style.fontSize = '';
+    const text = amountSizer.getBoundingClientRect().width;
+    const room = amountRow.clientWidth;
+    if (!text || !room) return;
+    const em = text / AMOUNT_PX;
+    // box = text + .24em padding + 2px for the caret; then the gap and ticker
+    const need = (em + 0.24 + 0.23) * AMOUNT_PX + 2 + amountSuffix.getBoundingClientRect().width;
+    const px = need > room ? Math.max(AMOUNT_MIN_PX, Math.floor(AMOUNT_PX * room / need)) : AMOUNT_PX;
+    if (px !== AMOUNT_PX) amountRow.style.fontSize = px + 'px';
+    amountInput.style.width = 'calc(' + (em + 0.24).toFixed(3) + 'em + 2px)';
   }
 
   function validateSend(): void {
@@ -2312,7 +2500,6 @@ export function mountMiniWallet(
     const okAddress = recipientIsAddress();
     renderRecipientIcon(okAddress ? compactRecipient() : null);
     const nim = amountNim();
-    renderSendFiat(nim);
     const okAmount = nim > 0 && (balanceLuna === null || nim <= lunaToNim(balanceLuna));
     // The recipient is settled by the time this sheet is up, so the button is
     // gated on the amount alone. okAddress stays in the condition as a belt: a
@@ -2322,6 +2509,7 @@ export function mountMiniWallet(
   }
   recipientInput.addEventListener('input', validateSend);
   amountInput.addEventListener('input', validateSend);
+  amountInput.addEventListener('input', fitAmount);
 
   /** Draw the two faces on the amount sheet. Both, not just the recipient:
    *  "am I paying the right person" and "from which of my accounts" are two
@@ -2344,6 +2532,15 @@ export function mountMiniWallet(
     recipientPartyIcon.appendChild(options.identicon(compactRecipient(), 56));
   }
 
+  /** Fade a party label at its edge only when it really runs past its column.
+   *  A mask on a name that fits would grey its last letters for nothing. Run
+   *  after the sheet is shown, since a hidden label measures 0 and so never
+   *  overflows. */
+  function fadeOverflow(label: HTMLElement): void {
+    label.classList.remove('nq-cc-fade');
+    label.classList.toggle('nq-cc-fade', label.scrollWidth > label.clientWidth + 1);
+  }
+
   /** Step one to step two, the moment the address is real.
    *
    *  No Next button, which is the wallet's behaviour too: the field is a fixed
@@ -2356,6 +2553,9 @@ export function mountMiniWallet(
     renderParties();
     root.classList.remove('nq-cc-show-sendto');
     root.classList.add('nq-cc-show-send');
+    fitAmount();
+    fadeOverflow(senderName);
+    fadeOverflow(recipientPartyName);
     amountInput.focus();
   }
   recipientInput.addEventListener('input', advanceToAmount);
@@ -2383,7 +2583,6 @@ export function mountMiniWallet(
       balanceLuna !== null ? `${i18n.t('shell.available')}: ${fmtNim(balanceLuna)} NIM` : '';
     names?.reset();
     validateSend();
-    void refreshSendRate();
     // Step ONE, always. A flow that reopened on the amount sheet would be
     // offering to pay whoever was in the field last time.
     root.classList.add('nq-cc-show-sendto');
@@ -2414,6 +2613,7 @@ export function mountMiniWallet(
     void offerToSave(spaced);
     writeRecipient('');
     amountInput.value = '';
+    fitAmount();
     balanceFetchedAt = 0; // the balance just changed — refetch on next look
     window.setTimeout(() => {
       closeSend();
@@ -2451,7 +2651,7 @@ export function mountMiniWallet(
       if (f.kind === 'pending') markSent(spaced, true);
       else if (f.kind !== 'cancelled') sendError.textContent = i18n.t(f.hintKey ?? 'shell.sendFailed');
     } finally {
-      sendConfirm.textContent = i18n.t('shell.send');
+      sendConfirm.textContent = i18n.t('shell.sendNim');
       messageInput.value = '';
       validateSend();
     }
@@ -2479,6 +2679,19 @@ export function mountMiniWallet(
       : '';
   };
 
+  /** Close the receive view AND empty it. Leaving the old address in the DOM
+   *  behind a hidden class is a stale address waiting for the next thing that
+   *  reveals the view without repainting it. */
+  function dropReceive(): void {
+    root.classList.remove('nq-cc-show-receive');
+    root.classList.remove('nq-cc-show-qr');
+    receiveAsset = null;
+    receiveAddress = null;
+    qrFor = '';
+    addressBtn.textContent = '';
+    qrSlot.textContent = '';
+  }
+
   /** Show the receive view. With an asset, it shows THAT asset's address, chain
    *  and QR payload; without one, the account's own NIM address as before.
    *
@@ -2489,9 +2702,10 @@ export function mountMiniWallet(
    *  (see asset-list), so this is the second of two guards on the same hazard. */
   function openReceive(asset?: ShellAsset): void {
     const account = wallet?.account ?? null;
-    if (!account) return;
     if (asset && !asset.address) return;
-    const address = asset?.address ?? account.address;
+    // An asset brings its own address, so it needs no Nimiq account: the EVM
+    // rows open this view while the Nimiq wallet is signed out.
+    const address = asset?.address ?? account?.address;
     if (!address) return;
     root.classList.add('nq-cc-show-receive');
 
@@ -2682,6 +2896,7 @@ export function mountMiniWallet(
       void refreshBalance();
       // History reads HERE and nowhere else: a closed menu makes no request.
       void history?.refresh();
+      void evmSection?.refresh();
     } else {
       history?.close();
       root.classList.remove('nq-cc-show-receive');
@@ -2759,10 +2974,12 @@ export function mountMiniWallet(
     for (const btn of shutLabels) btn.setAttribute('aria-label', i18n.t('shell.close'));
     for (const btn of qrLabels) btn.setAttribute('aria-label', i18n.t('shell.showQr'));
     for (const f of messageLabels) f.placeholder = i18n.t('shell.publicMessage');
+    for (const f of amountLabels) f.setAttribute('aria-label', i18n.t('shell.amount'));
     renderLangValue();
     renderFaceFlag();
     renderFace();
     renderStaked();
+    evmSection?.applyLang();
   });
 
   return {
@@ -2773,11 +2990,16 @@ export function mountMiniWallet(
     destroy() {
       unsubWallet();
       unsubLang();
+      inkWatch?.disconnect();
+      clearInterval(inkTick);
       setOpen(false);
       // Before root.remove(): the list has in-flight chain reads that must see
       // the destroyed flag, or a slow RPC repaints a detached node.
       assetList?.destroy();
       history?.destroy();
+      evmSection?.destroy();
+      // Only the handle this mount created. A host's own outlives the menu.
+      if (ownsEvm) evm?.destroy();
       root.remove();
     },
   };
