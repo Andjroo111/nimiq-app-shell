@@ -237,10 +237,14 @@ export interface CornerControlOptions {
    *  closed, one request per read. Off on testnet and inside Nimiq Pay, where
    *  the host wallet already shows it.
    *
+   *  A host that wires its own balances (`assets` or `getBalanceLuna`) gets no
+   *  history unless it passes `true` or `{ fetch }`: its account may not be a
+   *  plain wallet address, and the shell does not guess.
+   *
    *  `false` turns it off. `{ fetch }` supplies the rows from your own indexer:
    *  newest first, `opts.max` of them, older than `opts.startAt` (a tx hash)
    *  when given. */
-  history?: false | { fetch?: (address: string, opts: HistoryFetchOptions) => Promise<ShellTx[]> };
+  history?: boolean | { fetch?: (address: string, opts: HistoryFetchOptions) => Promise<ShellTx[]> };
   /** Multi-asset balances. Supersedes `getBalanceLuna`: when present the mini
    *  wallet shows a per-asset stack, and the account row's right-hand figure
    *  becomes the fiat TOTAL across them.
@@ -570,7 +574,7 @@ function ensureStyles(): void {
 .nq-cc-account { display:grid; grid-template-columns:68px minmax(0,1fr) auto; column-gap:12px; row-gap:2px;
   align-items:baseline; }
 .nq-cc-identicon { display:block; width:68px; height:68px; grid-column:1; grid-row:1 / span 3; align-self:center; }
-.nq-cc-account > .nq-cc-name, .nq-cc-account > .nq-cc-name-input { grid-column:2; grid-row:1; justify-self:start; max-width:100%;
+.nq-cc-account > .nq-cc-name { grid-column:2; grid-row:1; justify-self:start; max-width:100%;
   margin-bottom:8px; }
 .nq-cc-identicon > * { width:100%; height:100%; display:block; }
 .nq-cc-name { font-size:14px; font-weight:600; min-width:0; overflow:hidden; text-overflow:ellipsis;
@@ -591,7 +595,15 @@ button.nq-cc-name:focus-visible { outline:2px solid var(--nq-cc-accent, var(--ni
 .nq-cc-balance[hidden] { display:none; }
 .nq-cc-balance-fiat { grid-column:3; grid-row:1; justify-self:end; font-size:14px; font-weight:700;
   color:var(--nq-cc-menu-fg, var(--nimiq-blue, #1f2348)); }
-.nq-cc-balance-avail { grid-column:2 / 4; grid-row:2; justify-self:end; display:flex; align-items:baseline; gap:4px; min-width:0; }
+.nq-cc-balance-avail { grid-column:2 / 4; grid-row:2; }
+/* Both lines: the LABEL gives way, the money never does. A long figure in a
+   long-worded locale used to push out of its cell, or lose digits to the
+   ellipsis. The figure cannot shrink; the label shrinks and ellipsizes. */
+.nq-cc-balance-avail, .nq-cc-balance-staked { display:flex; justify-content:flex-end; align-items:baseline; gap:4px;
+  min-width:0; max-width:100%; justify-self:stretch; }
+.nq-cc-balance-avail > .nq-cc-balance-label, .nq-cc-balance-staked > .nq-cc-balance-label {
+  flex:0 1 auto; min-width:0; overflow:hidden; text-overflow:ellipsis; }
+.nq-cc-balance-avail > .nq-cc-balance-nim, .nq-cc-balance-staked > b { flex:none; white-space:nowrap; }
 .nq-cc-balance-nim { font-size:12px; font-weight:700; white-space:nowrap;
   color:var(--nq-cc-menu-fg, var(--nimiq-blue, #1f2348)); }
 /* A multi-asset host: the one figure is the fiat total, so it takes the
@@ -599,15 +611,14 @@ button.nq-cc-name:focus-visible { outline:2px solid var(--nq-cc-accent, var(--ni
 .nq-cc-account[data-total] { align-items:center; }
 .nq-cc-account[data-total] .nq-cc-identicon { grid-row:1; }
 .nq-cc-account[data-total] > .nq-cc-name { margin-bottom:-6px; }
-.nq-cc-account[data-total] .nq-cc-balance-avail { grid-column:3; grid-row:1; }
+.nq-cc-account[data-total] .nq-cc-balance-avail { grid-column:3; grid-row:1; justify-self:end; }
 .nq-cc-account[data-total] .nq-cc-balance-nim { font-size:14px; }
 /* The figure is SPENDABLE and says so; stake is a quieter line under it and is
    never summed in. */
 .nq-cc-balance-label { font-size:12px; font-weight:600; white-space:nowrap;
   color:var(--nq-cc-menu-muted, rgba(31,35,72,.5)); }
-.nq-cc-balance-staked { grid-column:2 / 4; grid-row:3; font-size:12px; font-weight:600; text-align:right;
-  overflow:hidden; text-overflow:ellipsis; white-space:nowrap;
-  color:var(--nq-cc-menu-muted, rgba(31,35,72,.5)); }
+.nq-cc-balance-staked { grid-column:2 / 4; grid-row:3; font-size:12px; font-weight:600; }
+.nq-cc-balance-staked[hidden], .nq-cc-balance-avail[hidden] { display:none; }
 .nq-cc-balance-staked b { font-weight:700; color:var(--nq-cc-menu-fg, var(--nimiq-blue, #1f2348)); }
 .nq-cc-balance-label[hidden], .nq-cc-balance-staked[hidden], .nq-cc-balance-fiat[hidden] { display:none; }
 
@@ -1446,8 +1457,13 @@ export function mountMiniWallet(
   const historyFetch: ((address: string, opts: HistoryFetchOptions) => Promise<ShellTx[]>) | undefined =
     !wallet || wallet.mode === 'miniapp' || options.history === false
       ? undefined
-      : options.history?.fetch
-        ?? (options.network === 'test' || options.balance === false ? undefined : createNimHistoryReader(balanceRpc));
+      : (typeof options.history === 'object' ? options.history.fetch : undefined)
+        ?? (options.network === 'test' || options.balance === false
+          // A host that wires its own balances (assets, getBalanceLuna) has an
+          // account that may not be a plain wallet address: Hashmark's is a
+          // betting key. Its transfers are not shown unless it asks (true).
+          || (!builtInBalance && options.history !== true)
+          ? undefined : createNimHistoryReader(balanceRpc));
   // Currency choice stands on its own: a wallet-less page (the language-only
   // corner from v0.5.0) still wants to offer it, so this is gated on the fiat
   // feed alone. It used to require hasBalance, which made the picker
@@ -1644,6 +1660,7 @@ export function mountMiniWallet(
   const balanceAvail = el('span', 'nq-cc-balance-avail', balanceStack);
   const balanceLabel = el('span', 'nq-cc-balance-label', balanceAvail);
   tNode(balanceLabel, 'shell.available');
+  balanceAvail.append(' ');
   const balanceNim = el('span', 'nq-cc-balance-nim', balanceAvail);
   const balanceFiat = el('span', 'nq-cc-balance-fiat', balanceStack);
   // Under the row, not in the stack: a long stake in the stack widened it and
@@ -2876,7 +2893,10 @@ export function mountMiniWallet(
     balanceStaked.textContent = '';
     if (stakedLuna === null) return;
     // Label quiet, figure in ink: the same pairing as the Available line above.
-    balanceStaked.append(`${i18n.t('shell.staked')} `);
+    el('span', 'nq-cc-balance-label', balanceStaked).textContent = i18n.t('shell.staked');
+    // Not drawn inside a flex row; it is there so the line still READS as
+    // "Staked 2.00 NIM" to a screen reader and in a copy.
+    balanceStaked.append(' ');
     el('b', undefined, balanceStaked).textContent = `${fmtNim(stakedLuna, { maxDecimals: 2 })} NIM`;
   }
   function renderBalance(): void {
@@ -2978,6 +2998,9 @@ export function mountMiniWallet(
         balanceLuna = null;
         stakedLuna = null;
         balanceStaked.hidden = true;
+        // The previous account's figures beside the new name are the same lie
+        // as its history: gone until this account's own read lands.
+        balanceStack.hidden = true;
         balanceFetchedAt = 0;
         assetList?.clear();
         // Another address's payments under this one's name would be the same

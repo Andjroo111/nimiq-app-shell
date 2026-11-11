@@ -158,6 +158,20 @@ describe('spendable and staked on the account row', () => {
     expect(q(two.host, '.nq-cc-balance-staked')!.textContent).toBe('Staked 2.00 NIM');
   });
 
+  test('a host with its own balance wiring gets no built-in history unless it asks', async () => {
+    const quiet = mount({ getBalanceLuna: async () => 1 });
+    await settle();
+    quiet.handle.open();
+    await settle();
+    expect(methods).toEqual([]);
+    expect(q(quiet.host, '.nq-cc-history')).toBeNull();
+    const asked = mount({ getBalanceLuna: async () => 1, history: true });
+    await settle();
+    asked.handle.open();
+    await settle();
+    expect(methods).toContain('getTransactionsByAddress');
+  });
+
   test('balance: false and testnet make no stake request', async () => {
     mount({ balance: false, history: false });
     mount({ network: 'test', history: false });
