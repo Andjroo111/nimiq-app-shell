@@ -81,6 +81,25 @@ export {
   type NimBalanceReaderOptions,
 } from './wallet/balance';
 export { createNimAccountReader, parseNimAccount, type NimAccount, type NimAccountType } from './wallet/account';
+// Staked NIM (the staking contract's record for an address), the account row's second line.
+export {
+  createNimStakedReader,
+  parseNimStaker,
+  type NimStake,
+  type NimStakedReaderOptions,
+} from './wallet/staked';
+// The connected address's chain history (getTransactionsByAddress), the mini wallet's history list.
+export {
+  createNimHistoryReader,
+  parseNimTransactions,
+  parseNimTx,
+  decodeTxMessage,
+  groupTxsByMonth,
+  type ShellTx,
+  type HistoryFetchOptions,
+  type NimHistoryReaderOptions,
+  type TxMonthGroup,
+} from './history/chain';
 
 // ---- rate-limit-tolerant price cache (fetcher injected) ----
 export { createPriceCache, PriceRateLimitError, type PriceCache, type PriceCacheOptions } from './prices/cache';

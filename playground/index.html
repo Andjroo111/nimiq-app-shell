@@ -191,6 +191,28 @@
         <fieldset>
           <label><input type="checkbox" id="opt-fiat" checked> Fiat picker ("Show amounts in")</label>
         </fieldset>
+        <fieldset>
+          <legend>Staked (<code>getStakedLuna</code>)</legend>
+          <label><input type="radio" name="staked" value="default" checked> Default (built-in read with the built-in balance, none otherwise)</label>
+          <label><input type="radio" name="staked" value="mock"> Mock: 10 034.93 NIM staked</label>
+          <label><input type="radio" name="staked" value="zero"> Mock: nothing staked</label>
+          <label><input type="radio" name="staked" value="throw"> Mock: the read throws</label>
+          <label><input type="checkbox" id="opt-staker"> Real staker address (NQ53 VN1C...), for the real RPC</label>
+          <p class="hint">The account row's figure is SPENDABLE and labelled so. Stake is a quiet second line, never summed in. A throwing stake read hides that line and leaves the spendable figure alone. The real-staker box swaps the mock account onto a live mainnet staker, so Built-in shows a real stake.</p>
+        </fieldset>
+      </div>
+
+      <div class="panel">
+        <h2>Transaction history (<code>history</code>)</h2>
+        <fieldset>
+          <label><input type="radio" name="hist" value="fixture" checked> Fixture: in, out, message, pending, failed, older months</label>
+          <label><input type="radio" name="hist" value="empty"> Empty (no transactions yet)</label>
+          <label><input type="radio" name="hist" value="error"> Error (fetch throws)</label>
+          <label><input type="radio" name="hist" value="loading"> Loading (fetch never answers)</label>
+          <label><input type="radio" name="hist" value="real"> Real RPC (built-in read, live mainnet)</label>
+          <label><input type="radio" name="hist" value="off"> Off (<code>history: false</code>)</label>
+          <p class="hint">Read when the menu opens and never while it is closed, one request per read. The fixture has 26 rows, so the first page of 20 fills and Load more fetches the rest. Real RPC is what an app gets by wiring nothing.</p>
+        </fieldset>
       </div>
 
       <div class="panel">
@@ -341,12 +363,16 @@ document.getElementById('clear').onclick = () => { logEl.textContent = ''; };
 const MOCK_ADDRESS  = 'NQ07 0000 0000 0000 0000 0000 0000 0000 0000';
 const MOCK_ADDRESS_B = 'NQ60 R21B PBC5 A01G 5KJU FHER 1XVU 8RAK U67S';
 const MOCK_POLYGON  = '0x71C7656EC7ab88b098defB751B7401B5f6d8976F';
+/* A live mainnet staker (found 2026-11-11 through the staking contract's own
+   history): about 10 million NIM staked, 30 NIM spendable, two transactions. */
+const REAL_STAKER   = 'NQ53 VN1C MLA8 YNXD 7HR1 CDYK DHHF GN7Q 714B';
 /* No BTC row on purpose. Through the Hub, chooseAddress hands back a fresh
    unused BTC address on every call, so a balance read against it is not the
    user's balance and a receive screen for it is a lie. See issue #124. */
 
 function createMockWallet({ mode, connected }) {
-  let account = connected ? { address: MOCK_ADDRESS, label: 'Playground' } : null;
+  const first = opt('opt-staker') ? REAL_STAKER : MOCK_ADDRESS;
+  let account = connected ? { address: first, label: 'Playground' } : null;
   const listeners = new Set();
   const emit = () => { for (const cb of listeners) cb(account); };
   return {
@@ -357,10 +383,10 @@ function createMockWallet({ mode, connected }) {
       await new Promise((r) => setTimeout(r, 400)); // the Hub popup's felt latency
       /* Connecting again IS the account switcher, so a second call has to hand
          back a DIFFERENT account or the Switch row cannot be exercised. */
-      const second = account?.address === MOCK_ADDRESS;
+      const second = account?.address === first;
       account = second
         ? { address: MOCK_ADDRESS_B, label: 'Second account' }
-        : { address: MOCK_ADDRESS, label: 'Playground' };
+        : { address: first, label: 'Playground' };
       emit(); renderState();
       log('info', '  -> connected', account.address);
       return account;
@@ -526,6 +552,46 @@ function qrEl(text, sizePx) {
    it. Kept in step with package.json by hand; it is a label, not a dependency. */
 const SHELL_VERSION = '0.21.1';
 
+/* ---------------------------------------------------------- mock history
+   Every state a row can be in, against the address book above: a contact by
+   name, a stranger by address, the staking contract by name, a message, a
+   pending row, a failed one, and months far enough back to group. */
+const HOUR = 3_600_000, DAY = 24 * HOUR;
+function fixtureRows() {
+  const me = wallet?.account?.address ?? MOCK_ADDRESS;
+  const t = Date.now();
+  const hash = (n) => n.toString(16).padStart(2, '0').repeat(32);
+  const row = (n, dir, other, nim, ago, extra = {}) => ({
+    hash: hash(n), direction: dir, counterparty: other,
+    sender: dir === 'in' ? other : me, recipient: dir === 'in' ? me : other,
+    valueLuna: Math.round(nim * 1e5), feeLuna: dir === 'in' ? 0 : 0,
+    timestamp: ago === null ? null : t - ago, message: null, pending: false, ...extra,
+  });
+  return [
+    row(1, 'in', 'NQ60 S8EH 3NNG K591 C4U9 CJQ4 83RD 108N BC4L', 250, null, { pending: true }),
+    row(2, 'in', 'NQ21 8LNC MJD3 D7T4 8FSX N5M8 5V2M A9GY 4KUJ', 110000, 2 * HOUR, { message: 'Birthday money, spend it well' }),
+    row(3, 'out', 'NQ73 6XLE 6VTP U4TX D3H0 UAKG 9YKR NRHR YVFB', 1250.5, 1 * DAY),
+    row(4, 'out', 'NQ77 0000 0000 0000 0000 0000 0000 0000 0001', 10000, 3 * DAY),
+    row(5, 'in', 'NQ19 VYJJ 8H3G 0FDT B4QH 3SK2 2UGL 6F9C 6XRJ', 42.18, 5 * DAY, { message: 'nimiq.cool order 7731' }),
+    row(6, 'out', 'NQ90 CASP 4X5V UPFS 4C38 Y8GB 2HBX 6Q5E 3KDP', 18, 9 * DAY, { failed: true }),
+    row(7, 'in', 'NQ48 1MQ4 0PH5 SLGB J8NL 3SR5 FN0Q 5V8N GA7E', 15874.607, 40 * DAY),
+    row(8, 'out', 'NQ21 8LNC MJD3 D7T4 8FSX N5M8 5V2M A9GY 4KUJ', 300, 70 * DAY, { message: 'Rent share' }),
+    row(9, 'in', 'NQ59 RXSD 0JUY 8GC0 E9KL 0M1E P4CX 4MAQ D88S', 3693.69, 200 * DAY),
+    row(10, 'out', 'NQ47 VGR3 0RH8 2LGQ KJSV GGDU B5UN 7EB6 1LH3', 0.5, 400 * DAY),
+    // Enough older rows that the first page (20) is full and Load more shows.
+    ...Array.from({ length: 16 }, (_, i) => row(11 + i, i % 3 ? 'in' : 'out',
+      i % 2 ? 'NQ55 1EQG 5GPL 3T2M 9T4X 9PDV D1PV U7JF 2C8N' : 'NQ17 DTK5 CK4M 0UD3 CPMB 8QF4 7H0E S7HK 9RTJ',
+      12.5 * (i + 1), (420 + i * 9) * DAY)),
+  ];
+}
+async function fixtureHistory(address, { max, startAt }) {
+  log('info', `history.fetch(max ${max}, startAt ${startAt ? startAt.slice(0, 8) : 'null'})`);
+  await new Promise((r) => setTimeout(r, 500));
+  const rows = fixtureRows();
+  const from = startAt ? rows.findIndex((r) => r.hash === startAt) + 1 : 0;
+  return rows.slice(from, from + max);
+}
+
 /* ------------------------------------------------------------ mock assets */
 const $ = (id) => document.getElementById(id);
 const opt = (id) => $(id).checked;
@@ -656,6 +722,18 @@ function buildOptions() {
   if (bal === 'none') o.balance = false;
   if (bal === 'nim') o.getBalanceLuna = async () => nimLuna;
   if (bal === 'multi') o.assets = buildAssets;   // a FUNCTION: re-read every refresh
+
+  const staked = radio('staked');
+  if (staked === 'mock') o.getStakedLuna = async () => 1_003_493_000;
+  if (staked === 'zero') o.getStakedLuna = async () => 0;
+  if (staked === 'throw') o.getStakedLuna = async () => { log('error', 'getStakedLuna threw (on purpose)'); throw new Error('staking rpc 503'); };
+
+  const hist = radio('hist');
+  if (hist === 'off') o.history = false;
+  if (hist === 'fixture') o.history = { fetch: fixtureHistory };
+  if (hist === 'empty') o.history = { fetch: async () => { log('info', 'history.fetch() -> []'); return []; } };
+  if (hist === 'error') o.history = { fetch: async () => { log('error', 'history.fetch() threw (on purpose)'); throw new Error('indexer 503'); } };
+  if (hist === 'loading') o.history = { fetch: () => { log('info', 'history.fetch() pending forever'); return new Promise(() => {}); } };
 
   if (opt('opt-fiat')) {
     o.fiat = {
@@ -851,6 +929,13 @@ function applyDeepLink() {
     const el = document.querySelector(`input[name="brand"][value="${brand}"]`);
     if (el) el.checked = true;
   }
+  // ?hist=fixture|empty|error|loading|real|off  ?staked=default|mock|zero|throw  ?bal=...
+  for (const name of ['hist', 'staked', 'bal']) {
+    const v = q.get(name);
+    const el = v && document.querySelector(`input[name="${name}"][value="${v}"]`);
+    if (el) el.checked = true;
+  }
+  if (q.get('staker') === '1') $('opt-staker').checked = true;
   const evm = q.get('evm');
   if (evm) {
     const el = document.querySelector(`input[name="evm"][value="${CSS.escape(evm)}"]`);
@@ -860,7 +945,7 @@ function applyDeepLink() {
   const state = q.get('state');
   // receive and send are BEHIND a connected wallet, so asking for either asks
   // for the wallet too rather than silently landing on the signed-out menu.
-  const wantsWallet = state === 'receive' || state === 'send';
+  const wantsWallet = ['receive', 'send', 'history', 'tx'].includes(state);
   if (q.get('connected') === '1' || wantsWallet) $('opt-connected').checked = true;
   return { state, corner: q.get('corner') };
 }
@@ -883,11 +968,17 @@ async function openState(state, which) {
   const c = corners[which === 'light' ? 1 : 0];
   if (!c) return;
   c.open();
-  const sel = state === 'receive' ? '.nq-cc-receive' : state === 'send' ? '.nq-cc-send' : null;
+  const sel = state === 'receive' ? '.nq-cc-receive' : state === 'send' ? '.nq-cc-send'
+    : state === 'history' ? '.nq-cc-tx-all' : state === 'tx' ? '.nq-cc-recent .nq-cc-tx' : null;
   if (!sel) return;
   const ready = await waitFor(() => c.el.dataset.connected !== undefined);
   if (!ready) return log('warn', `deep-link ?state=${state} timed out waiting for the wallet`);
-  c.el.querySelector(sel)?.click();
+  // History rows exist only once the read lands, so wait for the thing itself.
+  const target = await waitFor(() => {
+    const n = c.el.querySelector(sel);
+    return n && !n.hidden ? n : null;
+  }, 4000);
+  target?.click();
 }
 
 function waitFor(read, timeoutMs = 2000) {
