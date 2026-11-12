@@ -262,8 +262,8 @@ for (const app of apps) {
 
     // ---- apply the bump ----------------------------------------------------
     if (app.model === 'cdn') {
-      // Search the WHOLE repo minus the noise. ninja keeps its app under app/,
-      // and a `public src` grep reported "no change" while doing nothing.
+      // Search the WHOLE repo minus the noise. An app can keep its pages outside
+      // public/ (nimiq.ninja did, under app/), and a `public src` grep reported "no change" while doing nothing.
       const files = await sh(work,
         `grep -rl "cdn.jsdelivr.net/gh/Andjroo111/nimiq-app-shell@v" . ` +
         `--exclude-dir=node_modules --exclude-dir=.git --exclude-dir=dist --exclude-dir=vendor || true`);

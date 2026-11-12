@@ -31,7 +31,7 @@ export interface App {
   /** House rule: every PR bumps package.json AND adds a CHANGELOG entry. */
   law?: boolean;
   /** Gate scripts, in order. Named explicitly because they are not uniform:
-   *  swellet calls them `typecheck`/`test:unit`, and ninja has no scripts at all. */
+   *  swellet calls them `typecheck`/`test:unit`, and multisend's only script is a Playwright smoke. */
   gates: string[];
   /** Work in a git worktree instead of the checkout. Set for a CONTESTED clone (a
    *  parallel session builds there), a repo whose checkout serves live traffic, or
@@ -51,8 +51,8 @@ export const FLEET: App[] = [
     gates: ['check', 'test'],
     note: 'its `lint` needs a Playwright browser CI installs and a laptop may not; left out of the gate set on purpose' },
   { repo: 'nimiq.gives', dir: `${P}/nimiq.gives`, model: 'cdn', law: true, gates: ['check', 'test', 'lint'] },
-  { repo: 'nimiq.ninja', dir: `${P}/nimiq.ninja`, model: 'cdn', gates: [],
-    note: 'no package scripts at all, and its app lives under app/ rather than public/' },
+  // nimiq.ninja is NOT here on purpose: Andrew dropped the shell from it (its PR
+  // #165). Never add it back without his word.
   { repo: 'nimiq.software', dir: `${P}/nimiq.software`, model: 'cdn', law: true, gates: ['check', 'test'] },
   { repo: 'nimiq.stream', dir: `${P}/nimiq.stream`, model: 'cdn', law: true, gates: ['check', 'test', 'lint'],
     note: 'carries the URL on four pages' },
@@ -61,7 +61,7 @@ export const FLEET: App[] = [
   { repo: 'nimiq.vote', dir: `${P}/nimiq.vote`, model: 'cdn', gates: ['check', 'test', 'lint'],
     note: 'the URL is in public/js/i18n.js, not an html file' },
   { repo: 'nimiq.multisend', dir: `${P}/nimiq-multisend`, model: 'cdn', gates: [],
-    note: 'one index.html and no package.json at all, so there is nothing to gate; its local checkout is nimiq-multisend, not the repo name' },
+    note: 'one index.html; its only script, test:smoke, needs a Playwright browser, so nothing is gated; its local checkout is nimiq-multisend, not the repo name' },
 
   // ---- dep: compiled into the app's own bundle -----------------------------
   { repo: 'nimiq.casino', dir: `${P}/nimiq.casino`, model: 'dep', build: 'build', commitsArtifact: true, law: true, gates: ['check', 'test'] },
