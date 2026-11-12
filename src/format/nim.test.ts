@@ -3,6 +3,7 @@ import {
   LUNA_PER_NIM,
   NIM_DECIMALS,
   fmtNim,
+  fmtNimBalance,
   fmtUnits,
   fmtFiat,
   lunaToNim,
@@ -200,5 +201,34 @@ describe('fmtUnits (multi-asset)', () => {
   test('rejects a nonsense unit width', () => {
     expect(() => fmtUnits(1n, -1)).toThrow();
     expect(() => fmtUnits(1n, 1.5)).toThrow();
+  });
+});
+
+describe('fmtNimBalance', () => {
+  test('whole NIM from 1 000 up, two decimals below', () => {
+    expect(fmtNimBalance(421_837_500)).toBe('4218');
+    expect(fmtNimBalance(1_250_000_000)).toBe('12\u202F500');
+    expect(fmtNimBalance(100_000_000)).toBe('1000');
+    expect(fmtNimBalance(88_612_345)).toBe('886.12');
+    expect(fmtNimBalance(500_000)).toBe('5.00');
+    expect(fmtNimBalance(0)).toBe('0.00');
+  });
+
+  test('rounds down, so the figure never shows more than is held', () => {
+    expect(fmtNimBalance(99_999_999)).toBe('999.99');
+    expect(fmtNimBalance(199_999_999)).toBe('1999');
+    expect(fmtNimBalance(999)).toBe('0.00');
+    expect(fmtNimBalance(123_456_789_012_345n)).toBe('1\u202F234\u202F567\u202F890');
+  });
+
+  test('a fractional number of luna is dropped, not thrown on', () => {
+    expect(fmtNimBalance(421_837_500.7)).toBe('4218');
+    expect(fmtNimBalance(1.5)).toBe('0.00');
+    expect(() => fmtNimBalance(Number.NaN)).toThrow();
+  });
+
+  test('a negative figure rounds toward zero on the same boundary', () => {
+    expect(fmtNimBalance(-199_999_999)).toBe('-1999');
+    expect(fmtNimBalance(-99_999_999)).toBe('-999.99');
   });
 });

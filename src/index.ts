@@ -156,6 +156,7 @@ export {
   LUNA_PER_NIM,
   NIM_DECIMALS,
   fmtNim,
+  fmtNimBalance,
   fmtUnits,
   fmtFiat,
   lunaToNim,

@@ -163,6 +163,33 @@ export function fmtNim(luna: number | bigint, options: FmtNimOptions = {}): stri
   return fmtUnits(luna, NIM_DECIMALS, options);
 }
 
+/** Whole NIM from this many NIM up on a glanceable balance line. */
+export const WHOLE_NIM_FROM = 1_000;
+
+/**
+ * Format luna for a balance someone READS at a glance (the account block's
+ * Available and Staked lines), not one they act on to the luna:
+ * whole NIM from 1 000 NIM up, exactly two decimals below that.
+ * `fmtNimBalance(421_837_500)` is `'4218'`, `fmtNimBalance(88_612_345)` is
+ * `'886.12'`.
+ *
+ * It rounds DOWN, never half-up: a spendable figure that shows more than the
+ * account holds is a promise the Send step then breaks. The Send step itself
+ * keeps `fmtNim` and the exact figure.
+ */
+export function fmtNimBalance(luna: number | bigint): string {
+  // A host reader that hands back a fractional or non-finite number is outside
+  // the luna contract. Fractions are dropped; the rest fails the way fmtNim does.
+  if (typeof luna === 'number' && !Number.isFinite(luna)) return fmtNim(luna);
+  const value = typeof luna === 'number' ? BigInt(Math.trunc(luna)) : luna;
+  const size = value < 0n ? -value : value;
+  const whole = size >= BigInt(WHOLE_NIM_FROM) * BigInt(LUNA_PER_NIM);
+  const step = BigInt(whole ? LUNA_PER_NIM : LUNA_PER_NIM / 100);
+  const floored = value - (value % step); // toward zero
+  const decimals = whole ? 0 : 2;
+  return fmtNim(floored, { maxDecimals: decimals, minDecimals: decimals });
+}
+
 /**
  * Format a fiat value (whole currency units, e.g. 12.5 for $12.50) with the
  * platform's Intl rules: correct symbol, the currency's own decimal count

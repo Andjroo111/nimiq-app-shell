@@ -27,7 +27,7 @@ import type { Wallet } from '../wallet';
 import { describeSendFailure } from '../wallet/send-hint';
 import { FEATURED_LANGUAGES, type ShellLanguage } from '../locales';
 import { buildFlagHex } from './flag-hex';
-import { fmtNim, fmtFiat, lunaToNim, nimToLuna } from '../format/nim';
+import { fmtNim, fmtNimBalance, fmtFiat, lunaToNim, nimToLuna } from '../format/nim';
 import { nimiqRequestLink } from '../format/request-link';
 import { BUG_ICON, openReportBugSheet, defaultReportBugRepo, type ReportBugOptions } from './report-bug';
 import { installReportCapture } from './report-capture';
@@ -2904,7 +2904,7 @@ export function mountMiniWallet(
     // Not drawn inside a flex row; it is there so the line still READS as
     // "Staked 2.00 NIM" to a screen reader and in a copy.
     balanceStaked.append(' ');
-    el('b', undefined, balanceStaked).textContent = `${fmtNim(stakedLuna, { maxDecimals: 2 })} NIM`;
+    el('b', undefined, balanceStaked).textContent = `${fmtNimBalance(stakedLuna)} NIM`;
   }
   function renderBalance(): void {
     // With a stack mounted, the account row belongs to its fiat total and this
@@ -2912,7 +2912,8 @@ export function mountMiniWallet(
     if (assetList) return;
     if (balanceLuna === null) { balanceStack.hidden = true; balanceStaked.hidden = true; return; }
     balanceStack.hidden = false;
-    balanceNim.textContent = `${fmtNim(balanceLuna)} NIM`;
+    // Glanceable, rounded down. The Send step shows the exact figure.
+    balanceNim.textContent = `${fmtNimBalance(balanceLuna)} NIM`;
     renderStaked();
     if (!hasFiat) balanceFiat.hidden = true;
   }

@@ -158,6 +158,22 @@ describe('spendable and staked on the account row', () => {
     expect(q(two.host, '.nq-cc-balance-staked')!.textContent).toBe('Staked 2.00 NIM');
   });
 
+  test('the account block shows whole NIM from 1 000 up, and the Send step keeps the exact figure', async () => {
+    const { host, handle } = mount({
+      history: false,
+      getBalanceLuna: async () => 421_837_500,
+      getStakedLuna: async () => 1_250_099_999,
+    });
+    await settle();
+    handle.open();
+    await settle();
+    expect(q(host, '.nq-cc-balance-nim')!.textContent).toBe('4218 NIM');
+    expect(q(host, '.nq-cc-balance-staked')!.textContent).toBe('Staked 12\u202F500 NIM');
+    q(host, '.nq-cc-send')!.click();
+    await settle();
+    expect(host.textContent).toContain('4218.375 NIM');
+  });
+
   test('a balance read still in flight when the account changes never paints beside the new name', async () => {
     let release!: () => void;
     const gate = new Promise<void>((r) => { release = r; });
