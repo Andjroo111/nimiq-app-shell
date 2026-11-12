@@ -31,7 +31,7 @@ export interface App {
   /** House rule: every PR bumps package.json AND adds a CHANGELOG entry. */
   law?: boolean;
   /** Gate scripts, in order. Named explicitly because they are not uniform:
-   *  swellet calls them `typecheck`/`test:unit`, and ninja has no scripts at all. */
+   *  swellet calls them `typecheck`/`test:unit`, and multisend has no scripts at all. */
   gates: string[];
   /** Work in a git worktree instead of the checkout. Set for a CONTESTED clone (a
    *  parallel session builds there), a repo whose checkout serves live traffic, or
@@ -51,8 +51,8 @@ export const FLEET: App[] = [
     gates: ['check', 'test'],
     note: 'its `lint` needs a Playwright browser CI installs and a laptop may not; left out of the gate set on purpose' },
   { repo: 'nimiq.gives', dir: `${P}/nimiq.gives`, model: 'cdn', law: true, gates: ['check', 'test', 'lint'] },
-  { repo: 'nimiq.ninja', dir: `${P}/nimiq.ninja`, model: 'cdn', gates: [],
-    note: 'no package scripts at all, and its app lives under app/ rather than public/' },
+  // nimiq.ninja is NOT here on purpose: Andrew dropped the shell from it (its PR
+  // #165). Never add it back without his word.
   { repo: 'nimiq.software', dir: `${P}/nimiq.software`, model: 'cdn', law: true, gates: ['check', 'test'] },
   { repo: 'nimiq.stream', dir: `${P}/nimiq.stream`, model: 'cdn', law: true, gates: ['check', 'test', 'lint'],
     note: 'carries the URL on four pages' },
