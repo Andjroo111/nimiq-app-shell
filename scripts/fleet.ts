@@ -31,7 +31,7 @@ export interface App {
   /** House rule: every PR bumps package.json AND adds a CHANGELOG entry. */
   law?: boolean;
   /** Gate scripts, in order. Named explicitly because they are not uniform:
-   *  swellet calls them `typecheck`/`test:unit`, and multisend has no scripts at all. */
+   *  swellet calls them `typecheck`/`test:unit`, and multisend's only script is a Playwright smoke. */
   gates: string[];
   /** Work in a git worktree instead of the checkout. Set for a CONTESTED clone (a
    *  parallel session builds there), a repo whose checkout serves live traffic, or
@@ -61,7 +61,7 @@ export const FLEET: App[] = [
   { repo: 'nimiq.vote', dir: `${P}/nimiq.vote`, model: 'cdn', gates: ['check', 'test', 'lint'],
     note: 'the URL is in public/js/i18n.js, not an html file' },
   { repo: 'nimiq.multisend', dir: `${P}/nimiq-multisend`, model: 'cdn', gates: [],
-    note: 'one index.html and no package.json at all, so there is nothing to gate; its local checkout is nimiq-multisend, not the repo name' },
+    note: 'one index.html; its only script, test:smoke, needs a Playwright browser, so nothing is gated; its local checkout is nimiq-multisend, not the repo name' },
 
   // ---- dep: compiled into the app's own bundle -----------------------------
   { repo: 'nimiq.casino', dir: `${P}/nimiq.casino`, model: 'dep', build: 'build', commitsArtifact: true, law: true, gates: ['check', 'test'] },
