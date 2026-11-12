@@ -1268,6 +1268,12 @@ button.nq-cc-name:focus-visible { outline:2px solid var(--nq-cc-accent, var(--ni
 
 /* identity (data-identity): the label is not a rename button */
 .nq-cc[data-identity] .nq-cc-name { cursor:default; }
+/* No address means no money rows: the block is the label, and the identicon
+   only when the host draws one. Its own display rule would outrank [hidden]. */
+.nq-cc[data-identity] .nq-cc-account { display:flex; align-items:center; gap:12px; }
+.nq-cc[data-identity] .nq-cc-identicon { width:40px; height:40px; flex:none; }
+.nq-cc[data-identity] .nq-cc-identicon[hidden] { display:none; }
+.nq-cc[data-identity] .nq-cc-name { margin-top:0; }
 
 `;
 
