@@ -213,6 +213,27 @@ describe('identity mode, connected', () => {
     expect(requests).toEqual([]);
   });
 
+  test('no name resolver is created: its options are never read', () => {
+    // createNameResolver reads these at construction, so an untouched getter
+    // means no resolver exists. The control mount (no identity) proves the
+    // getter is reachable at all.
+    const watched = () => {
+      const reads: string[] = [];
+      const names = {
+        get resolvers() { reads.push('resolvers'); return []; },
+        get fetch() { reads.push('fetch'); return undefined; },
+      };
+      return { reads, names };
+    };
+    const control = watched();
+    mount({ address: META, label: 'ninja-7' }, { names: control.names, reportBug: false, balance: false });
+    expect(control.reads.length).toBeGreaterThan(0);
+
+    const pinned = watched();
+    mount({ address: META, label: 'ninja-7' }, { names: pinned.names, identity: true });
+    expect(pinned.reads).toEqual([]);
+  });
+
   test('a conflicting option does not throw', () => {
     const { opts } = hostile();
     expect(() => mount({ address: META, label: '' }, { ...opts, identity: true, switchAccount: true, receive: true })).not.toThrow();

@@ -43,6 +43,10 @@ export interface EvmSectionOptions {
   location?: Pick<Location, 'host' | 'pathname' | 'search'>;
   /** Default: a user-agent test. */
   isMobile?: () => boolean;
+  /** Forwarded to the token stack's <style>: `false` creates none. */
+  injectStyles?: boolean;
+  /** Nonce for the token stack's <style>, for a nonce-based style-src. */
+  styleNonce?: string;
 }
 
 export interface EvmSectionHandle {
@@ -258,6 +262,8 @@ export function mountEvmSection(parent: HTMLElement, options: EvmSectionOptions)
       // note on why a list inside a closed menu does not read at page load.
       autoRefresh: false,
       onSelect: options.onReceive,
+      injectStyles: options.injectStyles,
+      ...(options.styleNonce ? { styleNonce: options.styleNonce } : {}),
     });
   }
 

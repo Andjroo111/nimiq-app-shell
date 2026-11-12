@@ -11,6 +11,7 @@ import { mountMiniWallet, CORNER_CONTROL_CSS, MINI_WALLET_CSS, type CornerContro
 import { ASSET_LIST_CSS } from './asset-list';
 import { REPORT_SHEET_CSS } from './report-bug';
 import { MINI_WALLET_CSS as FROM_INDEX } from '../index';
+import { createEvmWallet, METAMASK_RDNS, type Eip1193Provider } from '../evm';
 import { createI18n } from '../i18n';
 import { mergeLocales, shellLocales } from '../locales';
 import type { Wallet } from '../wallet';
@@ -19,9 +20,11 @@ const ME = 'NQ53 VN1C MLA8 YNXD 7HR1 CDYK DHHF GN7Q 714B';
 const KEYS = ['window', 'document', 'HTMLElement', 'navigator', 'localStorage', 'getComputedStyle', 'Event'] as const;
 let saved: Record<string, unknown> = {};
 let realFetch: typeof fetch;
+let win: Window;
 
 beforeEach(() => {
   const w = new Window();
+  win = w;
   saved = {};
   for (const k of KEYS) {
     saved[k] = (globalThis as Record<string, unknown>)[k];
@@ -68,6 +71,38 @@ function mountAll(opts: Partial<CornerControlOptions>) {
   return { host, handle };
 }
 
+const EVM_ADDR = '0x71C7656EC7ab88b098defB751B7401B5f6d8976F';
+
+/** A browser wallet already connected to this page: eth_accounts answers, so
+ *  the section's silent restore connects at mount and mounts its token stack
+ *  (an asset list, with its own <style>). No Nimiq `assets`, so that stack is
+ *  the only asset list on the page. */
+async function mountEvmConnected(opts: Partial<CornerControlOptions>) {
+  const provider: Eip1193Provider = {
+    async request({ method }) {
+      if (method === 'eth_accounts' || method === 'eth_requestAccounts') return [EVM_ADDR];
+      if (method === 'eth_chainId') return '0x89';
+      if (method === 'eth_call') return `0x${'0'.repeat(64)}`;
+      throw new Error(`unhandled ${method}`);
+    },
+    on() {},
+    removeListener() {},
+  };
+  const evm = createEvmWallet({ win: win as unknown as globalThis.Window });
+  win.dispatchEvent(new win.CustomEvent('eip6963:announceProvider', {
+    detail: { info: { rdns: METAMASK_RDNS, name: 'MetaMask' }, provider },
+  }) as never);
+  const i18n = createI18n({ locales: mergeLocales(shellLocales), fallback: 'en', initial: 'en' });
+  const host = document.createElement('div');
+  document.body.appendChild(host);
+  const handle = mountMiniWallet(host, { wallet: wallet(), i18n, evm, reportBug: false, balance: false, ...opts });
+  await new Promise((r) => setTimeout(r, 40));
+  expect(evm.account?.address).toBe(EVM_ADDR);
+  expect(host.querySelector('.nq-cc-evm-assets .nq-al')).not.toBeNull();
+  handle.open();
+  return { host, handle };
+}
+
 const styles = () => [...document.querySelectorAll('style')] as HTMLStyleElement[];
 
 describe('styleNonce', () => {
@@ -86,6 +121,19 @@ describe('styleNonce', () => {
     }
   });
 
+  test('lands on the EVM section\'s token stack too, with a connected browser wallet', async () => {
+    await mountEvmConnected({ styleNonce: 'r4nd0m' });
+    const all = styles();
+    expect(all.map((s) => s.id).sort()).toEqual([
+      'nimiq-shell-asset-list-style',
+      'nimiq-shell-corner-control-style',
+    ]);
+    for (const s of all) {
+      expect(s.getAttribute('nonce')).toBe('r4nd0m');
+      expect(s.nonce).toBe('r4nd0m');
+    }
+  });
+
   test('without it, no nonce attribute is written', () => {
     mountAll({});
     expect(styles()).toHaveLength(3);
@@ -96,6 +144,11 @@ describe('styleNonce', () => {
 describe('injectStyles: false', () => {
   test('leaves zero <style> elements after mounting, opening the menu and opening the bug sheet', () => {
     mountAll({ injectStyles: false, styleNonce: 'ignored' });
+    expect(styles()).toHaveLength(0);
+  });
+
+  test('also with a connected browser wallet in Other chains', async () => {
+    await mountEvmConnected({ injectStyles: false });
     expect(styles()).toHaveLength(0);
   });
 });

@@ -397,7 +397,9 @@ export interface CornerControlOptions {
    *  is still called with it when wired, and nothing is drawn when not. The
    *  menu is that label, `rows`, the language section and Disconnect. No
    *  balance, staked line, fiat total, Receive, Send, history, contacts, scan,
-   *  cashlink, Other chains, "Show amounts in" or Switch account.
+   *  cashlink, Other chains, "Show amounts in" or Switch account. The Report a
+   *  bug and Open in Nimiq Pay rows still follow their own options
+   *  (`reportBug`, `openInPay`).
    *
    *  It also makes NO network request: no balance, staked or history reader
    *  and no name resolver is created, whatever the other options say (this
@@ -1882,6 +1884,7 @@ export function mountMiniWallet(
       evm,
       i18n,
       glyph: WALLET_ICON,
+      ...styleOpts,
       onReceive: showReceive ? (asset) => openReceive(asset) : undefined,
       // A receive view left open on the EVM address is now showing an address
       // that is no longer connected.

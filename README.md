@@ -1155,9 +1155,17 @@ The mini wallet's styles are `<style>` elements it creates at mount. Under a
 
 | route | what to set |
 |---|---|
-| nonce | `styleNonce: '<the page nonce>'`; every `<style>` the mini wallet and what it mounts (asset stack, bug sheet) create carries it |
+| nonce | `styleNonce: '<the page nonce>'`; every `<style>` the mini wallet and what it mounts (asset stack, Other chains token stack, bug sheet) create carries it |
 | no injection | `injectStyles: false`, and ship the CSS yourself: link `dist/app-shell.css`, or write `MINI_WALLET_CSS` (exported from the package root) into your own stylesheet; they are the same string |
 
+- `injectStyles: false` now also covers the asset stack, the Other chains
+  token stack and the bug sheet, which used to inject their own `<style>`
+  regardless. A host that already passed `false` must ship the whole
+  `dist/app-shell.css` (or `MINI_WALLET_CSS`), not only the corner's old CSS.
+- Only the mini wallet takes these options. The standalone components
+  (`mountLanguagePill`, `mountLanguageSwitcher`, `mountProfileWidget`,
+  `mountWalletPill`, `mountOpenInPayGate`) still inject a `<style>` with no nonce
+  option; their `injectStyles: false` is the only route for them.
 - No markup the mini wallet inserts carries a `style="..."` attribute (a test
   scans `src/ui` for one). Positions it computes at runtime are CSSOM writes
   (`el.style.setProperty`), which `style-src` does not govern.
@@ -1170,8 +1178,10 @@ The mini wallet's styles are `<style>` elements it creates at mount. Under a
   history) and name lookups; `identity` makes none of those. Report a bug posts
   to its own endpoint (nimiq.bot by default) only on submit; `reportBug: false`
   removes it.
-- `dist/app-shell.css` is rebuilt with `dist/app-shell.js` (`bun run
-  build:dist`), so it matches the tag you load, not necessarily `main`.
+- `bun run build:dist` writes `dist/app-shell.css` alongside `dist/app-shell.js`.
+  The committed `dist/app-shell.js` is only rebuilt in release commits, so
+  between releases the two committed files can come from different builds;
+  `MINI_WALLET_CSS` from the source you import is always current.
 
 ---
 
