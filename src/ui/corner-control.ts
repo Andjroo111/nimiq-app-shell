@@ -29,9 +29,10 @@ import { FEATURED_LANGUAGES, type ShellLanguage } from '../locales';
 import { buildFlagHex } from './flag-hex';
 import { fmtNim, fmtNimBalance, fmtFiat, lunaToNim, nimToLuna } from '../format/nim';
 import { nimiqRequestLink } from '../format/request-link';
-import { BUG_ICON, openReportBugSheet, defaultReportBugRepo, type ReportBugOptions } from './report-bug';
+import { BUG_ICON, openReportBugSheet, defaultReportBugRepo, REPORT_SHEET_CSS, type ReportBugOptions } from './report-bug';
 import { installReportCapture } from './report-capture';
-import { mountAssetList, type AssetListHandle, type ShellAsset } from './asset-list';
+import { mountAssetList, ASSET_LIST_CSS, type AssetListHandle, type ShellAsset } from './asset-list';
+import { injectStyle, type StyleInjection } from './style-inject';
 import { createNimBalanceReader } from '../wallet/balance';
 import { createNimStakedReader } from '../wallet/staked';
 import { createNimHistoryReader, type HistoryFetchOptions, type ShellTx } from '../history/chain';
@@ -375,8 +376,40 @@ export interface CornerControlOptions {
    *  only runs once someone types a name, so a page that never sends never
    *  calls it. `false` turns it off; `{ resolvers }` ADDS resolvers. */
   names?: false | NameResolverOptions;
-  /** Inject the component's <style> once. Default true. */
+  /** Inject the component's <style> once. Default true.
+   *
+   *  `false` covers everything the mini wallet mounts (the asset stack and the
+   *  bug sheet too), so the page gets no <style> element from it at all. The
+   *  host then ships the CSS itself: `MINI_WALLET_CSS`, or dist/app-shell.css,
+   *  which is the same string. For a CSP with no 'unsafe-inline' in style-src. */
   injectStyles?: boolean;
+  /** Nonce for every <style> element the mini wallet and what it mounts create
+   *  (set as the property and the attribute), for a CSP that admits styles by
+   *  nonce. Ignored with `injectStyles: false`. An element an earlier mount on
+   *  the same page already created keeps whatever nonce it was given. */
+  styleNonce?: string;
+  /** The connected wallet has NO Nimiq address the shell may show or act on:
+   *  the account is an identity (nimiq.ninja's is a stealth meta-address held
+   *  in the browser, with no single balance), not a spendable NQ address.
+   *
+   *  Connected, the face and menu show the account's label (else the generic
+   *  "Account") and never any part of `account.address`; the host's `identicon`
+   *  is still called with it when wired, and nothing is drawn when not. The
+   *  menu is that label, `rows`, the language section and Disconnect. No
+   *  balance, staked line, fiat total, Receive, Send, history, contacts, scan,
+   *  cashlink, Other chains, "Show amounts in" or Switch account. The Report a
+   *  bug and Open in Nimiq Pay rows still follow their own options
+   *  (`reportBug`, `openInPay`).
+   *
+   *  It also makes NO network request: no balance, staked or history reader
+   *  and no name resolver is created, whatever the other options say (this
+   *  wins over `balance`, `getBalanceLuna`, `assets`, `history`, `names`,
+   *  `evm` and `fiat`, without throwing). Signed out it is the ordinary
+   *  "Connect wallet" control.
+   *
+   *  `rows` are plain menu rows under the label; a tap calls `onSelect` and
+   *  then closes the menu. */
+  identity?: true | { rows?: Array<{ label: string; onSelect: () => void }> };
 }
 
 export interface CornerControlHandle {
@@ -422,11 +455,7 @@ export const FIAT_FLAGS: Record<string, string> = {
   // text-only, which is the honest answer rather than a guess.
 };
 
-function ensureStyles(): void {
-  if (typeof document === 'undefined' || document.getElementById(STYLE_ID)) return;
-  const style = document.createElement('style');
-  style.id = STYLE_ID;
-  // Ported from the registry corner-control.css (locked 2026-07-23). EVERY
+// Ported from the registry corner-control.css (locked 2026-07-23). EVERY
   // painted value reads a --nq-cc-* var whose default is the Nimiq value it
   // replaced, so an app that sets nothing is unchanged and an app that sets a
   // brand is not fighting a hardcode. See theme.ts for the token layer above
@@ -437,7 +466,10 @@ function ensureStyles(): void {
   // as a color-mix of that var: identical when untouched, and it follows the
   // foreground the moment a host themes one. Same for the light-blue washes,
   // which are --nq-cc-accent at 8% and 12%.
-  style.textContent = NAME_LOOKUP_CSS + EVM_SECTION_CSS + HISTORY_CSS + `
+//
+// Exported (with the sub-components' CSS, as MINI_WALLET_CSS below) so a
+// strict-CSP host can ship it as a file; ensureStyles() injects this string.
+export const CORNER_CONTROL_CSS = NAME_LOOKUP_CSS + EVM_SECTION_CSS + HISTORY_CSS + `
 .nq-cc { position:relative; display:inline-block;
   font-family:var(--nq-cc-font, 'Mulish','Muli',system-ui,sans-serif); }
 .nq-cc-caret { width:10px; height:6px; flex:none; color:currentColor; opacity:.6;
@@ -1231,8 +1263,30 @@ button.nq-cc-name:focus-visible { outline:2px solid var(--nq-cc-accent, var(--ni
 .nq-cc[data-mode="miniapp"]:not([data-testnet]) .nq-cc-footer,
 .nq-cc[data-mode="miniapp"]:not([data-testnet]) .nq-cc-footer-divider { display:none; }
 
+/* Were style attributes in inserted markup, which a style-src without
+   'unsafe-inline' drops. Classes carry them now. */
+.nq-cc-wallet-glyph { flex:none; opacity:.85; }
+.nq-flag-hex { display:block; overflow:visible; }
+
+/* identity (data-identity): the label is not a rename button */
+.nq-cc[data-identity] .nq-cc-name { cursor:default; }
+/* No address means no money rows: the block is the label, and the identicon
+   only when the host draws one. Its own display rule would outrank [hidden]. */
+.nq-cc[data-identity] .nq-cc-account { display:flex; align-items:center; gap:12px; }
+.nq-cc[data-identity] .nq-cc-identicon { width:40px; height:40px; flex:none; }
+.nq-cc[data-identity] .nq-cc-identicon[hidden] { display:none; }
+.nq-cc[data-identity] .nq-cc-name { margin-top:0; }
+
 `;
-  document.head.appendChild(style);
+
+/** Every rule the mini wallet can need on a page: its own (which already
+ *  carries the name lookup, EVM section and history CSS), the multi-asset
+ *  stack, and the bug sheet. One string, so a host that passes
+ *  `injectStyles: false` can ship exactly this (dist/app-shell.css is it). */
+export const MINI_WALLET_CSS = CORNER_CONTROL_CSS + ASSET_LIST_CSS + REPORT_SHEET_CSS;
+
+function ensureStyles(style: StyleInjection): void {
+  injectStyle(STYLE_ID, CORNER_CONTROL_CSS, style);
 }
 
 /** The wallet's close mark: @nimiq/style close.svg verbatim, as the registry's
@@ -1259,7 +1313,7 @@ const PLACEHOLDER_HEX =
   '<svg viewBox="0 -4 64 64" aria-hidden="true"><path opacity=".25" d="M62.3 25.4L49.2 2.6A5.3 5.3 0 0 0 44.6 0H18.4c-1.9 0-3.6 1-4.6 2.6L.7 25.4c-1 1.6-1 3.6 0 5.2l13.1 22.8c1 1.6 2.7 2.6 4.6 2.6h26.2c1.9 0 3.6-1 4.6-2.6l13-22.8c1-1.6 1-3.6.1-5.2z" fill="currentColor"/></svg>';
 
 const WALLET_ICON =
-  '<svg width="18" height="18" viewBox="0 0 20 20" fill="none" aria-hidden="true" style="flex:none;opacity:.85">' +
+  '<svg class="nq-cc-wallet-glyph" width="18" height="18" viewBox="0 0 20 20" fill="none" aria-hidden="true">' +
   '<rect x="2" y="5" width="16" height="12" rx="2" stroke="currentColor" stroke-width="1.5"/>' +
   '<path d="M2 9h16" stroke="currentColor" stroke-width="1.5"/>' +
   '<circle cx="6" cy="13" r="1" fill="currentColor"/></svg>';
@@ -1421,8 +1475,15 @@ export function mountMiniWallet(
 ): CornerControlHandle {
   const { wallet, i18n } = options;
   const languages = options.languages ?? FEATURED_LANGUAGES;
-  const showReceive = options.receive !== false;
-  const hasAssets = !!options.assets;
+  // Identity mode: the account has no address this shell may show or act on.
+  // Resolved first because it switches off every reader below, whatever the
+  // other options say.
+  const identity: { rows: Array<{ label: string; onSelect: () => void }> } | null =
+    options.identity && wallet
+      ? { rows: options.identity === true ? [] : options.identity.rows ?? [] }
+      : null;
+  const showReceive = !identity && options.receive !== false;
+  const hasAssets = !identity && !!options.assets;
   // Resolve the balance source ONCE, here, so everything downstream reads one
   // name and no branch has to re-decide which of three seams is live.
   //
@@ -1434,7 +1495,8 @@ export function mountMiniWallet(
   //                       which is worse than a missing one.
   //   otherwise         → the built-in read, which is the new default.
   const balanceReader: ((address: string) => Promise<number>) | undefined =
-    options.getBalanceLuna
+    identity ? undefined
+    : options.getBalanceLuna
     ?? (hasAssets || options.balance === false || options.network === 'test'
       ? undefined
       : createNimBalanceReader(
@@ -1450,12 +1512,12 @@ export function mountMiniWallet(
   const builtInBalance = !options.getBalanceLuna && !!balanceReader;
   const balanceRpc = options.balance && options.balance.rpc ? { rpc: options.balance.rpc } : {};
   const stakedReader: ((address: string) => Promise<number>) | undefined =
-    hasAssets ? undefined
+    hasAssets || identity ? undefined
       : options.getStakedLuna ?? (builtInBalance ? createNimStakedReader(balanceRpc) : undefined);
   // History: a Hub wallet only (inside Nimiq Pay the host wallet is the
   // context), off on testnet for the balance's reason, off on `history: false`.
   const historyFetch: ((address: string, opts: HistoryFetchOptions) => Promise<ShellTx[]>) | undefined =
-    !wallet || wallet.mode === 'miniapp' || options.history === false
+    !wallet || identity || wallet.mode === 'miniapp' || options.history === false
       ? undefined
       : (typeof options.history === 'object' ? options.history.fetch : undefined)
         ?? (options.network === 'test' || options.balance === false
@@ -1468,13 +1530,14 @@ export function mountMiniWallet(
   // corner from v0.5.0) still wants to offer it, so this is gated on the fiat
   // feed alone. It used to require hasBalance, which made the picker
   // unreachable on exactly those pages.
-  const hasFiat = !!options.fiat && options.fiat.currencies.length > 0;
-  if (options.injectStyles !== false) ensureStyles();
+  const hasFiat = !identity && !!options.fiat && options.fiat.currencies.length > 0;
+  const styleOpts: StyleInjection = { injectStyles: options.injectStyles, styleNonce: options.styleNonce };
+  ensureStyles(styleOpts);
 
   // Inside Nimiq Pay there is no browser wallet to find, so the section is not
   // built there at all. A wallet-less page (no `wallet` option) still gets it.
-  const ownsEvm = options.evm === true;
-  const evm: EvmWallet | null = !options.evm || wallet?.mode === 'miniapp'
+  const ownsEvm = options.evm === true && !identity;
+  const evm: EvmWallet | null = !options.evm || identity || wallet?.mode === 'miniapp'
     ? null
     : options.evm === true ? createEvmWallet({ network: options.network }) : options.evm;
 
@@ -1491,7 +1554,10 @@ export function mountMiniWallet(
   // No wallet → the wallet is not merely ambient (mini-app) but absent, and the
   // menu's own when-hub / when-connected gates already collapse it to the
   // language section alone. Reuse that state rather than inventing a third mode.
-  root.dataset.mode = !wallet || wallet.mode === 'miniapp' ? 'miniapp' : 'hub';
+  //
+  // An identity wallet is always presented as a Hub one: its menu is the
+  // when-hub sections, and a miniapp mode would hide them all.
+  root.dataset.mode = !wallet || (wallet.mode === 'miniapp' && !identity) ? 'miniapp' : 'hub';
   // ...but the FACE is not shared: mini-app recedes into the host wallet's
   // chrome, a wallet-less page keeps the outline pill (see the data-face rules).
   if (!wallet) root.dataset.face = 'lang';
@@ -1559,8 +1625,17 @@ export function mountMiniWallet(
     syncInk();
     face.textContent = '';
     const account = wallet?.account ?? null;
-    if (account) {
+    if (account && identity) {
+      // The label and nothing derived from the address: no slice of it, no
+      // stored rename (keyed on it), no mono address styling. The host's
+      // identicon is its own call; without one there is no placeholder either.
       root.dataset.connected = '';
+      root.dataset.identity = '';
+      if (options.identicon) el('span', 'nq-cc-face-icon', face).appendChild(options.identicon(account.address, 28));
+      el('span', 'nq-cc-face-label', face).textContent = account.label || i18n.t('shell.account');
+    } else if (account) {
+      root.dataset.connected = '';
+      delete root.dataset.identity;
       const icon = el('span', 'nq-cc-face-icon', face);
       if (options.identicon) icon.appendChild(options.identicon(account.address, 28));
       else icon.innerHTML = PLACEHOLDER_HEX;
@@ -1573,6 +1648,7 @@ export function mountMiniWallet(
       // no caret. One shape fleet-wide (Andjroo, 2026-11-11), and with more
       // than one kind of wallet behind it a single glyph would name the wrong one.
       delete root.dataset.connected;
+      delete root.dataset.identity;
       const label = el('span', 'nq-cc-face-label', face);
       label.textContent = i18n.t('shell.connectWallet');
       return;
@@ -1599,6 +1675,10 @@ export function mountMiniWallet(
   const viewSendTo = el('div', 'nq-cc-view-sendto', menu);
   const viewSend = el('div', 'nq-cc-view-send', menu);
   const viewMain = el('div', 'nq-cc-view-main', menu);
+  // An identity has no address, so none of the views built around one are on
+  // the page: they are still built (the code below wires them) but detached,
+  // and their openers return early too.
+  if (identity) for (const v of [viewReceive, viewQr, viewRequest, viewSendTo, viewSend]) v.remove();
 
   // translatable text registry: node -> i18n key
   const i18nNodes: Array<[HTMLElement, string]> = [];
@@ -1649,10 +1729,18 @@ export function mountMiniWallet(
   const walletSection = el('div', 'nq-cc-section nq-cc-wallet nq-cc-when-connected nq-cc-when-hub', viewMain);
   const accountRow = el('div', 'nq-cc-account', walletSection);
   const identiconSlot = el('span', 'nq-cc-identicon', accountRow);
-  // the name IS the rename affordance (tap to edit) — always on, local-first
-  const nameEl = el('button', 'nq-cc-name', accountRow);
-  nameEl.type = 'button';
-  nameEl.addEventListener('click', () => startRename(nameEl));
+  // the name IS the rename affordance (tap to edit) — always on, local-first.
+  // Not for an identity: the rename is stored under the address, and there is
+  // no address to key it on.
+  let nameEl: HTMLElement;
+  if (identity) {
+    nameEl = el('span', 'nq-cc-name', accountRow);
+  } else {
+    const btn = el('button', 'nq-cc-name', accountRow);
+    btn.type = 'button';
+    btn.addEventListener('click', () => startRename(btn));
+    nameEl = btn;
+  }
   const balanceStack = el('div', 'nq-cc-balance', accountRow);
   balanceStack.hidden = true;
   // "Available N NIM" is ONE grid item, so the fiat figure alone sets the
@@ -1683,6 +1771,8 @@ export function mountMiniWallet(
       // the list's own mount read. Leaving it on would hit a Polygon RPC on
       // every page load of every app, for a panel most visitors never open.
       autoRefresh: false,
+      injectStyles: options.injectStyles,
+      ...(options.styleNonce ? { styleNonce: options.styleNonce } : {}),
       // Tapping a row receives THAT asset. Only offered when the receive flow
       // is on at all, so `receive: false` does not leave rows that look
       // pressable and do nothing.
@@ -1721,7 +1811,8 @@ export function mountMiniWallet(
   // Send is ALWAYS there: the built-in send view makes the menu a real mini
   // wallet (recipient + amount here, the wallet only for the approval); an
   // options.send override redirects it to an app-specific flow instead.
-  {
+  // An identity has nothing to send from or receive to, so it gets no bar.
+  if (!identity) {
     const actions = el('div', 'nq-cc-actions', walletSection);
     if (showReceive) {
       const btn = el('button', 'nq-cc-receive', actions);
@@ -1758,6 +1849,21 @@ export function mountMiniWallet(
   }
   el('div', 'nq-cc-divider nq-cc-when-connected nq-cc-when-hub', viewMain);
 
+  // ---- identity rows (the host's own actions for the account) ---------------
+  if (identity && identity.rows.length) {
+    const rows = el('div', 'nq-cc-section nq-cc-identity-rows nq-cc-when-connected nq-cc-when-hub', viewMain);
+    for (const item of identity.rows) {
+      const row = el('button', 'nq-cc-row', rows);
+      row.type = 'button';
+      el('span', 'nq-cc-strong', row).textContent = item.label;
+      row.addEventListener('click', () => {
+        item.onSelect();
+        setOpen(false);
+      });
+    }
+    el('div', 'nq-cc-divider nq-cc-when-connected nq-cc-when-hub', viewMain);
+  }
+
   // ---- no cashlink row here any more ---------------------------------------
   // It lives in ONE place, the send step-one footer, which is where the wallet
   // has it and for the wallet's reason: a cashlink is what you make when you
@@ -1778,6 +1884,7 @@ export function mountMiniWallet(
       evm,
       i18n,
       glyph: WALLET_ICON,
+      ...styleOpts,
       onReceive: showReceive ? (asset) => openReceive(asset) : undefined,
       // A receive view left open on the EVM address is now showing an address
       // that is no longer connected.
@@ -1933,7 +2040,7 @@ export function mountMiniWallet(
   if (typeof reportBug === 'object' && reportBug.bot) {
     installReportCapture(reportBug.bot.service ?? 'https://bot.nimiq.tech');
   }
-  const showSwitch = !!wallet && options.switchAccount !== false;
+  const showSwitch = !!wallet && !identity && options.switchAccount !== false;
 
   if (showSwitch || reportBug) {
     // ONE divider for the pair, and it has to be gated as loosely as the group's
@@ -1994,7 +2101,7 @@ export function mountMiniWallet(
       if (typeof target === 'function') target();
       // Forward the brand: the sheet portals to body, so it cannot inherit the
       // vars stamped on this root and has to be handed them.
-      else openReportBugSheet(document, i18n, options.theme ? { ...target, theme: target.theme ?? options.theme } : target);
+      else openReportBugSheet(document, i18n, options.theme ? { ...target, theme: target.theme ?? options.theme } : target, styleOpts);
     });
   }
 
@@ -2215,6 +2322,7 @@ export function mountMiniWallet(
   requestAmount.addEventListener('input', renderRequestLink);
 
   function openRequest(): void {
+    if (identity) return;
     if (!wallet?.account) return;
     requestAmount.value = '';
     renderRequestLink();
@@ -2605,7 +2713,7 @@ export function mountMiniWallet(
   }
   recipientInput.addEventListener('input', advanceToAmount);
 
-  const names = options.names === false ? null : mountNameLookup({
+  const names = options.names === false || identity ? null : mountNameLookup({
     field: recipientInput,
     after: recipientWrap,
     resolver: createNameResolver(options.names ?? {}),
@@ -2619,6 +2727,7 @@ export function mountMiniWallet(
   });
 
   function openSend(): void {
+    if (identity) return;
     if (!wallet?.account) return;
     sendError.textContent = '';
     viewSend.classList.remove('nq-cc-sent');
@@ -2746,6 +2855,7 @@ export function mountMiniWallet(
    *  made that pairing read as deliberate. The row is also left unselectable
    *  (see asset-list), so this is the second of two guards on the same hazard. */
   function openReceive(asset?: ShellAsset): void {
+    if (identity) return;
     const account = wallet?.account ?? null;
     if (asset && !asset.address) return;
     // An asset brings its own address, so it needs no Nimiq account: the EVM
@@ -2923,6 +3033,12 @@ export function mountMiniWallet(
     const account = wallet?.account ?? null;
     if (!account) return;
     identiconSlot.textContent = '';
+    if (identity) {
+      identiconSlot.hidden = !options.identicon;
+      if (options.identicon) identiconSlot.appendChild(options.identicon(account.address, 68));
+      nameEl.textContent = account.label || i18n.t('shell.account');
+      return;
+    }
     if (options.identicon) identiconSlot.appendChild(options.identicon(account.address, 68));
     else identiconSlot.innerHTML = PLACEHOLDER_HEX;
     nameEl.textContent = shortLabel(account, i18n.t('shell.account'));
@@ -3042,6 +3158,8 @@ export function mountMiniWallet(
     renderFaceFlag();
     renderFace();
     renderStaked();
+    // The identity fallback label ("Account") is translated text.
+    if (identity && wallet?.account) renderWalletBlock();
     evmSection?.applyLang();
   });
 

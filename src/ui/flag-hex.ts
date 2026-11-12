@@ -56,8 +56,11 @@ export function flagHexMarkup(code: string, options: FlagHexOptions = {}): strin
   // small pill), never below 0.4 viewBox units.
   const stroke = Math.max(0.4, 22 / size);
   const id = `nq-flag-${(uid += 1)}`;
+  // display/overflow are SVG presentation attributes, not a style attribute:
+  // a CSP style-src without 'unsafe-inline' drops a style attribute parsed
+  // from markup. The components that draw flags also set both from .nq-flag-hex.
   return (
-    `<svg class="nq-flag-hex" viewBox="0 0 20 18" width="${size}" height="${(size * 0.9).toFixed(2)}" aria-hidden="true" style="display:block;overflow:visible">` +
+    `<svg class="nq-flag-hex" viewBox="0 0 20 18" width="${size}" height="${(size * 0.9).toFixed(2)}" aria-hidden="true" display="block" overflow="visible">` +
     `<defs><clipPath id="${id}"><path d="${HEX}"/></clipPath></defs>` +
     // The clip goes on a <g> WRAPPER, never on the <image> itself. WebKit skips a
     // clip-path referenced directly by an <image> whose data-URI artwork decodes
