@@ -246,6 +246,9 @@ export {
   type ShellContact,
   addressGrid,
   menuShift,
+  // Every rule the mini wallet can put on a page, for a strict-CSP host that
+  // passes `injectStyles: false` and ships it itself (= dist/app-shell.css).
+  MINI_WALLET_CSS,
 } from './ui/corner-control';
 // Host branding. `theme` on the mini wallet is the front door; these are for a
 // host that wants the same tokens on a surface of its own, or wants to read the

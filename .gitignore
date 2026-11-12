@@ -7,3 +7,5 @@ dist/*
 # The prebuilt browser ESM IS committed so jsdelivr can serve it from a tag to
 # no-bundler apps (`<script type=module>` import). Rebuild with `bun run build:dist`.
 !dist/app-shell.js
+# The mini wallet's CSS as a file, for strict-CSP hosts (`injectStyles: false`).
+!dist/app-shell.css

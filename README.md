@@ -1122,6 +1122,57 @@ reads "Cancelled" and is never an error. Inside Nimiq Pay the section is not
 built. Token addresses (native USDC, USDT) match nimiq.markets'
 `app/src/shared/evm-chains.ts`.
 
+### Identity-only accounts
+
+```ts
+mountMiniWallet(el, {
+  wallet, i18n,
+  identity: { rows: [{ label: 'Back up phrase', onSelect: openBackup }] },
+});
+```
+
+For a wallet whose account has **no Nimiq address the shell may show or act
+on**: nimiq.ninja's account is a stealth meta-address (`nqstealth:1:...`) held
+in the browser, with no single balance. `identity: true` is the same with no
+rows.
+
+| | connected with `identity` |
+|---|---|
+| face | the host's `identicon` (if passed, else nothing, not even the placeholder hexagon) and `account.label`, else "Account" |
+| menu | the label, your `rows` (a tap calls `onSelect`, then closes the menu), Language, Disconnect |
+| never | any part of `account.address`, rename (it is keyed on the address), balance, staked, fiat total, Receive, Send and the built-in send view, history, contacts, scan, cashlink, Other chains, Show amounts in, Switch account |
+| network | none: no balance, staked or history reader and no name resolver is created, whatever `balance`, `getBalanceLuna`, `assets`, `history`, `names`, `evm` or `fiat` say |
+
+Signed out it is the ordinary **Connect wallet** control, and an account change
+switches between the two live. Report a bug and Open in Nimiq Pay keep their own
+options. The wallet is presented as a Hub one even if its `mode` says
+`miniapp`.
+
+### Strict CSP
+
+The mini wallet's styles are `<style>` elements it creates at mount. Under a
+`style-src` with no `'unsafe-inline'`, pick one:
+
+| route | what to set |
+|---|---|
+| nonce | `styleNonce: '<the page nonce>'`; every `<style>` the mini wallet and what it mounts (asset stack, bug sheet) create carries it |
+| no injection | `injectStyles: false`, and ship the CSS yourself: link `dist/app-shell.css`, or write `MINI_WALLET_CSS` (exported from the package root) into your own stylesheet; they are the same string |
+
+- No markup the mini wallet inserts carries a `style="..."` attribute (a test
+  scans `src/ui` for one). Positions it computes at runtime are CSSOM writes
+  (`el.style.setProperty`), which `style-src` does not govern.
+- The CSS and the language flags use `data:` URIs (CSS masks, flag `<image>`
+  artwork), so `img-src` needs `data:`.
+- `script-src 'self'` needs nothing extra: there is no `eval`, `new Function`,
+  inline script or `javascript:` URL in the source or in `dist/app-shell.js`.
+  Serve the JS from your own origin, not the CDN.
+- `connect-src 'self'` blocks the built-in public-node reads (balance, staked,
+  history) and name lookups; `identity` makes none of those. Report a bug posts
+  to its own endpoint (nimiq.bot by default) only on submit; `reportBug: false`
+  removes it.
+- `dist/app-shell.css` is rebuilt with `dist/app-shell.js` (`bun run
+  build:dist`), so it matches the tag you load, not necessarily `main`.
+
 ---
 
 ## Use without a bundler (prebuilt ESM)

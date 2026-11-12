@@ -24,6 +24,7 @@
 import type { I18n } from '../i18n';
 import { pageContext } from './report-capture';
 import { applyTheme, type ShellTheme } from './theme';
+import { injectStyle, type StyleInjection } from './style-inject';
 
 export type ReportBugType = 'bug' | 'idea' | 'question';
 
@@ -448,12 +449,9 @@ export const BUG_ICON =
   'M16.2 12.2 18.4 10.8 19 8.9M17 15h3.6M16.2 17.8 18.4 19.2 19 21.1"/>' +
   '<path d="M10.8 7.6 9.5 5.9 8 5.3M13.2 7.6 14.5 5.9 16 5.3"/></g></svg>';
 
-/** @internal Shared with the fullscreen prompt so both sheets look alike. */
-export function ensureSheetStyles(doc: Document): void {
-  if (doc.getElementById(SHEET_STYLE_ID)) return;
-  const style = doc.createElement('style');
-  style.id = SHEET_STYLE_ID;
-  style.textContent = `
+/** The bug sheet's CSS (also the fullscreen prompt's), exported so
+ *  MINI_WALLET_CSS can carry it for a host that ships the stylesheet itself. */
+export const REPORT_SHEET_CSS = `
 .nq-fb-scrim { position:fixed; inset:0; z-index:10000; display:flex; align-items:center;
   justify-content:center; padding:16px;
   background:color-mix(in srgb, var(--nq-cc-scrim, var(--nimiq-blue, #1f2348)) 50%, transparent);
@@ -495,7 +493,10 @@ textarea.nq-fb-input { min-height:104px; resize:vertical; font-weight:400; line-
   font-family:var(--nq-cc-font, 'Mulish','Muli',system-ui,sans-serif); font-size:14px; font-weight:600;
   box-shadow:0 4px 14px rgba(31,35,72,.25); }
 `;
-  doc.head.appendChild(style);
+
+/** @internal Shared with the fullscreen prompt so both sheets look alike. */
+export function ensureSheetStyles(doc: Document, style: StyleInjection = {}): void {
+  injectStyle(SHEET_STYLE_ID, REPORT_SHEET_CSS, style, doc);
 }
 
 function escapeHtml(s: string): string {
@@ -519,9 +520,14 @@ function toast(doc: Document, msg: string, theme?: ShellTheme): void {
 
 /** Open the report-a-bug sheet. Idempotent: a second call while one is open is
  *  a no-op rather than a stacked overlay. */
-export function openReportBugSheet(doc: Document, i18n: I18n, options: ReportBugOptions): void {
+export function openReportBugSheet(
+  doc: Document,
+  i18n: I18n,
+  options: ReportBugOptions,
+  style: StyleInjection = {},
+): void {
   if (doc.getElementById('nq-fb-scrim')) return;
-  ensureSheetStyles(doc);
+  ensureSheetStyles(doc, style);
   const t = (key: string): string => i18n.t(key);
   const wantsDiagnostics = options.diagnostics !== false;
 

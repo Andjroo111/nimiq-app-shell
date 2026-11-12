@@ -28,6 +28,7 @@
 // a host that themes that menu must not have to theme its contents separately.
 
 import { fmtFiat, fmtUnits } from '../format/nim';
+import { injectStyle } from './style-inject';
 
 /** One asset the corner can show. The host supplies the address and the read;
  *  the shell owns the row. */
@@ -102,6 +103,8 @@ export interface AssetListOptions {
   autoRefresh?: boolean;
   /** Inject the component's <style> once. Default true. */
   injectStyles?: boolean;
+  /** Nonce for that <style>, for a page whose CSP allows styles by nonce. */
+  styleNonce?: string;
 }
 
 export interface AssetListHandle {
@@ -145,11 +148,9 @@ export function assetSubtitle(asset: ShellAsset): string {
 
 const STYLE_ID = 'nimiq-shell-asset-list-style';
 
-function ensureStyles(): void {
-  if (typeof document === 'undefined' || document.getElementById(STYLE_ID)) return;
-  const style = document.createElement('style');
-  style.id = STYLE_ID;
-  style.textContent = `
+/** The stack's CSS, exported so MINI_WALLET_CSS can carry it for a host that
+ *  ships the stylesheet itself (`injectStyles: false`). */
+export const ASSET_LIST_CSS = `
 .nq-al { display:flex; flex-direction:column; gap:1px; }
 .nq-al-row { display:flex; align-items:center; gap:9px; width:100%; padding:6px 8px;
   border:none; border-radius:6px; background:none; font-family:inherit; text-align:left;
@@ -177,8 +178,6 @@ button.nq-al-row:focus-visible { outline:2px solid var(--nq-cc-accent, var(--nim
    and three spinners in a 272px card reads as "broken", not "loading" */
 .nq-al-units.nq-al-pending { color:var(--nq-cc-menu-muted, rgba(31,35,72,.35)); font-weight:600; }
 `;
-  document.head.appendChild(style);
-}
 
 function el<K extends keyof HTMLElementTagNameMap>(
   tag: K,
@@ -204,7 +203,7 @@ export function mountAssetList(
   container: HTMLElement,
   options: AssetListOptions,
 ): AssetListHandle {
-  if (options.injectStyles !== false) ensureStyles();
+  injectStyle(STYLE_ID, ASSET_LIST_CSS, options);
   const cacheMs = options.cacheMs ?? 30_000;
   const readAssets = (): ShellAsset[] =>
     typeof options.assets === 'function' ? options.assets() : options.assets;

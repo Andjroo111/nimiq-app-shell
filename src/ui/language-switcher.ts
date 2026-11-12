@@ -34,6 +34,7 @@ function ensureStyles(): void {
   const style = document.createElement('style');
   style.id = STYLE_ID;
   style.textContent = `
+.nq-flag-hex { display:block; overflow:visible; }
 .nq-langsw { list-style:none; margin:0; padding:0; display:flex; flex-wrap:wrap; justify-content:center; gap:calc(var(--nq-flag-w,40px)*0.3); }
 .nq-langsw li { display:block; }
 .nq-langsw__btn { position:relative; display:block; padding:0; border:none; background:none; cursor:pointer; line-height:0; }

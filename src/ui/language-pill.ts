@@ -38,6 +38,7 @@ function ensureStyles(): void {
   const style = document.createElement('style');
   style.id = STYLE_ID;
   style.textContent = `
+.nq-flag-hex { display:block; overflow:visible; }
 .nq-langpill { position: relative; }
 .nq-langpill__btn { display:inline-flex; align-items:center; gap:7px; height:40px; padding:0 12px;
   border:1px solid color-mix(in srgb, currentColor 20%, transparent); border-radius:999px;
