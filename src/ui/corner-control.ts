@@ -369,13 +369,17 @@ export interface CornerControlOptions {
    *  so it wins where both are set. */
   theme?: ShellTheme;
   /** Nimiq names in the send sheet's recipient field: type `gaston`, tap the
-   *  row, pay the address it proves to. ON by default, because a name that
-   *  works in one fleet app and not the next is not a name.
+   *  row, pay the address it proves to. OFF by default (since v0.34.1): the
+   *  registry is NNS (nimiqnames.com), a third party, and a payment sheet does
+   *  not send what someone types into its recipient field to a third party
+   *  unless the host asked for that.
    *
-   *  The registry is NNS (nimiqnames.com), not ours; see ../names. A lookup
-   *  only runs once someone types a name, so a page that never sends never
-   *  calls it. `false` turns it off; `{ resolvers }` ADDS resolvers. */
-  names?: false | NameResolverOptions;
+   *  Left out, `undefined` or `false`: the field takes an address only, no
+   *  resolver is created and no lookup is ever made. `true` turns it on with
+   *  the shipped resolvers (the same as `{}`); `{ resolvers }` turns it on and
+   *  ADDS resolvers. See ../names. A lookup only runs once someone types a
+   *  name, so a page that never sends never calls it. */
+  names?: boolean | NameResolverOptions;
   /** Inject the component's <style> once. Default true.
    *
    *  `false` covers everything the mini wallet mounts (the asset stack and the
@@ -431,6 +435,15 @@ function storedLabel(address: string): string | null {
 }
 function setStoredLabel(address: string, label: string): void {
   try { localStorage.setItem(LABEL_STORE_PREFIX + address.replace(/\s+/g, ''), label); } catch { /* ignore */ }
+}
+
+/** What the `names` option asks for: resolver options when the host opted in,
+ *  null when it did not. Absent is OFF. Only `true` or an options object turns
+ *  the lookup on, so a site that passes nothing sends nothing to the registry. */
+export function resolveNamesOption(names: CornerControlOptions['names']): NameResolverOptions | null {
+  if (names === true) return {};
+  if (names && typeof names === 'object') return names;
+  return null;
 }
 
 /** Native-language display names (the locked spec shows native names in the
@@ -2368,7 +2381,11 @@ export function mountMiniWallet(
   const recipientHead = el('div', 'nq-cc-field-head', sendToBody);
   const recipientIcon = el('span', 'nq-cc-recipient-icon', recipientHead);
   const recipientLabel = el('label', 'nq-cc-eyebrow', recipientHead);
-  tNode(recipientLabel, options.names === false ? 'shell.enterAddress' : 'shell.enterAddressOrName');
+  // Names are OPT-IN. This is the one place the option is read: everything
+  // below asks `nameOptions`, so there is no second default to drift from it.
+  // Identity mode never reaches this sheet, and gets null either way.
+  const nameOptions = identity ? null : resolveNamesOption(options.names);
+  tNode(recipientLabel, nameOptions ? 'shell.enterAddressOrName' : 'shell.enterAddress');
 
   // Nine four-char blocks in a 3x3 grid, the wallet's own send-modal field.
   const recipientWrap = el('div', 'nq-cc-addr-field', sendToBody);
@@ -2383,7 +2400,7 @@ export function mountMiniWallet(
   // A name is left as typed: the blocks are an address's shape, and `gaston`
   // upper-cased into `GAST ON` reads as neither.
   recipientInput.addEventListener('input', () => {
-    const isName = options.names !== false && isNameInput(recipientInput.value);
+    const isName = nameOptions !== null && isNameInput(recipientInput.value);
     recipientWrap.classList.toggle('nq-cc-addr-is-name', isName);
     if (!isName) reformatInPlace(recipientInput);
   });
@@ -2649,7 +2666,7 @@ export function mountMiniWallet(
     // Kept in step with the field on every path that writes it (typing, a
     // contact chip, a name pick), not only on input events.
     recipientWrap.classList.toggle('nq-cc-addr-is-name',
-      options.names !== false && isNameInput(recipientInput.value));
+      nameOptions !== null && isNameInput(recipientInput.value));
     const okAddress = recipientIsAddress();
     renderRecipientIcon(okAddress ? compactRecipient() : null);
     const nim = amountNim();
@@ -2713,10 +2730,10 @@ export function mountMiniWallet(
   }
   recipientInput.addEventListener('input', advanceToAmount);
 
-  const names = options.names === false || identity ? null : mountNameLookup({
+  const names = nameOptions === null ? null : mountNameLookup({
     field: recipientInput,
     after: recipientWrap,
-    resolver: createNameResolver(options.names ?? {}),
+    resolver: createNameResolver(nameOptions),
     i18n,
     ...(options.identicon ? { identicon: options.identicon } : {}),
     onPick: (address) => {
