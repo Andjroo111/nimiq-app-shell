@@ -1640,9 +1640,15 @@ describe('step one is the wallet\'s Send Transaction sheet', () => {
   // The one uppercase nimiq-ui allows (rule 17, a short grey section label) and
   // exactly what the wallet ships here.
   test('the address label is the grey uppercase eyebrow', async () => {
+    // Names are opt-in (v0.34.1): the label only offers a name where the host
+    // turned the lookup on.
     const { host } = mount();
     await openSend(host);
     expect(host.querySelector('.nq-cc-view-sendto .nq-cc-eyebrow')?.textContent)
+      .toBe('Enter address');
+    const named = mount({ names: true });
+    await openSend(named.host);
+    expect(named.host.querySelector('.nq-cc-view-sendto .nq-cc-eyebrow')?.textContent)
       .toBe('Enter address or name');
     const src = await Bun.file(new URL('./corner-control.ts', import.meta.url)).text();
     expect(src).toMatch(/\.nq-cc-eyebrow \{[^}]*text-transform:uppercase/);

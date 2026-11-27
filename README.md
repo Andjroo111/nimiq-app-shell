@@ -584,7 +584,8 @@ persists.
 
 ### Nimiq names (NNS)
 
-The send sheet's recipient field takes a name as well as an address. Type
+With `names: true`, the send sheet's recipient field takes a name as well as
+an address. Type
 `gaston`, and a row appears with the face and first blocks of the address the
 name proves to. Tapping it fills the field with that address and moves to the
 amount step, where the recipient shows as `gaston`.
@@ -608,8 +609,10 @@ catches a drifted database or a bad deploy, not an operator who lies.
 | resolver down, quorum split, bad proof | "Could not check gaston right now" |
 | `NQ..` | the address grid, unchanged, and no lookup |
 
-On by default. `names: false` restores the old field; `names: { resolvers }`
-adds resolvers to the shipped two. The pure pieces are exported from
+Off by default since v0.34.1. NNS is a third party, so the field takes an
+address only, and makes no lookup, until the host opts in: `names: true` uses
+the shipped two resolvers, `names: { resolvers }` adds to them. Leaving the
+option out, or passing `names: false`, keeps the address-only field. The pure pieces are exported from
 `nimiq-app-shell/names` (`nameQuery`, `createNameResolver`).
 
 ### `.nim` names
@@ -1175,7 +1178,8 @@ The mini wallet's styles are `<style>` elements it creates at mount. Under a
   inline script or `javascript:` URL in the source or in `dist/app-shell.js`.
   Serve the JS from your own origin, not the CDN.
 - `connect-src 'self'` blocks the built-in public-node reads (balance, staked,
-  history) and name lookups; `identity` makes none of those. Report a bug posts
+  history) and, where the host turned `names` on, name lookups; `identity`
+  makes none of those. Report a bug posts
   to its own endpoint (nimiq.bot by default) only on submit; `reportBug: false`
   removes it.
 - `bun run build:dist` writes `dist/app-shell.css` alongside `dist/app-shell.js`.
