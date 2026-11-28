@@ -102,13 +102,73 @@ describe('scrubAddresses', () => {
     ]) expect(scrubAddresses(id)).toBe('[id redacted]');
   });
 
-  // The other direction. A scrub that eats hashes takes the diagnostics down
-  // with it, and hex that long is a tx hash or a digest, not a person.
-  test('hex that is merely long is left alone', () => {
-    const txHash = 'a'.repeat(64);
-    expect(scrubAddresses(`tx ${txHash} failed`)).toBe(`tx ${txHash} failed`);
-    expect(scrubAddresses('checksum d41d8cd98f00b204e9800998ecf8427e'))
-      .toBe('checksum d41d8cd98f00b204e9800998ecf8427e');
+  // This used to be pinned the other way: "hex that is merely long is left
+  // alone", on the grounds that it is a tx hash or a digest and not a person.
+  // A private key and an HTLC preimage are the same 64 characters, and nothing
+  // on the page can tell them from a hash. So long hex goes, hashes included.
+  const KEY = '3fa9'.repeat(16);
+
+  test('a bare 64 hex string goes: a private key or a preimage in an error', () => {
+    expect(scrubAddresses(`invalid preimage ${KEY} for htlc`))
+      .toBe('invalid preimage [hex redacted] for htlc');
+    expect(scrubAddresses(KEY.toUpperCase())).toBe('[hex redacted]');
+  });
+
+  test('a 0x-prefixed 64 hex string goes, prefix and all', () => {
+    expect(scrubAddresses(`signer 0x${KEY} rejected`)).toBe('signer [hex redacted] rejected');
+    expect(scrubAddresses(`0X${KEY.toUpperCase()}`)).toBe('[hex redacted]');
+  });
+
+  test('the hex threshold is 32: a 16 byte key goes, 31 digits stay', () => {
+    expect(scrubAddresses('checksum d41d8cd98f00b204e9800998ecf8427e')).toBe('checksum [hex redacted]');
+    const short = 'd41d8cd98f00b204e9800998ecf8427';
+    expect(scrubAddresses(`etag ${short}`)).toBe(`etag ${short}`);
+  });
+
+  test('long hex glued into a key name still goes', () => {
+    expect(scrubAddresses(`sk_${KEY}_v2`)).toBe('sk_[hex redacted]_v2');
+  });
+
+  test('a base64 key goes, padding included', () => {
+    const b64 = 'q83vEjRWeJCrze8SNFZ4kKvN7xI0VniQq83vEjRWeJA=';
+    expect(scrubAddresses(`bad key ${b64} given`)).toBe('bad key [base64 redacted] given');
+  });
+
+  test('a base64url value goes whole, not split at its first hyphen', () => {
+    const b64url = 'q83vEjRWeJCrze8SNFZ4kKvN7xI0VniQq83vEjRW-eJ_A';
+    expect(scrubAddresses(`token=${b64url}`)).toBe('token=[base64 redacted]');
+  });
+
+  test('the base64 threshold is 40 characters', () => {
+    const thirtyNine = 'q83vEjRWeJCrze8SNFZ4kKvN7xI0VniQq83vEjR';
+    expect(scrubAddresses(thirtyNine)).toBe(thirtyNine);
+    expect(scrubAddresses(`${thirtyNine}W`)).toBe('[base64 redacted]');
+  });
+
+  // The base64 alphabet also spells every URL path. What separates them is that
+  // encoded bytes mix upper case, lower case and digits in one run.
+  test('a long path or identifier is not base64', () => {
+    for (const line of [
+      'GET /api/households/settings/notifications/preferences/list → 500',
+      'at https://nimiq.kids/assets/chunks/treasure-box-screen-with-a-long-name/index.js:10:4',
+      'missing translation shell.some_really_long_snake_case_message_key_for_the_sheet',
+    ]) expect(scrubAddresses(line)).toBe(line);
+  });
+
+  test('an ordinary error message is unchanged', () => {
+    for (const line of [
+      "TypeError: Cannot read properties of undefined (reading 'balance')",
+      'Unhandled rejection: Request failed with status 502\n  at fetchRates (https://nimiq.cool/app.js:120:15)',
+      'tx 9f8e7d6c failed after 3 retries at block 4821337',
+    ]) expect(scrubAddresses(line)).toBe(line);
+  });
+
+  // The seed heuristic is twelve plain lowercase words, which is also what a
+  // sentence somebody types looks like. So it runs on captured lines only (see
+  // report-capture.test.ts) and typed text keeps its words.
+  test('typed prose is not mistaken for a seed phrase', () => {
+    const typed = 'the button does not work when click send from wallet page today';
+    expect(scrubAddresses(typed)).toBe(typed);
   });
 
   test('a UUID-shaped run with hex glued to its FRONT is not a UUID', () => {
@@ -275,6 +335,27 @@ describe('submitToBot (the nimiq.bot transport)', () => {
     expect(sent).not.toContain('NQ07 0000');
     expect(sent).not.toContain('NQ0700000000');
     expect(sent).toContain('[address redacted]');
+  });
+
+  // Second pass, at send. Capture scrubs on the way into its buffer, but a host
+  // can hand submitToBot a pageContext it built itself.
+  test('a key or a seed phrase in the context never reaches the service', async () => {
+    stubBot(draftOk, filedOk);
+    const key = '3fa9'.repeat(16);
+    const seed = 'abandon ability able about above absent absorb abstract absurd abuse access accident';
+    await submitToBot({ repo: 'nimiq.kids' }, {
+      ...valid,
+      description: `it logged ${key} at me`,
+      pageContext: {
+        consoleErrors: [`invalid preimage ${key}`, `sign failed 0x${key}`, `could not import: ${seed}`],
+        url: 'https://nimiq.kids/kid/',
+      },
+    });
+    const sent = JSON.stringify(calls[0]!.body);
+    expect(sent).not.toContain(key);
+    expect(sent).not.toContain('abandon');
+    expect(sent).toContain('[hex redacted]');
+    expect(sent).toContain('could not import: [seed phrase redacted]');
   });
 
   test('the draft title is scrubbed too, since the service echoes our text back', async () => {

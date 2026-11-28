@@ -304,6 +304,7 @@ export {
 } from './ui/report-bug';
 export {
   installReportCapture,
+  clearReportCapture,
   pageContext,
   type PageContext,
 } from './ui/report-capture';

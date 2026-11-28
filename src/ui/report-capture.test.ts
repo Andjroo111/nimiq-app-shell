@@ -10,7 +10,7 @@
 // `location` / `document` behind typeof guards precisely so it works in a
 // non-DOM runtime, and this repo has no DOM harness by convention.
 import { afterEach, beforeEach, describe, expect, test } from 'bun:test';
-import { _resetCaptureForTests, installReportCapture, pageContext } from './report-capture';
+import { _resetCaptureForTests, clearReportCapture, installReportCapture, pageContext } from './report-capture';
 
 type Loose = Record<string, unknown>;
 const g = globalThis as unknown as Loose;
@@ -205,5 +205,83 @@ describe('installReportCapture: what it records, and what it leaves out', () => 
     expect(ctx.consoleErrors.at(-1)).toBe('e29');
     expect(ctx.networkFailures).toHaveLength(10);
     expect(ctx.viewport).toEqual({ w: 390, h: 844, dpr: 3 });
+  });
+
+  // Scrubbed on the way IN. The buffer is module state any script on the page
+  // can read through pageContext(), so a secret must never sit in it waiting for
+  // somebody to file a report. Each of these reads the buffer straight after the
+  // line is captured, with no send in between.
+  const KEY = '3fa9'.repeat(16);
+  const SEED = 'abandon ability able about above absent absorb abstract absurd abuse access accident '
+    + 'account accuse achieve acid acoustic acquire across act action actor actress actual';
+
+  test('a bare 64 hex string never enters the buffer', () => {
+    installReportCapture();
+    console.error(`invalid preimage ${KEY}`);
+    expect(pageContext().consoleErrors).toEqual(['invalid preimage [hex redacted]']);
+  });
+
+  test('a 0x-prefixed 64 hex string never enters it either, on any hook', () => {
+    installReportCapture();
+    console.error('sign failed', { privateKey: `0x${KEY}` });
+    fire('unhandledrejection', { reason: new Error(`bad key 0x${KEY}`) });
+    fire('error', { message: `Uncaught Error: 0x${KEY}` });
+    const errs = pageContext().consoleErrors;
+    expect(errs).toHaveLength(3);
+    expect(errs[0]).toBe('sign failed {"privateKey":"[hex redacted]"}');
+    expect(errs[1]).toStartWith('Unhandled rejection: bad key [hex redacted]');
+    expect(errs[2]).toBe('Uncaught Error: [hex redacted]');
+    expect(errs.join('\n')).not.toContain(KEY);
+  });
+
+  test('a 24 word seed phrase line never enters the buffer', () => {
+    installReportCapture();
+    console.error(SEED);
+    console.error(`could not import: ${SEED}`);
+    expect(pageContext().consoleErrors).toEqual([
+      '[seed phrase redacted]',
+      'could not import: [seed phrase redacted]',
+    ]);
+  });
+
+  test('eleven words is a sentence, not a seed phrase', () => {
+    installReportCapture();
+    const eleven = SEED.split(' ').slice(0, 11).join(' ');
+    console.error(eleven);
+    expect(pageContext().consoleErrors).toEqual([eleven]);
+  });
+
+  test('addresses and UUIDs are scrubbed at capture too, with their own labels', () => {
+    installReportCapture();
+    console.error(`balance failed for NQ07${'0'.repeat(32)}`);
+    console.error('already_owned for 8f3c1d2e-4b5a-4c7d-8e9f-0a1b2c3d4e5f');
+    expect(pageContext().consoleErrors).toEqual([
+      'balance failed for [address redacted]',
+      'already_owned for [id redacted]',
+    ]);
+  });
+
+  test('an ordinary error message is captured unchanged', () => {
+    installReportCapture();
+    const line = "TypeError: Cannot read properties of undefined (reading 'balance')";
+    console.error(line);
+    expect(pageContext().consoleErrors).toEqual([line]);
+  });
+
+  test('clearReportCapture empties both buffers and capture carries on', async () => {
+    installReportCapture();
+    console.error('before');
+    await wfetch('/api/rates');
+    expect(pageContext().consoleErrors).toHaveLength(1);
+    expect(pageContext().networkFailures).toHaveLength(1);
+
+    clearReportCapture();
+    expect(pageContext().consoleErrors).toEqual([]);
+    expect(pageContext().networkFailures).toEqual([]);
+
+    console.error('after');
+    await wfetch('/api/rates');
+    expect(pageContext().consoleErrors).toEqual(['after']);
+    expect(pageContext().networkFailures).toEqual(['GET /api/rates → 502']);
   });
 });
