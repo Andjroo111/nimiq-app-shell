@@ -10,7 +10,8 @@
 // `location` / `document` behind typeof guards precisely so it works in a
 // non-DOM runtime, and this repo has no DOM harness by convention.
 import { afterEach, beforeEach, describe, expect, test } from 'bun:test';
-import { _resetCaptureForTests, installReportCapture, pageContext } from './report-capture';
+import { _resetCaptureForTests, clearReportCapture, installReportCapture, pageContext } from './report-capture';
+import * as shell from '../index';
 
 type Loose = Record<string, unknown>;
 const g = globalThis as unknown as Loose;
@@ -205,5 +206,188 @@ describe('installReportCapture: what it records, and what it leaves out', () => 
     expect(ctx.consoleErrors.at(-1)).toBe('e29');
     expect(ctx.networkFailures).toHaveLength(10);
     expect(ctx.viewport).toEqual({ w: 390, h: 844, dpr: 3 });
+  });
+
+  // Scrubbed on the way IN. The buffer is module state any script on the page
+  // can read through pageContext(), so a secret must never sit in it waiting for
+  // somebody to file a report. Each of these reads the buffer straight after the
+  // line is captured, with no send in between.
+  const KEY = '3fa9'.repeat(16);
+  const SEED = 'abandon ability able about above absent absorb abstract absurd abuse access accident '
+    + 'account accuse achieve acid acoustic acquire across act action actor actress actual';
+
+  test('a bare 64 hex string never enters the buffer', () => {
+    installReportCapture();
+    console.error(`invalid preimage ${KEY}`);
+    expect(pageContext().consoleErrors).toEqual(['invalid preimage [hex redacted]']);
+  });
+
+  test('a 0x-prefixed 64 hex string never enters it either, on any hook', () => {
+    installReportCapture();
+    console.error('sign failed', { privateKey: `0x${KEY}` });
+    fire('unhandledrejection', { reason: new Error(`bad key 0x${KEY}`) });
+    fire('error', { message: `Uncaught Error: 0x${KEY}` });
+    const errs = pageContext().consoleErrors;
+    expect(errs).toHaveLength(3);
+    expect(errs[0]).toBe('sign failed {"privateKey":"[hex redacted]"}');
+    expect(errs[1]).toStartWith('Unhandled rejection: bad key [hex redacted]');
+    expect(errs[2]).toBe('Uncaught Error: [hex redacted]');
+    expect(errs.join('\n')).not.toContain(KEY);
+  });
+
+  test('a 24 word seed phrase line never enters the buffer', () => {
+    installReportCapture();
+    console.error(SEED);
+    console.error(`could not import: ${SEED}`);
+    expect(pageContext().consoleErrors).toEqual([
+      '[seed phrase redacted]',
+      'could not import: [seed phrase redacted]',
+    ]);
+  });
+
+  test('eleven words is a sentence, not a seed phrase', () => {
+    installReportCapture();
+    const eleven = SEED.split(' ').slice(0, 11).join(' ');
+    console.error(eleven);
+    expect(pageContext().consoleErrors).toEqual([eleven]);
+  });
+
+  // The forms a phrase takes when it is not typed out on one line. The first is
+  // the one this capture produces by itself: safeStr JSON-encodes an array, so
+  // `console.error(words)` holds no space at all between two words.
+  const WORDS = SEED.split(' ');
+
+  test('a seed phrase logged as an array never enters the buffer', () => {
+    installReportCapture();
+    console.error(WORDS);
+    console.error('import failed', { words: WORDS.slice(0, 12) });
+    const errs = pageContext().consoleErrors;
+    expect(errs).toEqual(['["[seed phrase redacted]"]', 'import failed {"words":["[seed phrase redacted]"]}']);
+    expect(errs.join('\n')).not.toContain('abandon');
+  });
+
+  // Rows of six, as a backup sheet lays them out: here the square brackets sit
+  // BETWEEN words. And the single quoted form an inspector prints.
+  test('an array in rows, or printed with single quotes, never enters it either', () => {
+    installReportCapture();
+    console.error([WORDS.slice(0, 6), WORDS.slice(6, 12)]);
+    console.error(`[ ${WORDS.slice(0, 12).map((w) => `'${w}'`).join(', ')} ]`);
+    expect(pageContext().consoleErrors).toEqual(['[["[seed phrase redacted]"]]', "[ '[seed phrase redacted]' ]"]);
+  });
+
+  test('a comma separated seed phrase never enters the buffer', () => {
+    installReportCapture();
+    console.error(`mnemonic: ${WORDS.join(', ')}`);
+    console.error(WORDS.join(','));
+    expect(pageContext().consoleErrors).toEqual(['mnemonic: [seed phrase redacted]', '[seed phrase redacted]']);
+  });
+
+  test('a seed phrase with one word per line never enters the buffer', () => {
+    installReportCapture();
+    console.error(`backup:\n${WORDS.join('\n')}`);
+    console.error(WORDS.join('\r\n'));
+    expect(pageContext().consoleErrors).toEqual(['backup:\n[seed phrase redacted]', '[seed phrase redacted]']);
+  });
+
+  test('a numbered seed phrase never enters the buffer', () => {
+    installReportCapture();
+    console.error(WORDS.map((w, i) => `${i + 1}. ${w}`).join(' '));
+    console.error(WORDS.map((w, i) => `${i + 1} ${w}`).join('\n'));
+    const errs = pageContext().consoleErrors;
+    expect(errs).toEqual(['1. [seed phrase redacted]', '1 [seed phrase redacted]']);
+    expect(errs.join('\n')).not.toContain('abandon');
+  });
+
+  test('eleven words are left alone in every one of those forms', () => {
+    installReportCapture();
+    const eleven = WORDS.slice(0, 11);
+    const lines = [JSON.stringify(eleven), eleven.join(', '), eleven.join('\n'), eleven.map((w, i) => `${i + 1}. ${w}`).join(' ')];
+    for (const line of lines) console.error(line);
+    expect(pageContext().consoleErrors).toEqual(lines);
+  });
+
+  // The wider separator is what could eat a stack: dots, digits and newlines
+  // now join words. Every frame still breaks the run, with `at`, a capital, a
+  // colon, a slash or a parenthesis.
+  test('a normal multi-line stack trace survives', () => {
+    installReportCapture();
+    const chrome = [
+      "TypeError: Cannot read properties of undefined (reading 'balance')",
+      '    at renderBalance (https://nimiq.cool/assets/index.js:120:15)',
+      '    at async loadWallet (https://nimiq.cool/assets/index.js:98:5)',
+      '    at async mount (https://nimiq.cool/assets/index.js:41:3)',
+      '    at https://nimiq.cool/assets/vendor.js:7:1024',
+      '    at new Promise (<anonymous>)',
+      '    at update (https://nimiq.cool/assets/vendor.js:7:980)',
+      '    at flush (https://nimiq.cool/assets/vendor.js:7:455)',
+      '    at render (https://nimiq.cool/assets/vendor.js:6:12)',
+      '    at patch (https://nimiq.cool/assets/vendor.js:6:8)',
+      '    at mount (https://nimiq.cool/assets/vendor.js:5:77)',
+      '    at start (https://nimiq.cool/assets/vendor.js:5:3)',
+      '    at main (https://nimiq.cool/assets/index.js:1:1)',
+    ].join('\n');
+    const firefox = [
+      'render@https://nimiq.cool/assets/index.js:120:15',
+      'async*load@https://nimiq.cool/assets/index.js:98:5',
+      'mount@https://nimiq.cool/assets/index.js:41:3',
+      'update@https://nimiq.cool/assets/vendor.js:7:980',
+      'flush@https://nimiq.cool/assets/vendor.js:7:455',
+      'patch@https://nimiq.cool/assets/vendor.js:6:8',
+      'start@https://nimiq.cool/assets/vendor.js:5:3',
+      'main@https://nimiq.cool/assets/index.js:1:1',
+      'dispatch@https://nimiq.cool/assets/vendor.js:2:9',
+      'handle@https://nimiq.cool/assets/vendor.js:2:4',
+      'listen@https://nimiq.cool/assets/vendor.js:1:7',
+      'boot@https://nimiq.cool/assets/index.js:1:0',
+    ].join('\n');
+    console.error(chrome);
+    console.error(firefox);
+    fire('unhandledrejection', { reason: { message: 'request failed with status 502', stack: chrome } });
+    const errs = pageContext().consoleErrors;
+    expect(errs[0]).toBe(chrome);
+    expect(errs[1]).toBe(firefox);
+    expect(errs[2]).toBe(`Unhandled rejection: request failed with status 502\n${chrome.split('\n').slice(0, 4).join('\n')}`);
+  });
+
+  test('clearReportCapture is exported from the package root, the same function', () => {
+    expect(shell.clearReportCapture).toBe(clearReportCapture);
+    installReportCapture();
+    console.error('before');
+    shell.clearReportCapture();
+    expect(pageContext().consoleErrors).toEqual([]);
+  });
+
+  test('addresses and UUIDs are scrubbed at capture too, with their own labels', () => {
+    installReportCapture();
+    console.error(`balance failed for NQ07${'0'.repeat(32)}`);
+    console.error('already_owned for 8f3c1d2e-4b5a-4c7d-8e9f-0a1b2c3d4e5f');
+    expect(pageContext().consoleErrors).toEqual([
+      'balance failed for [address redacted]',
+      'already_owned for [id redacted]',
+    ]);
+  });
+
+  test('an ordinary error message is captured unchanged', () => {
+    installReportCapture();
+    const line = "TypeError: Cannot read properties of undefined (reading 'balance')";
+    console.error(line);
+    expect(pageContext().consoleErrors).toEqual([line]);
+  });
+
+  test('clearReportCapture empties both buffers and capture carries on', async () => {
+    installReportCapture();
+    console.error('before');
+    await wfetch('/api/rates');
+    expect(pageContext().consoleErrors).toHaveLength(1);
+    expect(pageContext().networkFailures).toHaveLength(1);
+
+    clearReportCapture();
+    expect(pageContext().consoleErrors).toEqual([]);
+    expect(pageContext().networkFailures).toEqual([]);
+
+    console.error('after');
+    await wfetch('/api/rates');
+    expect(pageContext().consoleErrors).toEqual(['after']);
+    expect(pageContext().networkFailures).toEqual(['GET /api/rates → 502']);
   });
 });

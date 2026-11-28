@@ -701,6 +701,25 @@ Deliberate choices worth knowing:
   had to run with `diagnostics: false` until this landed, nearly every call it
   makes is addressed by child UUID, and `POST /api/kids/<uuid>/buy → 400` was
   going into public issues.)
+- **Key material is redacted too** (unreleased, lands in the release after
+  v0.34.1). A console error can quote a private key or an HTLC preimage, and
+  until this the scrubber let both through. Now, from the same three places:
+
+  | shape | rule | becomes |
+  |---|---|---|
+  | long hex, with or without `0x` | 32 or more hex digits in a row | `[hex redacted]` |
+  | base64 and base64url | 40 or more characters in a row that mix upper case, lower case and a digit | `[base64 redacted]` |
+  | seed phrase | 12 or more lowercase words of 3 to 8 letters, with only whitespace, commas, quotes, square brackets, digits or dots between them | `[seed phrase redacted]` |
+
+  Captured lines are scrubbed as they enter the buffer, not only at send, so
+  the buffer never holds a key. What it costs: a transaction hash or a checksum
+  is long hex and goes as well, and a 40 character path that mixes case and
+  digits reads as base64. The seed rule covers a phrase on one line, as a JSON
+  array (what `console.error(words)` is captured as), comma separated, one word
+  per line, and numbered. So a logged array or list of twelve or more short
+  lowercase strings goes too, whatever it was. It runs on captured lines only.
+  Twelve plain lowercase words is also what a typed sentence looks like, so the
+  description and the issue draft are left out of it.
 - **No draft to approve.** The service can hand back an editable issue draft; the
   sheet files straight through. Asking a parent to proofread a GitHub issue is
   not a review step, it is an obstacle.
@@ -708,6 +727,20 @@ Deliberate choices worth knowing:
 Pass a function instead (`reportBug: () => openMyOwnForm()`) to keep the row and
 render your own UI. `openReportBugSheet`, `submitToBot`, `submitFeedback` and
 `validateFeedbackInput` are exported for hosts with another entry point.
+
+**Clearing what was captured.** `clearReportCapture()` empties both buffers and
+leaves the hooks installed, so capture carries on from nothing. Call it when the
+page has just handled something that must not ride along with a later report:
+
+```ts
+import { clearReportCapture } from 'nimiq-app-shell';
+
+await importPrivateKey(file);   // or a seed phrase screen, a logout, an account switch
+clearReportCapture();
+```
+
+The scrubber only knows the shapes in the table above. This is for everything
+else, and it is the host's call because only the host knows when that moment is.
 
 ---
 

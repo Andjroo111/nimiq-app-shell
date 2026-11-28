@@ -14,6 +14,8 @@
 // Bounded on purpose: ring buffers, short stacks, paths without origins. This
 // leaves the device, so it is a debugging aid, not a session recording.
 
+import { scrubCaptured } from './report-scrub';
+
 const MAX_ERRORS = 20;
 const MAX_FAILURES = 12;
 
@@ -21,8 +23,12 @@ const consoleErrors: string[] = [];
 const networkFailures: string[] = [];
 let installed = false;
 
+/** Every line is scrubbed on its way IN, not only when a report is sent. A
+ *  console error can quote a private key or an HTLC preimage, and a buffer that
+ *  holds one until somebody files a report is a second copy of the secret that
+ *  any script on the page could reach through `pageContext()`. */
 function push(list: string[], line: string, cap: number): void {
-  list.push(line);
+  list.push(scrubCaptured(line));
   if (list.length > cap) list.shift();
 }
 
@@ -148,6 +154,18 @@ export function pageContext(hasScreenshot = false): PageContext {
     networkFailures: networkFailures.slice(-10),
     hasScreenshot,
   };
+}
+
+/** Empty both ring buffers. The hooks stay installed, so capture carries on
+ *  from a clean slate.
+ *
+ *  For the moments a host knows the page has just handled something that must
+ *  not ride along with a later report: after a key import or export, a seed
+ *  phrase screen, a logout, an account switch. The scrubber catches the shapes
+ *  it knows; this is for everything else. */
+export function clearReportCapture(): void {
+  consoleErrors.length = 0;
+  networkFailures.length = 0;
 }
 
 /** Test seam. */
