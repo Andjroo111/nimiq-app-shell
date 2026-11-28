@@ -1,8 +1,12 @@
 // Move the whole fleet to a new mini-wallet release.
 //
 //   bun run bump-fleet -- v0.20.4 --dry-run
-//   bun run bump-fleet -- v0.20.4
-//   bun run bump-fleet -- v0.20.4 --only nimiq.gift,swellet --no-pr
+//   bun run bump-fleet -- v0.20.4 --note "Fixes the copy button on iOS. No API change."
+//   bun run bump-fleet -- v0.20.4 --note "..." --only nimiq.gift,swellet --no-pr
+//
+// --note is what this release changes for an app, in one line. It is REQUIRED on
+// any run that writes, and it is the only sentence about the release in the
+// CHANGELOG entry, the commit message and the PR body (see bump-text.ts for why).
 //
 // It opens a PR per app and NEVER merges. The gate stays where it was: CI on each
 // repo, and Andrew on the merge button.
@@ -28,11 +32,13 @@
 //     from the string that was written into package.json
 //   - an app that commits its artifact must show that artifact actually moved
 //   - a commit is confirmed by re-reading HEAD, never by the fact the call returned
+//   - what the release changed: there is no default note, and no "No API change"
 
 import { $ } from 'bun';
 import { copyFileSync, existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
+import { changelogEntry, commitMessage, noteProblem, prBody, type Bump } from './bump-text';
 import { FLEET, SALE_VENDOR, type App } from './fleet';
 
 const ROOT = new URL('..', import.meta.url).pathname;
@@ -44,17 +50,31 @@ const version = argv.find((a) => /^v\d+\.\d+\.\d+$/.test(a));
 const dryRun = argv.includes('--dry-run');
 const noPr = argv.includes('--no-pr');
 const keepWorktrees = argv.includes('--keep-worktrees');
-const onlyArg = argv.find((a) => a.startsWith('--only'));
-const only = onlyArg
-  ? (onlyArg.includes('=') ? onlyArg.split('=')[1]! : argv[argv.indexOf(onlyArg) + 1] ?? '')
-      .split(',').map((s) => s.trim()).filter(Boolean)
-  : null;
+/** The value of `--name value` or `--name=value`, or undefined when the flag is absent. */
+const flag = (name: string): string | undefined => {
+  const i = argv.findIndex((a) => a === name || a.startsWith(`${name}=`));
+  if (i < 0) return undefined;
+  return argv[i]!.includes('=') ? argv[i]!.slice(name.length + 1) : argv[i + 1] ?? '';
+};
+const onlyArg = flag('--only');
+const only = onlyArg === undefined ? null : onlyArg.split(',').map((s) => s.trim()).filter(Boolean);
+const note = flag('--note');
 
 if (!version) {
-  console.error('usage: bun run bump-fleet -- v0.20.4 [--dry-run] [--only a,b] [--no-pr] [--keep-worktrees]');
+  console.error('usage: bun run bump-fleet -- v0.20.4 --note "what this release changes" [--dry-run] [--only a,b] [--no-pr] [--keep-worktrees]');
   process.exit(2);
 }
 const bare = version.slice(1); // 0.20.4
+
+// A dry run writes nothing, so it needs no note; if one is given it is still
+// checked, so the plan and the real run fail on the same input.
+const noteWrong = dryRun && note === undefined ? null : noteProblem(note);
+if (noteWrong) {
+  console.error(`✗ --note cannot be used: ${noteWrong}.`);
+  console.error('  Say what this release changes for an app, in one line. It goes into every');
+  console.error('  CHANGELOG entry, commit message and PR body, so read the release diff first.');
+  process.exit(2);
+}
 
 const apps = FLEET.filter((a) => !only || only.includes(a.repo));
 if (only && apps.length !== only.length) {
@@ -163,15 +183,12 @@ function bumpPatch(dir: string): string {
   return next;
 }
 
-function prependChangelog(dir: string, appVersion: string, from: string): void {
+function prependChangelog(dir: string, appVersion: string, bump: Bump): void {
   const p = join(dir, 'CHANGELOG.md');
   if (!existsSync(p)) return;
   const s = readFileSync(p, 'utf8');
   const at = s.search(/^## /m);
-  const entry =
-    `## [${appVersion}] — app-shell ${version}\n\n` +
-    `- Pins the mini wallet at \`${version}\`, up from \`${from}\`. No API change; the mount\n` +
-    `  call and every option are the same.\n\n`;
+  const entry = changelogEntry(bump, appVersion);
   writeFileSync(p, at < 0 ? s + '\n' + entry : s.slice(0, at) + entry + s.slice(at));
 }
 
@@ -241,6 +258,8 @@ for (const app of apps) {
   }
 
   const branch = `chore/app-shell-${version}`;
+  // `note` passed noteProblem above on every path that reaches here.
+  const bump: Bump = { version, from, note: note! };
   let work = app.dir;
   let wt: string | null = null;
 
@@ -336,7 +355,7 @@ for (const app of apps) {
     let appVersion = '';
     if (app.law) {
       appVersion = bumpPatch(work);
-      prependChangelog(work, appVersion, from);
+      prependChangelog(work, appVersion, bump);
     }
 
     // ---- gates --------------------------------------------------------------
@@ -365,19 +384,7 @@ for (const app of apps) {
     const staged = await sh(work, 'git diff --cached --name-only');
     if (!staged.out) throw new Error('nothing staged after a bump that reported changes');
 
-    const msg =
-      `chore: point the mini wallet at app-shell ${version}\n\n` +
-      `${from} to ${version}. ` +
-      (app.model === 'cdn'
-        ? 'One CDN URL; nothing here is vendored, so the browser picks up the new bundle on the next load.'
-        : app.model === 'vendor-file'
-          ? `${SALE_VENDOR} replaced with the ${version} dist. No dep and no build script, so the copy IS the upgrade.`
-          : app.commitsArtifact
-            ? 'The committed bundle is REBUILT, without which the bump is a no-op live.'
-            : 'The browser bundle is gitignored here and built at deploy time, so there is nothing to commit but the pin. It was built and its resolution checked anyway.') +
-      `\n\nNo API change. The mount call and every option are the same.\n` +
-      (app.worktree ? `\nDone in a git worktree, so this repo's checkout was not disturbed.\n` : '') +
-      `\nOpened by scripts/bump-fleet.ts.\n`;
+    const msg = commitMessage(bump, app, SALE_VENDOR);
     writeFileSync('/tmp/bump-fleet-msg.txt', msg);
     await sh(work, 'git commit -q -F /tmp/bump-fleet-msg.txt');
 
@@ -391,11 +398,7 @@ for (const app of apps) {
     if (!noPr) {
       const push = await sh(work, `git push -q -u origin ${branch}`);
       if (!push.ok) throw new Error(`push: ${push.out.slice(-200)}`);
-      const body =
-        `Pins the mini wallet at \`${version}\`, up from \`${from}\`.\n\n` +
-        (app.commitsArtifact ? 'The committed bundle is REBUILT — without that rebuild the bump is a no-op live.\n\n' : '') +
-        'No API change. The mount call and every option are the same.\n\n' +
-        'Opened by `scripts/bump-fleet.ts` in nimiq-app-shell. **Not auto-merged.**\n';
+      const body = prBody(bump, app);
       writeFileSync('/tmp/bump-fleet-body.txt', body);
       const made = await sh(work,
         `gh pr create --title "Point the mini wallet at app-shell ${version}" --body-file /tmp/bump-fleet-body.txt`);

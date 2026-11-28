@@ -452,10 +452,16 @@ the pin, installs, rebuilds the committed artifact, applies that repo's
 version-and-CHANGELOG law, runs its gates, commits and opens a PR. It NEVER merges.
 
 ```
-bun run bump-fleet -- v0.20.4 --dry-run          # the plan, nothing written
-bun run bump-fleet -- v0.20.4                    # PR per app
-bun run bump-fleet -- v0.20.4 --only swellet --no-pr
+bun run bump-fleet -- v0.20.4 --dry-run                    # the plan, nothing written
+bun run bump-fleet -- v0.20.4 --note "..."                 # PR per app
+bun run bump-fleet -- v0.20.4 --note "..." --only swellet --no-pr
 ```
+
+`--note` is required on any run that writes: one line saying what the release changes
+for an app. It is the only sentence about the release in the CHANGELOG entry, the commit
+message and the PR body. There is no default, because the old hard coded "No API change"
+went out on seven v0.34.2 PRs when that release added an export and changed what bug
+report text is sent.
 
 The registry is `scripts/fleet.ts`, one record per app: model, build script, whether
 the artifact is COMMITTED, whether the repo's law applies, its gate names, and whether
