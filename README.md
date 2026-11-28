@@ -701,8 +701,8 @@ Deliberate choices worth knowing:
   had to run with `diagnostics: false` until this landed, nearly every call it
   makes is addressed by child UUID, and `POST /api/kids/<uuid>/buy → 400` was
   going into public issues.)
-- **Key material is redacted too** (unreleased, lands in the release after
-  v0.34.1). A console error can quote a private key or an HTLC preimage, and
+- **Key material is redacted too** (v0.34.2). A console error can quote a
+  private key or an HTLC preimage, and
   until this the scrubber let both through. Now, from the same three places:
 
   | shape | rule | becomes |
