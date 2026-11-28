@@ -42,19 +42,34 @@ function looksEncoded(run: string): boolean {
   return /[A-Z]/.test(run) && /[a-z]/.test(run) && /[0-9]/.test(run);
 }
 
-/** Twelve or more lowercase words of 3 to 8 letters, single spaces between:
- *  the shape of a BIP39 recovery phrase (12 to 24 words, and every word on the
- *  list is 3 to 8 letters).
+/** Twelve or more lowercase words of 3 to 8 letters in a row: the shape of a
+ *  BIP39 recovery phrase (12 to 24 words, and every word on the list is 3 to 8
+ *  letters).
+ *
+ *  What may sit BETWEEN two words is any run of whitespace, commas, quotes,
+ *  square brackets, digits and dots. A single space was the first version, and
+ *  it missed the form the capture itself produces: `console.error(words)` goes
+ *  through `safeStr`, which is JSON.stringify, so an array of words lands as
+ *  `["abandon","ability",…]` with no space in it. The same class covers a comma
+ *  separated list, one word per line, and a numbered backup sheet
+ *  (`1. abandon 2. ability`).
  *
  *  A heuristic, because the real test is the 2048 word list and that is 13 KB
- *  in a bundle every fleet app loads. The false positive is a stretch of plain
- *  prose with twelve such words in a row and no capital, digit, punctuation or
- *  one or two letter word (`a`, `is`, `to`, `of`) among them. Console errors
- *  rarely read like that; sentences people type often do, which is why this
- *  runs on captured lines only and not on the description or the issue draft.
+ *  in a bundle every fleet app loads. The false positives are a stretch of
+ *  plain prose with twelve such words in a row and no capital, colon, bracket
+ *  or one or two letter word (`a`, `is`, `to`, `of`) among them, where a comma
+ *  or a full stop no longer ends the run; and any JSON array or comma separated
+ *  list of twelve or more short lowercase strings (a list of locale names, of
+ *  CSS classes without hyphens, of enum values). Stack traces stay readable:
+ *  every frame carries `at`, a capital, a colon, a slash or a parenthesis.
+ *  Console errors rarely read like a word list; sentences people type often do,
+ *  which is why this runs on captured lines only and not on the description or
+ *  the issue draft.
  *
- *  The leading character is captured rather than looked behind at, for Safari. */
-const SEED_PHRASE = /(^|[^a-z])(?:[a-z]{3,8} ){11,}[a-z]{3,8}(?![a-z])/g;
+ *  Each word ends where the separator class begins and the two share no
+ *  character, so there is one way to match and no backtracking blowup. The
+ *  leading character is captured rather than looked behind at, for Safari. */
+const SEED_PHRASE = /(^|[^a-z])(?:[a-z]{3,8}[\s,'"[\]\d.]+){11,}[a-z]{3,8}(?![a-z])/g;
 
 /** Redact anything identifier-shaped or secret-shaped: NQ addresses (spaced and
  *  compact forms), UUIDs, long hex runs and long base64 runs. This runs

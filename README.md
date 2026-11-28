@@ -709,13 +709,16 @@ Deliberate choices worth knowing:
   |---|---|---|
   | long hex, with or without `0x` | 32 or more hex digits in a row | `[hex redacted]` |
   | base64 and base64url | 40 or more characters in a row that mix upper case, lower case and a digit | `[base64 redacted]` |
-  | seed phrase | 12 or more lowercase words of 3 to 8 letters, single spaces between | `[seed phrase redacted]` |
+  | seed phrase | 12 or more lowercase words of 3 to 8 letters, with only whitespace, commas, quotes, square brackets, digits or dots between them | `[seed phrase redacted]` |
 
   Captured lines are scrubbed as they enter the buffer, not only at send, so
   the buffer never holds a key. What it costs: a transaction hash or a checksum
   is long hex and goes as well, and a 40 character path that mixes case and
-  digits reads as base64. The seed rule runs on captured lines only. Twelve
-  plain lowercase words is also what a typed sentence looks like, so the
+  digits reads as base64. The seed rule covers a phrase on one line, as a JSON
+  array (what `console.error(words)` is captured as), comma separated, one word
+  per line, and numbered. So a logged array or list of twelve or more short
+  lowercase strings goes too, whatever it was. It runs on captured lines only.
+  Twelve plain lowercase words is also what a typed sentence looks like, so the
   description and the issue draft are left out of it.
 - **No draft to approve.** The service can hand back an editable issue draft; the
   sheet files straight through. Asking a parent to proofread a GitHub issue is

@@ -11,6 +11,7 @@
 // non-DOM runtime, and this repo has no DOM harness by convention.
 import { afterEach, beforeEach, describe, expect, test } from 'bun:test';
 import { _resetCaptureForTests, clearReportCapture, installReportCapture, pageContext } from './report-capture';
+import * as shell from '../index';
 
 type Loose = Record<string, unknown>;
 const g = globalThis as unknown as Loose;
@@ -249,6 +250,111 @@ describe('installReportCapture: what it records, and what it leaves out', () => 
     const eleven = SEED.split(' ').slice(0, 11).join(' ');
     console.error(eleven);
     expect(pageContext().consoleErrors).toEqual([eleven]);
+  });
+
+  // The forms a phrase takes when it is not typed out on one line. The first is
+  // the one this capture produces by itself: safeStr JSON-encodes an array, so
+  // `console.error(words)` holds no space at all between two words.
+  const WORDS = SEED.split(' ');
+
+  test('a seed phrase logged as an array never enters the buffer', () => {
+    installReportCapture();
+    console.error(WORDS);
+    console.error('import failed', { words: WORDS.slice(0, 12) });
+    const errs = pageContext().consoleErrors;
+    expect(errs).toEqual(['["[seed phrase redacted]"]', 'import failed {"words":["[seed phrase redacted]"]}']);
+    expect(errs.join('\n')).not.toContain('abandon');
+  });
+
+  // Rows of six, as a backup sheet lays them out: here the square brackets sit
+  // BETWEEN words. And the single quoted form an inspector prints.
+  test('an array in rows, or printed with single quotes, never enters it either', () => {
+    installReportCapture();
+    console.error([WORDS.slice(0, 6), WORDS.slice(6, 12)]);
+    console.error(`[ ${WORDS.slice(0, 12).map((w) => `'${w}'`).join(', ')} ]`);
+    expect(pageContext().consoleErrors).toEqual(['[["[seed phrase redacted]"]]', "[ '[seed phrase redacted]' ]"]);
+  });
+
+  test('a comma separated seed phrase never enters the buffer', () => {
+    installReportCapture();
+    console.error(`mnemonic: ${WORDS.join(', ')}`);
+    console.error(WORDS.join(','));
+    expect(pageContext().consoleErrors).toEqual(['mnemonic: [seed phrase redacted]', '[seed phrase redacted]']);
+  });
+
+  test('a seed phrase with one word per line never enters the buffer', () => {
+    installReportCapture();
+    console.error(`backup:\n${WORDS.join('\n')}`);
+    console.error(WORDS.join('\r\n'));
+    expect(pageContext().consoleErrors).toEqual(['backup:\n[seed phrase redacted]', '[seed phrase redacted]']);
+  });
+
+  test('a numbered seed phrase never enters the buffer', () => {
+    installReportCapture();
+    console.error(WORDS.map((w, i) => `${i + 1}. ${w}`).join(' '));
+    console.error(WORDS.map((w, i) => `${i + 1} ${w}`).join('\n'));
+    const errs = pageContext().consoleErrors;
+    expect(errs).toEqual(['1. [seed phrase redacted]', '1 [seed phrase redacted]']);
+    expect(errs.join('\n')).not.toContain('abandon');
+  });
+
+  test('eleven words are left alone in every one of those forms', () => {
+    installReportCapture();
+    const eleven = WORDS.slice(0, 11);
+    const lines = [JSON.stringify(eleven), eleven.join(', '), eleven.join('\n'), eleven.map((w, i) => `${i + 1}. ${w}`).join(' ')];
+    for (const line of lines) console.error(line);
+    expect(pageContext().consoleErrors).toEqual(lines);
+  });
+
+  // The wider separator is what could eat a stack: dots, digits and newlines
+  // now join words. Every frame still breaks the run, with `at`, a capital, a
+  // colon, a slash or a parenthesis.
+  test('a normal multi-line stack trace survives', () => {
+    installReportCapture();
+    const chrome = [
+      "TypeError: Cannot read properties of undefined (reading 'balance')",
+      '    at renderBalance (https://nimiq.cool/assets/index.js:120:15)',
+      '    at async loadWallet (https://nimiq.cool/assets/index.js:98:5)',
+      '    at async mount (https://nimiq.cool/assets/index.js:41:3)',
+      '    at https://nimiq.cool/assets/vendor.js:7:1024',
+      '    at new Promise (<anonymous>)',
+      '    at update (https://nimiq.cool/assets/vendor.js:7:980)',
+      '    at flush (https://nimiq.cool/assets/vendor.js:7:455)',
+      '    at render (https://nimiq.cool/assets/vendor.js:6:12)',
+      '    at patch (https://nimiq.cool/assets/vendor.js:6:8)',
+      '    at mount (https://nimiq.cool/assets/vendor.js:5:77)',
+      '    at start (https://nimiq.cool/assets/vendor.js:5:3)',
+      '    at main (https://nimiq.cool/assets/index.js:1:1)',
+    ].join('\n');
+    const firefox = [
+      'render@https://nimiq.cool/assets/index.js:120:15',
+      'async*load@https://nimiq.cool/assets/index.js:98:5',
+      'mount@https://nimiq.cool/assets/index.js:41:3',
+      'update@https://nimiq.cool/assets/vendor.js:7:980',
+      'flush@https://nimiq.cool/assets/vendor.js:7:455',
+      'patch@https://nimiq.cool/assets/vendor.js:6:8',
+      'start@https://nimiq.cool/assets/vendor.js:5:3',
+      'main@https://nimiq.cool/assets/index.js:1:1',
+      'dispatch@https://nimiq.cool/assets/vendor.js:2:9',
+      'handle@https://nimiq.cool/assets/vendor.js:2:4',
+      'listen@https://nimiq.cool/assets/vendor.js:1:7',
+      'boot@https://nimiq.cool/assets/index.js:1:0',
+    ].join('\n');
+    console.error(chrome);
+    console.error(firefox);
+    fire('unhandledrejection', { reason: { message: 'request failed with status 502', stack: chrome } });
+    const errs = pageContext().consoleErrors;
+    expect(errs[0]).toBe(chrome);
+    expect(errs[1]).toBe(firefox);
+    expect(errs[2]).toBe(`Unhandled rejection: request failed with status 502\n${chrome.split('\n').slice(0, 4).join('\n')}`);
+  });
+
+  test('clearReportCapture is exported from the package root, the same function', () => {
+    expect(shell.clearReportCapture).toBe(clearReportCapture);
+    installReportCapture();
+    console.error('before');
+    shell.clearReportCapture();
+    expect(pageContext().consoleErrors).toEqual([]);
   });
 
   test('addresses and UUIDs are scrubbed at capture too, with their own labels', () => {

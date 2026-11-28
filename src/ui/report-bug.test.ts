@@ -364,6 +364,26 @@ describe('submitToBot (the nimiq.bot transport)', () => {
     expect(String(calls[1]!.body.title)).toContain('[address redacted]');
   });
 
+  // The body is the part that becomes the issue, and it is written by a service
+  // we do not run from context we sent it. Scrubbed on its way to /api/file, so
+  // nothing the draft quotes back lands in the tracker.
+  test('the draft body is scrubbed too, on its way to being filed', async () => {
+    const key = '3fa9'.repeat(16);
+    stubBot({
+      reportId: 'r1',
+      draft: {
+        title: 'Send fails',
+        body: `Console shows \`invalid preimage ${key}\` for NQ07 0000 0000 0000 0000 0000 0000 0000 0000 and 8f3c1d2e-4b5a-4c7d-8e9f-0a1b2c3d4e5f.`,
+      },
+    }, filedOk);
+    await submitToBot({ repo: 'nimiq.kids' }, valid);
+    const body = String(calls[1]!.body.body);
+    expect(body).not.toContain(key);
+    expect(body).not.toContain('NQ07');
+    expect(body).not.toContain('8f3c1d2e');
+    expect(body).toBe('Console shows `invalid preimage [hex redacted]` for [address redacted]and [id redacted].');
+  });
+
   // The report that actually got filed, reconstructed: a kid taps Buy on a pack
   // she already owns, the 400 lands in networkFailures as
   // `POST /api/kids/<uuid>/buy → 400`, and a parent files "the treasure box
